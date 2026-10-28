@@ -191,6 +191,38 @@ struct OnboardingView: View {
             )
 
             VStack(spacing: 6) {
+                Text(text("IslandX düzeni", "IslandX layout"))
+                    .font(.system(size: 13, weight: .semibold))
+
+                Picker(
+                    text("IslandX düzeni", "IslandX layout"),
+                    selection: $settings.contentMode
+                ) {
+                    ForEach(IslandContentMode.allCases) { mode in
+                        Label(
+                            mode.title(language: settings.language),
+                            systemImage: mode == .music
+                                ? "music.note"
+                                : "rectangle.split.2x1.fill"
+                        )
+                        .tag(mode)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 440)
+
+                Text(
+                    settings.contentMode.subtitle(
+                        language: settings.language
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            }
+
+            VStack(spacing: 6) {
                 Text(text("Çentik boşta görünümü", "Notch idle appearance"))
                     .font(.system(size: 13, weight: .semibold))
 

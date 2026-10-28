@@ -51,6 +51,25 @@ struct SettingsView: View {
             }
 
             Section(text("Görünüm", "Appearance")) {
+                Picker(
+                    text("IslandX düzeni", "IslandX layout"),
+                    selection: $settings.contentMode
+                ) {
+                    ForEach(IslandContentMode.allCases) { mode in
+                        Text(mode.title(language: settings.language))
+                            .tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Text(
+                    settings.contentMode.subtitle(
+                        language: settings.language
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
                 ThemeChoicePicker(
                     selection: $settings.theme,
                     language: settings.language

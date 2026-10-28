@@ -73,7 +73,8 @@ struct NotchLayout: Equatable {
 
     func size(
         for state: NotchPresentationState,
-        idleMode: NotchIdleMode = .visibleIsland
+        idleMode: NotchIdleMode = .visibleIsland,
+        contentMode: IslandContentMode = .music
     ) -> CGSize {
         switch state {
         case .idle:
@@ -89,6 +90,12 @@ struct NotchLayout: Equatable {
                 height: idleHeight
             )
         case .expanded:
+            if contentMode == .dashboard {
+                return CGSize(
+                    width: min(780, max((NSScreen.main?.frame.width ?? 804) - 24, 600)),
+                    height: hasCameraHousing ? 252 : 240
+                )
+            }
             return CGSize(
                 width: expandedWidth,
                 height: hasCameraHousing ? 136 : 124
@@ -210,6 +217,10 @@ struct DynamicNotchView: View {
             guard presentation == .idle else { return }
             onPreferredSizeChange(preferredSize, !reduceMotion)
         }
+        .onChange(of: settings.contentMode) { _ in
+            guard presentation == .expanded else { return }
+            onPreferredSizeChange(preferredSize, !reduceMotion)
+        }
         .onReceive(
             NotificationCenter.default.publisher(for: .islandXExpand)
         ) { _ in
@@ -232,6 +243,23 @@ struct DynamicNotchView: View {
             setPresentation(.idle)
         }
         .contextMenu {
+            Menu(localized("IslandX Düzeni", "IslandX Layout")) {
+                ForEach(IslandContentMode.allCases) { mode in
+                    Button {
+                        settings.contentMode = mode
+                    } label: {
+                        Label(
+                            mode.title(language: settings.language),
+                            systemImage: settings.contentMode == mode
+                                ? "checkmark"
+                                : (mode == .music
+                                    ? "music.note"
+                                    : "rectangle.split.2x1.fill")
+                        )
+                    }
+                }
+            }
+
             Menu(localized("Görünüm", "Appearance")) {
                 ForEach(AppTheme.allCases) { theme in
                     Button {
@@ -363,11 +391,281 @@ struct DynamicNotchView: View {
 
     @ViewBuilder
     private var expandedContent: some View {
-        if layout.hasCameraHousing {
+        if settings.contentMode == .dashboard {
+            dashboardExpandedContent
+        } else if layout.hasCameraHousing {
             notchedExpandedContent
         } else {
             standardExpandedContent
         }
+    }
+
+    private var dashboardExpandedContent: some View {
+        VStack(spacing: 0) {
+            dashboardNavigationRow
+
+            HStack(spacing: 18) {
+                dashboardMediaPane
+
+                Divider()
+                    .overlay(primaryColor.opacity(0.13))
+                    .padding(.vertical, 4)
+
+                dashboardTodayPane
+                    .frame(width: 238)
+            }
+            .padding(.horizontal, 22)
+            .padding(.bottom, 16)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    private var dashboardNavigationRow: some View {
+        Group {
+            if layout.hasCameraHousing {
+                HStack(spacing: 0) {
+                    dashboardNavigationLeading
+                        .padding(.trailing, 12)
+                        .frame(
+                            width: dashboardNotchWingWidth,
+                            alignment: .trailing
+                        )
+
+                    Color.clear
+                        .frame(width: layout.cameraHousingWidth)
+                        .accessibilityHidden(true)
+
+                    dashboardNavigationTrailing
+                        .padding(.leading, 12)
+                        .frame(
+                            width: dashboardNotchWingWidth,
+                            alignment: .leading
+                        )
+                }
+                .frame(height: max(layout.notchBandHeight + 8, 38))
+            } else {
+                HStack(spacing: 8) {
+                    dashboardNavigationLeading
+                    Spacer(minLength: 12)
+                    dashboardNavigationTrailing
+                }
+                .padding(.horizontal, 18)
+                .padding(.vertical, 8)
+            }
+        }
+        .foregroundStyle(primaryColor.opacity(0.78))
+        .padding(.bottom, 8)
+    }
+
+    private var dashboardNavigationLeading: some View {
+        HStack(spacing: 8) {
+            Label(localized("Ana", "Home"), systemImage: "house.fill")
+                .font(.system(size: 11, weight: .semibold))
+                .padding(.horizontal, 11)
+                .frame(height: 28)
+                .background(
+                    Capsule().fill(primaryColor.opacity(0.12))
+                )
+
+            dashboardNavigationIcon("calendar")
+            dashboardNavigationIcon("timer")
+            dashboardNavigationIcon("battery.75percent")
+        }
+    }
+
+    private var dashboardNavigationTrailing: some View {
+        HStack(spacing: 8) {
+            Text(localized("GENEL", "GENERAL"))
+                .font(.system(size: 8, weight: .bold))
+                .tracking(1.4)
+                .foregroundStyle(primaryColor.opacity(0.38))
+
+            smallUtilityButton(
+                icon: "gearshape.fill",
+                label: localized("Ayarlar", "Settings")
+            ) {
+                NotificationCenter.default.post(
+                    name: .islandXShowSettings,
+                    object: nil
+                )
+            }
+
+            smallUtilityButton(
+                icon: "chevron.up",
+                label: localized("Küçült", "Collapse")
+            ) {
+                isPinned = false
+                setPresentation(.idle)
+            }
+        }
+    }
+
+    private var dashboardNotchWingWidth: CGFloat {
+        max((preferredSize.width - layout.cameraHousingWidth) / 2, 0)
+    }
+
+    private func dashboardNavigationIcon(_ name: String) -> some View {
+        Image(systemName: name)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(primaryColor.opacity(0.5))
+            .frame(width: 28, height: 28)
+    }
+
+    private var dashboardMediaPane: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 14) {
+                sourceArtwork(size: 62, cornerRadius: 15)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(trackTitle)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(primaryColor)
+                        .lineLimit(1)
+
+                    Text(artistTitle)
+                        .font(.system(size: 12))
+                        .foregroundStyle(primaryColor.opacity(0.55))
+                        .lineLimit(1)
+
+                    PlaybackWaveform(isPlaying: mediaManager.isPlaying)
+                        .foregroundStyle(playbackIndicatorColor)
+                }
+
+                Spacer(minLength: 8)
+
+                sourceTile
+            }
+
+            progressSection
+                .offset(y: 0)
+
+            HStack(spacing: 28) {
+                compactMediaControlButton(
+                    icon: "backward.fill",
+                    label: localized("Önceki parça", "Previous track"),
+                    action: mediaManager.previousTrack
+                )
+
+                Button(action: mediaManager.togglePlayPause) {
+                    Image(systemName: mediaManager.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(panelColor)
+                        .frame(width: 44, height: 44)
+                        .background(Circle().fill(primaryColor))
+                }
+                .buttonStyle(.plain)
+
+                compactMediaControlButton(
+                    icon: "forward.fill",
+                    label: localized("Sonraki parça", "Next track"),
+                    action: mediaManager.nextTrack
+                )
+
+                Spacer()
+
+                compactPlaybackModeButton(
+                    icon: "shuffle",
+                    label: localized("Karışık çal", "Shuffle"),
+                    isActive: mediaManager.isShuffleEnabled,
+                    action: mediaManager.toggleShuffle
+                )
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var dashboardTodayPane: some View {
+        TimelineView(.periodic(from: .now, by: 60)) { context in
+            VStack(alignment: .leading, spacing: 10) {
+                Text(dashboardWeekday(context.date).uppercased())
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(1.2)
+                    .foregroundStyle(Color.red.opacity(0.85))
+
+                HStack(alignment: .firstTextBaseline) {
+                    Text(dashboardDate(context.date))
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundStyle(primaryColor)
+
+                    Spacer()
+
+                    Text(dashboardTime(context.date))
+                        .font(.system(size: 13, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(primaryColor.opacity(0.58))
+                }
+
+                dashboardSummaryCard(
+                    icon: "calendar.badge.checkmark",
+                    title: localized("Bugün için hazırsın", "You're clear for today"),
+                    subtitle: localized("Günün tadını çıkar", "Enjoy your day")
+                )
+
+                Text(localized("Sıradaki", "Up next"))
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(primaryColor.opacity(0.4))
+
+                dashboardSummaryCard(
+                    icon: "sparkles",
+                    title: localized("Yeni bir plan yok", "No upcoming plans"),
+                    subtitle: localized("Takvim bağlantısı yakında", "Calendar connection coming soon")
+                )
+            }
+        }
+    }
+
+    private func dashboardSummaryCard(
+        icon: String,
+        title: String,
+        subtitle: String
+    ) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 28, height: 28)
+                .background(Circle().fill(Color.accentColor.opacity(0.12)))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(primaryColor)
+                    .lineLimit(1)
+
+                Text(subtitle)
+                    .font(.system(size: 9))
+                    .foregroundStyle(primaryColor.opacity(0.48))
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 46)
+        .background(
+            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                .fill(primaryColor.opacity(0.075))
+        )
+    }
+
+    private func dashboardWeekday(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: settings.language == .turkish ? "tr_TR" : "en_US")
+        formatter.dateFormat = "EEEE"
+        return formatter.string(from: date)
+    }
+
+    private func dashboardDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: settings.language == .turkish ? "tr_TR" : "en_US")
+        formatter.setLocalizedDateFormatFromTemplate("d MMM")
+        return formatter.string(from: date)
+    }
+
+    private func dashboardTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = .current
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
     }
 
     /// On a MacBook display the camera housing becomes the visual centre of the
@@ -1065,7 +1363,10 @@ struct DynamicNotchView: View {
             return isPointerInside
         }
 
-        let expandedSize = layout.size(for: .expanded)
+        let expandedSize = layout.size(
+            for: .expanded,
+            contentMode: settings.contentMode
+        )
         let topGap: CGFloat = screen.safeAreaInsets.top > 0 ? 0 : 6
         let expandedFrame = NSRect(
             x: screen.frame.midX - expandedSize.width / 2,
@@ -1098,7 +1399,8 @@ struct DynamicNotchView: View {
         onPreferredSizeChange(
             layout.size(
                 for: newValue,
-                idleMode: settings.notchIdleMode
+                idleMode: settings.notchIdleMode,
+                contentMode: settings.contentMode
             ),
             !reduceMotion
         )
@@ -1114,7 +1416,8 @@ struct DynamicNotchView: View {
     private var preferredSize: CGSize {
         layout.size(
             for: presentation,
-            idleMode: settings.notchIdleMode
+            idleMode: settings.notchIdleMode,
+            contentMode: settings.contentMode
         )
     }
 
