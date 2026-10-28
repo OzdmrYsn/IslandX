@@ -799,12 +799,23 @@ struct DynamicNotchView: View {
 
     private var isPointerInsideFloatingWindow: Bool {
         guard let window = NSApp.windows.first(where: {
-            $0 is NSPanel && $0.isVisible && $0.level == .statusBar
-        }) else {
+            $0.identifier?.rawValue == "IslandXFloatingNotch"
+        }), let screen = window.screen ?? NSScreen.main else {
             return isPointerInside
         }
 
-        return window.frame.contains(NSEvent.mouseLocation)
+        let expandedSize = layout.size(for: .expanded)
+        let topGap: CGFloat = screen.safeAreaInsets.top > 0 ? 0 : 6
+        let expandedFrame = NSRect(
+            x: screen.frame.midX - expandedSize.width / 2,
+            y: screen.frame.maxY - topGap - expandedSize.height,
+            width: expandedSize.width,
+            height: expandedSize.height
+        )
+
+        return expandedFrame
+            .insetBy(dx: -4, dy: -4)
+            .contains(NSEvent.mouseLocation)
     }
 
     private func updateInteraction(_ active: Bool) {

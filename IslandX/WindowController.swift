@@ -77,6 +77,7 @@ final class FloatingNotchWindowController: NSWindowController {
         panel.acceptsMouseMovedEvents = true
         panel.ignoresMouseEvents = false
         panel.animationBehavior = .none
+        panel.identifier = NSUserInterfaceItemIdentifier("IslandXFloatingNotch")
 
         panel.isFloatingPanel = true
         panel.becomesKeyOnlyIfNeeded = true
