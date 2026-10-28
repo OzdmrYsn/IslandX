@@ -31,4 +31,8 @@ extension Notification.Name {
     static let islandXExpand = Notification.Name(
         "IslandX.expand"
     )
+
+    static let islandXCollapse = Notification.Name(
+        "IslandX.collapse"
+    )
 }

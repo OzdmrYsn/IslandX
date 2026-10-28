@@ -10,7 +10,7 @@ final class SettingsWindowController: NSWindowController {
         )
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 580, height: 660),
+            contentRect: NSRect(x: 0, y: 0, width: 580, height: 740),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -23,7 +23,7 @@ final class SettingsWindowController: NSWindowController {
         window.isReleasedWhenClosed = false
         centerOnPrimaryDisplay(
             window,
-            contentSize: NSSize(width: 580, height: 660)
+            contentSize: NSSize(width: 580, height: 740)
         )
 
         super.init(window: window)
@@ -44,7 +44,7 @@ final class SettingsWindowController: NSWindowController {
             guard let window = self?.window else { return }
             centerOnPrimaryDisplay(
                 window,
-                contentSize: NSSize(width: 580, height: 660)
+                contentSize: NSSize(width: 580, height: 740)
             )
             window.makeKeyAndOrderFront(nil)
         }

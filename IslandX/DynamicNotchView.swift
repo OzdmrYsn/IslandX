@@ -124,6 +124,8 @@ struct DynamicNotchView: View {
     @State private var isPointerInside = false
     @State private var isInteracting = false
     @State private var hoverTask: Task<Void, Never>?
+    @State private var trackChangeTask: Task<Void, Never>?
+    @State private var isTemporaryTrackPreview = false
     @State private var scrubValue: Double = 0
     @State private var isScrubbing = false
     @State private var expansionProgress: CGFloat = 0
@@ -178,7 +180,7 @@ struct DynamicNotchView: View {
             }
         }
         .contentShape(notchShape)
-        .onHover(perform: handleHover)
+        .onContinuousHover(perform: handleContinuousHover)
         .onAppear {
             scrubValue = mediaManager.playbackPosition
             expansionProgress = presentation == .expanded ? 1 : 0
@@ -186,6 +188,7 @@ struct DynamicNotchView: View {
         }
         .onDisappear {
             hoverTask?.cancel()
+            trackChangeTask?.cancel()
         }
         .onReceive(mediaManager.$playbackPosition) { newValue in
             guard !isScrubbing else { return }
@@ -195,8 +198,11 @@ struct DynamicNotchView: View {
             guard !isScrubbing else { return }
             scrubValue = min(scrubValue, max(newDuration, 0))
         }
-        .onChange(of: settings.expandOnHover) { enabled in
-            if !enabled, !isPinned, presentation == .expanded {
+        .onChange(of: settings.activationMode) { mode in
+            if mode == .click,
+               !isPinned,
+               !isTemporaryTrackPreview,
+               presentation == .expanded {
                 setPresentation(.idle)
             }
         }
@@ -208,8 +214,22 @@ struct DynamicNotchView: View {
             NotificationCenter.default.publisher(for: .islandXExpand)
         ) { _ in
             hoverTask?.cancel()
+            trackChangeTask?.cancel()
+            isTemporaryTrackPreview = false
             isPinned = true
             setPresentation(.expanded)
+        }
+        .onReceive(mediaManager.$trackChangeRevision.dropFirst()) { _ in
+            showTrackChangePreviewIfNeeded()
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .islandXCollapse)
+        ) { _ in
+            hoverTask?.cancel()
+            trackChangeTask?.cancel()
+            isTemporaryTrackPreview = false
+            isPinned = false
+            setPresentation(.idle)
         }
         .contextMenu {
             Menu(localized("Görünüm", "Appearance")) {
@@ -244,6 +264,21 @@ struct DynamicNotchView: View {
                 }
             }
 
+            Menu(localized("Açılma Davranışı", "Opening Behavior")) {
+                ForEach(NotchActivationMode.allCases) { mode in
+                    Button {
+                        settings.activationMode = mode
+                    } label: {
+                        Label(
+                            mode.title(language: settings.language),
+                            systemImage: settings.activationMode == mode
+                                ? "checkmark"
+                                : "cursorarrow.motionlines"
+                        )
+                    }
+                }
+            }
+
             Button(localized("Ayarlar…", "Settings…")) {
                 NotificationCenter.default.post(
                     name: .islandXShowSettings,
@@ -266,6 +301,8 @@ struct DynamicNotchView: View {
     private var compactContent: some View {
         Button {
             hoverTask?.cancel()
+            trackChangeTask?.cancel()
+            isTemporaryTrackPreview = false
             isPinned = true
             setPresentation(.expanded)
         } label: {
@@ -341,7 +378,7 @@ struct DynamicNotchView: View {
             notchAccessoryRow
 
             HStack(spacing: 10) {
-                artwork(size: 52, cornerRadius: 14)
+                sourceArtwork(size: 52, cornerRadius: 14)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(trackTitle)
@@ -419,6 +456,8 @@ struct DynamicNotchView: View {
                     label: localized("Medya kontrollerini küçült", "Collapse media controls")
                 ) {
                     hoverTask?.cancel()
+                    trackChangeTask?.cancel()
+                    isTemporaryTrackPreview = false
                     isPinned = false
                     setPresentation(.idle)
                 }
@@ -430,18 +469,24 @@ struct DynamicNotchView: View {
     }
 
     private var sourceTile: some View {
-        VStack(spacing: 2) {
-            Image(systemName: sourceSymbolName)
-                .font(.system(size: 15, weight: .semibold))
+        Button(action: mediaManager.openSourceApplication) {
+            VStack(spacing: 2) {
+                Image(systemName: sourceSymbolName)
+                    .font(.system(size: 15, weight: .semibold))
 
-            Text(sourceShortName)
-                .font(.system(size: 7, weight: .semibold))
-                .lineLimit(1)
+                Text(sourceShortName)
+                    .font(.system(size: 7, weight: .semibold))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(primaryColor.opacity(0.72))
+            .frame(width: 48, height: 48)
+            .background(Circle().fill(primaryColor.opacity(0.08)))
         }
-        .foregroundStyle(primaryColor.opacity(0.72))
-        .frame(width: 48, height: 48)
-        .background(Circle().fill(primaryColor.opacity(0.08)))
-        .accessibilityElement(children: .combine)
+        .buttonStyle(.plain)
+        .disabled(mediaManager.source == .none)
+        .opacity(mediaManager.source == .none ? 0.5 : 1)
+        .accessibilityLabel(Text(openSourceLabel))
+        .help(openSourceLabel)
     }
 
     private var sourceSymbolName: String {
@@ -457,6 +502,17 @@ struct DynamicNotchView: View {
         case .appleMusic: "Music"
         case .spotify: "Spotify"
         case .none: localized("Medya", "Media")
+        }
+    }
+
+    private var openSourceLabel: String {
+        switch mediaManager.source {
+        case .appleMusic:
+            localized("Music'te aç", "Open in Music")
+        case .spotify:
+            localized("Spotify'da aç", "Open in Spotify")
+        case .none:
+            localized("Medya uygulamasını aç", "Open media app")
         }
     }
 
@@ -531,7 +587,7 @@ struct DynamicNotchView: View {
 
     private var trackHeader: some View {
         HStack(alignment: .center, spacing: 10) {
-            artwork(size: 52, cornerRadius: 11)
+            sourceArtwork(size: 52, cornerRadius: 11)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(trackTitle)
@@ -577,6 +633,8 @@ struct DynamicNotchView: View {
                     label: "Collapse media controls"
                 ) {
                     hoverTask?.cancel()
+                    trackChangeTask?.cancel()
+                    isTemporaryTrackPreview = false
                     isPinned = false
                     setPresentation(.idle)
                 }
@@ -748,6 +806,19 @@ struct DynamicNotchView: View {
         .accessibilityHidden(true)
     }
 
+    private func sourceArtwork(
+        size: CGFloat,
+        cornerRadius: CGFloat
+    ) -> some View {
+        Button(action: mediaManager.openSourceApplication) {
+            artwork(size: size, cornerRadius: cornerRadius)
+        }
+        .buttonStyle(.plain)
+        .disabled(mediaManager.source == .none)
+        .accessibilityLabel(Text(openSourceLabel))
+        .help(openSourceLabel)
+    }
+
     private func mediaControlButton(
         icon: String,
         label: String,
@@ -862,13 +933,96 @@ struct DynamicNotchView: View {
 
     // MARK: - Interaction and State
 
-    private func handleHover(_ isInside: Bool) {
-        isPointerInside = isInside
-        hoverTask?.cancel()
+    private func handleContinuousHover(_ phase: HoverPhase) {
+        switch phase {
+        case let .active(location):
+            isPointerInside = true
+            hoverTask?.cancel()
 
-        guard settings.expandOnHover else { return }
-        guard !isPinned, !isInteracting else { return }
-        schedulePresentation(isInside ? .expanded : .idle)
+            guard presentation == .idle,
+                  !isPinned,
+                  !isInteracting else {
+                return
+            }
+
+            let shouldExpand: Bool
+            switch settings.activationMode {
+            case .hover:
+                shouldExpand = true
+            case .click:
+                shouldExpand = false
+            case .activationZone:
+                shouldExpand = isInsideActivationZone(location)
+            }
+
+            if shouldExpand {
+                isTemporaryTrackPreview = false
+                schedulePresentation(.expanded)
+            }
+
+        case .ended:
+            isPointerInside = false
+            hoverTask?.cancel()
+
+            guard !isPinned, !isInteracting else { return }
+            guard presentation == .expanded else { return }
+
+            if settings.activationMode != .click || isTemporaryTrackPreview {
+                schedulePresentation(.idle)
+            }
+        }
+    }
+
+    private func isInsideActivationZone(_ location: CGPoint) -> Bool {
+        let zoneWidth: CGFloat
+        if layout.hasCameraHousing {
+            zoneWidth = min(
+                layout.cameraHousingWidth + 24,
+                preferredSize.width
+            )
+        } else {
+            zoneWidth = min(76, preferredSize.width)
+        }
+
+        return abs(location.x - preferredSize.width / 2) <= zoneWidth / 2
+    }
+
+    private func showTrackChangePreviewIfNeeded() {
+        guard settings.showOnTrackChange,
+              mediaManager.hasActiveTrack,
+              !isPinned else {
+            return
+        }
+
+        hoverTask?.cancel()
+        trackChangeTask?.cancel()
+        isTemporaryTrackPreview = true
+        setPresentation(.expanded)
+
+        let delay = UInt64(
+            settings.trackChangeDisplayDuration * 1_000_000_000
+        )
+        trackChangeTask = Task { @MainActor in
+            do {
+                try await Task<Never, Never>.sleep(nanoseconds: delay)
+            } catch {
+                return
+            }
+
+            guard !Task.isCancelled,
+                  !isPinned,
+                  !isInteracting else {
+                return
+            }
+
+            guard !isPointerInsideFloatingWindow else {
+                isPointerInside = true
+                return
+            }
+
+            isTemporaryTrackPreview = false
+            setPresentation(.idle)
+        }
     }
 
     private func schedulePresentation(_ state: NotchPresentationState) {
@@ -932,6 +1086,11 @@ struct DynamicNotchView: View {
 
     private func setPresentation(_ newValue: NotchPresentationState) {
         guard newValue != presentation else { return }
+
+        if newValue == .idle {
+            trackChangeTask?.cancel()
+            isTemporaryTrackPreview = false
+        }
 
         onPreferredSizeChange(
             layout.size(

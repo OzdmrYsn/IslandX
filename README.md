@@ -17,6 +17,9 @@ IslandX, Music ve Spotify kontrollerini MacBook'un kamera çentiğiyle bütünle
 - Akıcı kompakt/genişletilmiş görünüm geçişi
 - Music ve Spotify parça, sanatçı ve kapak bilgileri
 - Oynat/duraklat, önceki/sonraki, karışık çal, tekrar, ilerleme ve sistem sesi kontrolleri
+- Üzerine gelme, tıklama veya çentiğin orta etkin alanıyla seçilebilir açılma davranışı
+- Şarkı değiştiğinde süreli gösterim ve tam ekran uygulamalarda isteğe bağlı gizleme
+- Albüm kapağı veya kaynak rozetinden çalan parçayı Music/Spotify'da açma
 - Sistem, Beyaz, Siyah ve desteklenen macOS sürümlerinde Liquid Glass görünümü
 - Türkçe/İngilizce ilk kurulum rehberi
 - Açılışta başlatma ve Sparkle tabanlı imzalı güncellemeler
@@ -48,6 +51,9 @@ IslandX is a SwiftUI + AppKit app that blends Music and Spotify controls into th
 - Fluid compact/expanded transitions
 - Track, artist, and artwork from Music and Spotify
 - Play/pause, previous/next, shuffle, repeat, progress, and system-volume controls
+- Selectable hover, click, or center-zone opening behavior
+- Timed track-change previews and optional hiding over full-screen apps
+- Open the current track in Music or Spotify from its artwork or source badge
 - System, White, Black, and Liquid Glass appearances on supported macOS versions
 - Turkish and English first-run guide
 - Launch at login and signed Sparkle updates

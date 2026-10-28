@@ -220,14 +220,36 @@ struct OnboardingView: View {
                 .multilineTextAlignment(.center)
             }
 
-            Toggle(
-                text(
-                    "Üzerine geldiğimde IslandX'i otomatik genişlet",
-                    "Expand IslandX automatically when I hover"
-                ),
-                isOn: $settings.expandOnHover
-            )
-            .toggleStyle(.switch)
+            VStack(spacing: 6) {
+                HStack {
+                    Text(text("Açılma davranışı", "Opening behavior"))
+                        .font(.system(size: 13, weight: .semibold))
+
+                    Spacer()
+
+                    Picker(
+                        text("Açılma davranışı", "Opening behavior"),
+                        selection: $settings.activationMode
+                    ) {
+                        ForEach(NotchActivationMode.allCases) { mode in
+                            Text(mode.title(language: settings.language))
+                                .tag(mode)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 230)
+                }
+
+                Text(
+                    settings.activationMode.subtitle(
+                        language: settings.language
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: 460)
 
             Spacer(minLength: 0)
         }

@@ -78,12 +78,56 @@ struct SettingsView: View {
             }
 
             Section(text("Etkileşim", "Interaction")) {
+                Picker(
+                    text("Açılma davranışı", "Opening behavior"),
+                    selection: $settings.activationMode
+                ) {
+                    ForEach(NotchActivationMode.allCases) { mode in
+                        Text(mode.title(language: settings.language))
+                            .tag(mode)
+                    }
+                }
+
+                Text(
+                    settings.activationMode.subtitle(
+                        language: settings.language
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
                 Toggle(
                     text(
-                        "İşaretçi IslandX'e geldiğinde genişlet",
-                        "Expand when the pointer reaches IslandX"
+                        "Şarkı değiştiğinde geçici olarak göster",
+                        "Temporarily show when the track changes"
                     ),
-                    isOn: $settings.expandOnHover
+                    isOn: $settings.showOnTrackChange
+                )
+
+                if settings.showOnTrackChange {
+                    LabeledContent(text("Gösterim süresi", "Display duration")) {
+                        HStack(spacing: 10) {
+                            Slider(
+                                value: $settings.trackChangeDisplayDuration,
+                                in: 2...8,
+                                step: 0.5
+                            )
+                            .frame(width: 170)
+
+                            Text("\(settings.trackChangeDisplayDuration, specifier: "%.1f") s")
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                                .frame(width: 48, alignment: .trailing)
+                        }
+                    }
+                }
+
+                Toggle(
+                    text(
+                        "Tam ekran uygulamalarda IslandX'i gizle",
+                        "Hide IslandX over full-screen apps"
+                    ),
+                    isOn: $settings.hideInFullScreen
                 )
 
                 LabeledContent(text("Otomatik kapanma gecikmesi", "Automatic collapse delay")) {
@@ -163,7 +207,7 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .padding(16)
-        .frame(width: 580, height: 660)
+        .frame(width: 580, height: 740)
         .preferredColorScheme(settings.theme.colorScheme)
     }
 

@@ -13,7 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem?
     private var themeMenuItems: [AppTheme: NSMenuItem] = [:]
     private var notchModeMenuItems: [NotchIdleMode: NSMenuItem] = [:]
-    private var expandOnHoverMenuItem: NSMenuItem?
+    private var activationModeMenuItems: [NotchActivationMode: NSMenuItem] = [:]
     private var launchAtLoginMenuItem: NSMenuItem?
     private var checkForUpdatesMenuItem: NSMenuItem?
     private var cancellables = Set<AnyCancellable>()
@@ -81,8 +81,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         for (mode, item) in notchModeMenuItems {
             item.state = settings.notchIdleMode == mode ? .on : .off
         }
+        for (mode, item) in activationModeMenuItems {
+            item.state = settings.activationMode == mode ? .on : .off
+        }
 
-        expandOnHoverMenuItem?.state = settings.expandOnHover ? .on : .off
         launchAtLoginMenuItem?.state = settings.launchAtLogin ? .on : .off
         checkForUpdatesMenuItem?.isEnabled = updateManager.canCheckForUpdates
     }
@@ -123,6 +125,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         themeMenuItems.removeAll()
         notchModeMenuItems.removeAll()
+        activationModeMenuItems.removeAll()
 
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = item.button {
@@ -184,12 +187,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         notchModeItem.submenu = notchModeMenu
         menu.addItem(notchModeItem)
 
-        let hoverItem = menuItem(
-            title: localized("Üzerine Gelince Genişlet", "Expand on Hover"),
-            action: #selector(toggleExpandOnHover(_:))
+        let activationTitle = localized(
+            "Açılma Davranışı",
+            "Opening Behavior"
         )
-        expandOnHoverMenuItem = hoverItem
-        menu.addItem(hoverItem)
+        let activationItem = NSMenuItem(
+            title: activationTitle,
+            action: nil,
+            keyEquivalent: ""
+        )
+        let activationMenu = NSMenu(title: activationTitle)
+        for (index, mode) in NotchActivationMode.allCases.enumerated() {
+            let modeItem = menuItem(
+                title: mode.title(language: settings.language),
+                action: #selector(selectActivationMode(_:))
+            )
+            modeItem.tag = index
+            activationMenu.addItem(modeItem)
+            activationModeMenuItems[mode] = modeItem
+        }
+        activationItem.submenu = activationMenu
+        menu.addItem(activationItem)
 
         let launchItem = menuItem(
             title: localized("Mac Açılışında Başlat", "Launch at Login"),
@@ -273,8 +291,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc
-    private func toggleExpandOnHover(_ sender: NSMenuItem) {
-        settings.expandOnHover.toggle()
+    private func selectActivationMode(_ sender: NSMenuItem) {
+        guard NotchActivationMode.allCases.indices.contains(sender.tag) else {
+            return
+        }
+        settings.activationMode = NotchActivationMode.allCases[sender.tag]
     }
 
     @objc

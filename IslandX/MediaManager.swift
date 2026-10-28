@@ -15,7 +15,7 @@ enum MediaSource: String, Sendable {
         }
     }
 
-    fileprivate var bundleIdentifier: String? {
+    var bundleIdentifier: String? {
         switch self {
         case .none: nil
         case .appleMusic: "com.apple.Music"
@@ -395,6 +395,7 @@ final class MediaManager: ObservableObject {
     @Published private(set) var volume: Double = 0
     @Published private(set) var isShuffleEnabled = false
     @Published private(set) var repeatMode: PlaybackRepeatMode = .off
+    @Published private(set) var trackChangeRevision = 0
     @Published private(set) var lastError: String?
 
     private let bridge = AppleScriptBridge()
@@ -403,6 +404,7 @@ final class MediaManager: ObservableObject {
     private var volumeWriteTask: Task<Void, Never>?
     private var isRefreshing = false
     private var artworkKey: String?
+    private var trackIdentifier = ""
     private var volumeRevision = 0
     private var permissionRetryAfter: [MediaSource: Date] = [:]
 
@@ -553,6 +555,55 @@ final class MediaManager: ObservableObject {
         perform(.setRepeat(nextMode))
     }
 
+    func openSourceApplication() {
+        guard source != .none,
+              let bundleIdentifier = source.bundleIdentifier else {
+            return
+        }
+
+        if source == .spotify,
+           let trackURL = URL(string: trackIdentifier),
+           trackURL.scheme?.lowercased() == "spotify" {
+            NSWorkspace.shared.open(trackURL)
+            activateRunningApplication(bundleIdentifier: bundleIdentifier)
+            return
+        }
+
+        if activateRunningApplication(bundleIdentifier: bundleIdentifier) {
+            return
+        }
+
+        guard let applicationURL = NSWorkspace.shared.urlForApplication(
+            withBundleIdentifier: bundleIdentifier
+        ) else {
+            return
+        }
+
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        NSWorkspace.shared.openApplication(
+            at: applicationURL,
+            configuration: configuration
+        )
+    }
+
+    @discardableResult
+    private func activateRunningApplication(
+        bundleIdentifier: String
+    ) -> Bool {
+        guard let application = NSRunningApplication.runningApplications(
+            withBundleIdentifier: bundleIdentifier
+        ).first else {
+            return false
+        }
+
+        application.activate(options: [
+            .activateAllWindows,
+            .activateIgnoringOtherApps
+        ])
+        return true
+    }
+
     /// Changes the system output volume, not merely the Music/Spotify app volume.
     /// Rapid slider updates are coalesced to avoid flooding AppleScript.
     func setVolume(_ normalizedValue: Double) {
@@ -605,20 +656,25 @@ final class MediaManager: ObservableObject {
     }
 
     private func apply(_ snapshot: MediaSnapshot) {
+        let nextArtworkKey = [
+            snapshot.source.rawValue,
+            snapshot.trackIdentifier
+        ].joined(separator: "|")
+
         source = snapshot.source
         trackName = snapshot.trackName
         artistName = snapshot.artistName
         albumName = snapshot.albumName
+        trackIdentifier = snapshot.trackIdentifier
         isPlaying = snapshot.isPlaying
         playbackPosition = min(snapshot.position, max(snapshot.duration, 0))
         duration = snapshot.duration
         isShuffleEnabled = snapshot.isShuffleEnabled
         repeatMode = snapshot.repeatMode
 
-        let nextArtworkKey = [
-            snapshot.source.rawValue,
-            snapshot.trackIdentifier
-        ].joined(separator: "|")
+        if !snapshot.trackName.isEmpty, artworkKey != nextArtworkKey {
+            trackChangeRevision &+= 1
+        }
 
         guard artworkKey != nextArtworkKey else { return }
         artworkKey = nextArtworkKey
@@ -692,6 +748,7 @@ final class MediaManager: ObservableObject {
         isShuffleEnabled = false
         repeatMode = .off
         artworkKey = nil
+        trackIdentifier = ""
     }
 
     private func readableMessage(for error: Error) -> String {

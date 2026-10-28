@@ -1,4 +1,6 @@
 import AppKit
+import Combine
+import Darwin
 import QuartzCore
 import SwiftUI
 
@@ -15,6 +17,8 @@ final class FloatingNotchWindowController: NSWindowController {
     private let settings: AppSettings
     private var layout: NotchLayout
     private var currentSize: CGSize
+    private var visibilityTask: Task<Void, Never>?
+    private var cancellables = Set<AnyCancellable>()
 
     init(mediaManager: MediaManager, settings: AppSettings) {
         self.mediaManager = mediaManager
@@ -47,6 +51,28 @@ final class FloatingNotchWindowController: NSWindowController {
             name: NSApplication.didChangeScreenParametersNotification,
             object: nil
         )
+
+        let workspaceCenter = NSWorkspace.shared.notificationCenter
+        workspaceCenter.addObserver(
+            self,
+            selector: #selector(workspaceContextDidChange),
+            name: NSWorkspace.activeSpaceDidChangeNotification,
+            object: nil
+        )
+        workspaceCenter.addObserver(
+            self,
+            selector: #selector(workspaceContextDidChange),
+            name: NSWorkspace.didActivateApplicationNotification,
+            object: nil
+        )
+
+        settings.$hideInFullScreen
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.scheduleVisibilityRefresh()
+            }
+            .store(in: &cancellables)
     }
 
     @available(*, unavailable)
@@ -55,14 +81,16 @@ final class FloatingNotchWindowController: NSWindowController {
     }
 
     deinit {
+        visibilityTask?.cancel()
         NotificationCenter.default.removeObserver(self)
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
     }
 
     override func showWindow(_ sender: Any?) {
         super.showWindow(sender)
         refreshLayoutIfNeeded()
         reposition(animated: false)
-        window?.orderFrontRegardless()
+        refreshVisibility()
     }
 
     private func configure(_ panel: FloatingNotchPanel) {
@@ -180,5 +208,153 @@ final class FloatingNotchWindowController: NSWindowController {
     private func screenParametersDidChange(_ notification: Notification) {
         refreshLayoutIfNeeded()
         reposition(animated: false)
+        scheduleVisibilityRefresh()
+    }
+
+    @objc
+    private func workspaceContextDidChange(_ notification: Notification) {
+        scheduleVisibilityRefresh()
+    }
+
+    private func scheduleVisibilityRefresh() {
+        visibilityTask?.cancel()
+        visibilityTask = Task { @MainActor [weak self] in
+            do {
+                try await Task<Never, Never>.sleep(nanoseconds: 180_000_000)
+            } catch {
+                return
+            }
+            self?.refreshVisibility()
+        }
+    }
+
+    private func refreshVisibility() {
+        guard let window else { return }
+
+        if settings.hideInFullScreen, frontmostAppOccupiesEntireScreen {
+            NotificationCenter.default.post(
+                name: .islandXCollapse,
+                object: nil
+            )
+            window.orderOut(nil)
+        } else {
+            window.orderFrontRegardless()
+        }
+    }
+
+    private var frontmostAppOccupiesEntireScreen: Bool {
+        guard let frontmostApplication = NSWorkspace.shared.frontmostApplication,
+              frontmostApplication.processIdentifier != ProcessInfo.processInfo.processIdentifier,
+              let screen = preferredScreen,
+              let screenNumber = screen.deviceDescription[
+                NSDeviceDescriptionKey("NSScreenNumber")
+              ] as? NSNumber else {
+            return false
+        }
+
+        let displayBounds = CGDisplayBounds(
+            CGDirectDisplayID(screenNumber.uint32Value)
+        )
+        let targetPID = frontmostApplication.processIdentifier
+
+        if let spaceResult = FullScreenSpaceDetector.isFullScreenSpace(
+            processIdentifier: targetPID,
+            displayID: CGDirectDisplayID(screenNumber.uint32Value)
+        ) {
+            return spaceResult
+        }
+
+        let options: CGWindowListOption = [
+            .optionOnScreenOnly,
+            .excludeDesktopElements
+        ]
+
+        guard let windows = CGWindowListCopyWindowInfo(
+            options,
+            kCGNullWindowID
+        ) as? [[String: Any]] else {
+            return false
+        }
+
+        let tolerance: CGFloat = 4
+        return windows.contains { info in
+            guard (info[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == targetPID,
+                  (info[kCGWindowLayer as String] as? NSNumber)?.intValue == 0,
+                  (info[kCGWindowAlpha as String] as? NSNumber)?.doubleValue ?? 1 > 0.05,
+                  let boundsDictionary = info[kCGWindowBounds as String] as? NSDictionary,
+                  let bounds = CGRect(
+                    dictionaryRepresentation: boundsDictionary
+                  ) else {
+                return false
+            }
+
+            return abs(bounds.minX - displayBounds.minX) <= tolerance &&
+                abs(bounds.minY - displayBounds.minY) <= tolerance &&
+                bounds.width >= displayBounds.width - tolerance &&
+                bounds.height >= displayBounds.height - tolerance
+        }
+    }
+}
+
+/// AppKit reports screen geometry but doesn't expose whether another app owns
+/// the active full-screen Space. The dynamically resolved WindowServer symbols
+/// provide that missing bit without adding a private-framework link dependency.
+/// If macOS ever removes them, the controller falls back to window geometry.
+private enum FullScreenSpaceDetector {
+    private typealias ConnectionFunction = @convention(c) () -> UInt32
+    private typealias ManagedSpacesFunction = @convention(c) (
+        UInt32
+    ) -> Unmanaged<CFArray>
+
+    static func isFullScreenSpace(
+        processIdentifier: pid_t,
+        displayID: CGDirectDisplayID
+    ) -> Bool? {
+        guard let handle = dlopen(nil, RTLD_LAZY),
+              let connectionSymbol = dlsym(
+                handle,
+                "CGSMainConnectionID"
+              ),
+              let spacesSymbol = dlsym(
+                handle,
+                "CGSCopyManagedDisplaySpaces"
+              ) else {
+            return nil
+        }
+
+        let connectionFunction = unsafeBitCast(
+            connectionSymbol,
+            to: ConnectionFunction.self
+        )
+        let spacesFunction = unsafeBitCast(
+            spacesSymbol,
+            to: ManagedSpacesFunction.self
+        )
+        let managedSpaces = spacesFunction(
+            connectionFunction()
+        ).takeRetainedValue()
+
+        guard let displays = managedSpaces as? [[String: Any]] else {
+            return nil
+        }
+
+        let displayUUID = CGDisplayCreateUUIDFromDisplayID(
+            displayID
+        ).takeRetainedValue()
+        let displayIdentifier = CFUUIDCreateString(
+            nil,
+            displayUUID
+        ) as String
+
+        guard let display = displays.first(where: {
+            ($0["Display Identifier"] as? String) == displayIdentifier
+        }), let currentSpace = display["Current Space"] as? [String: Any]
+        else {
+            return nil
+        }
+
+        let type = (currentSpace["type"] as? NSNumber)?.intValue
+        let ownerPID = (currentSpace["pid"] as? NSNumber)?.int32Value
+        return type == 4 && ownerPID == processIdentifier
     }
 }

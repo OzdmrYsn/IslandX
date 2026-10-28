@@ -140,6 +140,54 @@ enum NotchIdleMode: String, CaseIterable, Identifiable {
     }
 }
 
+enum NotchActivationMode: String, CaseIterable, Identifiable {
+    case hover
+    case click
+    case activationZone
+
+    var id: String { rawValue }
+
+    func title(language: AppLanguage) -> String {
+        switch self {
+        case .hover:
+            language.value(
+                turkish: "Üzerine gelince",
+                english: "On hover"
+            )
+        case .click:
+            language.value(
+                turkish: "Yalnızca tıklayınca",
+                english: "Only on click"
+            )
+        case .activationZone:
+            language.value(
+                turkish: "Orta etkin alana gelince",
+                english: "On center activation zone"
+            )
+        }
+    }
+
+    func subtitle(language: AppLanguage) -> String {
+        switch self {
+        case .hover:
+            language.value(
+                turkish: "İşaretçi IslandX'in herhangi bir yerine geldiğinde açılır.",
+                english: "Opens when the pointer reaches any part of IslandX."
+            )
+        case .click:
+            language.value(
+                turkish: "Kendiliğinden açılmaz; kompakt görünüme tıklamanız gerekir.",
+                english: "Never opens automatically; click the compact island to open it."
+            )
+        case .activationZone:
+            language.value(
+                turkish: "Yalnızca çentiğin üst-orta bölümüne geldiğinizde açılır.",
+                english: "Opens only when the pointer reaches the top-center notch area."
+            )
+        }
+    }
+}
+
 @MainActor
 final class AppSettings: ObservableObject {
     static let shared = AppSettings()
@@ -148,8 +196,12 @@ final class AppSettings: ObservableObject {
         static let theme = "appearance.theme"
         static let language = "general.language"
         static let notchIdleMode = "appearance.notchIdleMode"
+        static let activationMode = "interaction.activationMode"
         static let expandOnHover = "interaction.expandOnHover"
         static let collapseDelay = "interaction.collapseDelay"
+        static let showOnTrackChange = "interaction.showOnTrackChange"
+        static let trackChangeDisplayDuration = "interaction.trackChangeDisplayDuration"
+        static let hideInFullScreen = "interaction.hideInFullScreen"
         static let onboardingCompleted = "onboarding.completed"
     }
 
@@ -174,9 +226,9 @@ final class AppSettings: ObservableObject {
         }
     }
 
-    @Published var expandOnHover: Bool {
+    @Published var activationMode: NotchActivationMode {
         didSet {
-            defaults.set(expandOnHover, forKey: Key.expandOnHover)
+            defaults.set(activationMode.rawValue, forKey: Key.activationMode)
         }
     }
 
@@ -184,6 +236,28 @@ final class AppSettings: ObservableObject {
         didSet {
             let clampedValue = min(max(collapseDelay, 0.15), 1.2)
             defaults.set(clampedValue, forKey: Key.collapseDelay)
+        }
+    }
+
+    @Published var showOnTrackChange: Bool {
+        didSet {
+            defaults.set(showOnTrackChange, forKey: Key.showOnTrackChange)
+        }
+    }
+
+    @Published var trackChangeDisplayDuration: Double {
+        didSet {
+            let clampedValue = min(max(trackChangeDisplayDuration, 2), 8)
+            defaults.set(
+                clampedValue,
+                forKey: Key.trackChangeDisplayDuration
+            )
+        }
+    }
+
+    @Published var hideInFullScreen: Bool {
+        didSet {
+            defaults.set(hideInFullScreen, forKey: Key.hideInFullScreen)
         }
     }
 
@@ -208,10 +282,16 @@ final class AppSettings: ObservableObject {
             rawValue: defaults.string(forKey: Key.notchIdleMode) ?? ""
         ) ?? .visibleIsland
 
-        if defaults.object(forKey: Key.expandOnHover) == nil {
-            expandOnHover = true
+        if let savedMode = NotchActivationMode(
+            rawValue: defaults.string(forKey: Key.activationMode) ?? ""
+        ) {
+            activationMode = savedMode
         } else {
-            expandOnHover = defaults.bool(forKey: Key.expandOnHover)
+            // Preserve the behavior selected in IslandX 1.5.
+            let legacyHoverEnabled = defaults.object(
+                forKey: Key.expandOnHover
+            ) == nil || defaults.bool(forKey: Key.expandOnHover)
+            activationMode = legacyHoverEnabled ? .hover : .click
         }
 
         if defaults.object(forKey: Key.collapseDelay) == nil {
@@ -222,6 +302,27 @@ final class AppSettings: ObservableObject {
                 1.2
             )
         }
+
+
+        if defaults.object(forKey: Key.showOnTrackChange) == nil {
+            showOnTrackChange = true
+        } else {
+            showOnTrackChange = defaults.bool(forKey: Key.showOnTrackChange)
+        }
+
+        if defaults.object(forKey: Key.trackChangeDisplayDuration) == nil {
+            trackChangeDisplayDuration = 3.5
+        } else {
+            trackChangeDisplayDuration = min(
+                max(
+                    defaults.double(forKey: Key.trackChangeDisplayDuration),
+                    2
+                ),
+                8
+            )
+        }
+
+        hideInFullScreen = defaults.bool(forKey: Key.hideInFullScreen)
 
         onboardingCompleted = defaults.bool(
             forKey: Key.onboardingCompleted
@@ -250,8 +351,11 @@ final class AppSettings: ObservableObject {
     }
 
     func resetInteractionDefaults() {
-        expandOnHover = true
+        activationMode = .hover
         collapseDelay = 0.28
+        showOnTrackChange = true
+        trackChangeDisplayDuration = 3.5
+        hideInFullScreen = false
     }
 
     func setLaunchAtLogin(_ enabled: Bool) {
