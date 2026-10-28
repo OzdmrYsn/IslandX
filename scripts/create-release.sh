@@ -1,0 +1,71 @@
+#!/bin/zsh
+set -euo pipefail
+
+project_root="${0:A:h:h}"
+cd "$project_root"
+
+repository="${ISLANDX_GITHUB_REPOSITORY:-OzdmrYsn/IslandX}"
+info_plist="$project_root/IslandX/Info.plist"
+version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$info_plist")
+build=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$info_plist")
+package_cache="$project_root/.sparkle-packages"
+derived_data=$(mktemp -d /tmp/IslandXRelease.XXXXXX)
+archive_name="IslandX-$version.zip"
+archive_path="$project_root/dist/$archive_name"
+
+mkdir -p "$project_root/dist"
+
+xcodebuild \
+    -resolvePackageDependencies \
+    -project IslandX.xcodeproj \
+    -scheme IslandX \
+    -clonedSourcePackagesDirPath "$package_cache"
+
+xcodebuild \
+    -project IslandX.xcodeproj \
+    -scheme IslandX \
+    -configuration Release \
+    -derivedDataPath "$derived_data" \
+    -clonedSourcePackagesDirPath "$package_cache" \
+    -destination 'generic/platform=macOS' \
+    ARCHS='arm64 x86_64' \
+    ONLY_ACTIVE_ARCH=NO \
+    build
+
+release_app="$derived_data/Build/Products/Release/IslandX.app"
+/usr/bin/codesign --verify --deep --strict "$release_app"
+
+if [[ -e "$archive_path" ]]; then
+    backup_path="$project_root/dist/$archive_name.previous"
+    mv "$archive_path" "$backup_path"
+fi
+
+/usr/bin/ditto \
+    -c -k --sequesterRsrc --keepParent \
+    "$release_app" \
+    "$archive_path"
+
+generate_appcast="$package_cache/artifacts/sparkle/Sparkle/bin/generate_appcast"
+download_prefix="https://github.com/$repository/releases/download/v$version/"
+
+if [[ -n "${SPARKLE_PRIVATE_KEY:-}" ]]; then
+    print -rn -- "$SPARKLE_PRIVATE_KEY" | "$generate_appcast" \
+        --ed-key-file - \
+        --download-url-prefix "$download_prefix" \
+        --link "https://github.com/$repository" \
+        --maximum-versions 3 \
+        -o "$project_root/appcast.xml" \
+        "$project_root/dist"
+else
+    "$generate_appcast" \
+        --download-url-prefix "$download_prefix" \
+        --link "https://github.com/$repository" \
+        --maximum-versions 3 \
+        -o "$project_root/appcast.xml" \
+        "$project_root/dist"
+fi
+
+echo "IslandX $version ($build) hazır:"
+echo "  $archive_path"
+echo "  $project_root/appcast.xml"
+echo "Önce ZIP'i GitHub Release v$version'a yükleyin; ardından appcast.xml'i yayınlayın."

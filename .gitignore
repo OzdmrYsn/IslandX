@@ -1,0 +1,8 @@
+.DS_Store
+.build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+.sparkle-packages/
+dist/*.previous
+dist/*.zip

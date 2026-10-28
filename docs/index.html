@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f9ff">
+  <meta name="description" content="IslandX, MacBook çentiğiyle bütünleşen zarif Music ve Spotify kontrolleridir.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="IslandX — Mac'inizin üstünde, müziğinizin yanında">
+  <meta property="og:description" content="MacBook çentiğiyle bütünleşen dinamik Music ve Spotify kontrolleri.">
+  <meta property="og:url" content="https://ozdmrysn.github.io/IslandX/">
+  <meta property="og:image" content="https://ozdmrysn.github.io/IslandX/assets/islandx-icon.png">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="IslandX">
+  <meta name="twitter:description" content="Dynamic media controls that feel native to your MacBook notch.">
+  <meta name="twitter:image" content="https://ozdmrysn.github.io/IslandX/assets/islandx-icon.png">
+  <title>IslandX — Dynamic media controls for macOS</title>
+  <link rel="icon" href="assets/islandx-icon.png">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="#top" aria-label="IslandX ana sayfa">
+      <img src="assets/islandx-icon.png" alt="" width="38" height="38">
+      <span>IslandX</span>
+    </a>
+
+    <nav aria-label="Ana menü">
+      <a href="#features" data-tr="Özellikler" data-en="Features">Özellikler</a>
+      <a href="#install" data-tr="Kurulum" data-en="Install">Kurulum</a>
+      <a href="#gallery" data-tr="Görseller" data-en="Gallery">Görseller</a>
+    </nav>
+
+    <div class="language-switch" role="group" aria-label="Dil / Language">
+      <button class="language-button active" type="button" data-language="tr" aria-pressed="true">TR</button>
+      <button class="language-button" type="button" data-language="en" aria-pressed="false">EN</button>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero section-shell">
+      <div class="hero-copy reveal">
+        <span class="eyebrow" data-tr="macOS için dinamik medya kontrolleri" data-en="Dynamic media controls for macOS">macOS için dinamik medya kontrolleri</span>
+        <h1 data-tr="Mac'inizin üstünde. Müziğinizin yanında." data-en="At the top of your Mac. Close to your music.">Mac'inizin üstünde.<br>Müziğinizin yanında.</h1>
+        <p data-tr="IslandX, Music ve Spotify kontrollerini MacBook'unuzun kamera çentiğiyle bütünleştirir. Çentik olmayan ekranlarda ise zarif, yüzen bir adaya dönüşür." data-en="IslandX blends Music and Spotify controls into your MacBook's camera notch. On displays without a notch, it becomes an elegant floating island.">IslandX, Music ve Spotify kontrollerini MacBook'unuzun kamera çentiğiyle bütünleştirir. Çentik olmayan ekranlarda ise zarif, yüzen bir adaya dönüşür.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="https://github.com/OzdmrYsn/IslandX/releases/latest" data-tr="Son sürümü indir" data-en="Download latest">Son sürümü indir</a>
+          <a class="button button-secondary" href="https://github.com/OzdmrYsn/IslandX" data-tr="GitHub'da görüntüle" data-en="View on GitHub">GitHub'da görüntüle</a>
+        </div>
+        <p class="compatibility" data-tr="macOS 13 ve sonrası · Apple Silicon ve Intel" data-en="macOS 13 or later · Apple Silicon and Intel">macOS 13 ve sonrası · Apple Silicon ve Intel</p>
+      </div>
+
+      <div class="hero-stage reveal" aria-label="IslandX genişleme animasyonu">
+        <div class="ambient ambient-one"></div>
+        <div class="ambient ambient-two"></div>
+        <div class="mac-screen">
+          <div class="menu-line"></div>
+          <div class="notch-demo">
+            <div class="demo-top"></div>
+            <div class="demo-content">
+              <img src="assets/islandx-icon.png" alt="" width="66" height="66">
+              <div class="track-copy">
+                <strong>IslandX Sessions</strong>
+                <span data-tr="Şimdi Çalıyor" data-en="Now Playing">Şimdi Çalıyor</span>
+                <div class="demo-controls" aria-hidden="true"><span>◀</span><span class="demo-play">▶</span><span>▶</span></div>
+              </div>
+              <div class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+            </div>
+            <div class="progress"><span></span></div>
+          </div>
+          <div class="screen-copy">
+            <span data-tr="Üzerine gelin" data-en="Hover to expand">Üzerine gelin</span>
+            <small data-tr="ve müzik kontrolünüz parmaklarınızın ucunda olsun" data-en="and keep playback at your fingertips">ve müzik kontrolünüz parmaklarınızın ucunda olsun</small>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="marquee" aria-label="Öne çıkan özellikler">
+      <div><span>Music</span><i></i><span>Spotify</span><i></i><span>Liquid Glass</span><i></i><span data-tr="Otomatik Güncelleme" data-en="Automatic Updates">Otomatik Güncelleme</span><i></i><span data-tr="Tüm Ekranlar" data-en="Every Display">Tüm Ekranlar</span></div>
+    </section>
+
+    <section id="features" class="section-shell content-section">
+      <div class="section-heading reveal">
+        <span class="eyebrow" data-tr="Her ayrıntı yerli yerinde" data-en="Every detail in its place">Her ayrıntı yerli yerinde</span>
+        <h2 data-tr="Küçük bir alanda, büyük kontrol." data-en="Big control in a small space.">Küçük bir alanda, büyük kontrol.</h2>
+        <p data-tr="IslandX, dikkatinizi dağıtmadan ihtiyacınız olan medya bilgilerini ve kontrolleri gösterir." data-en="IslandX shows the media information and controls you need without pulling you away from your work.">IslandX, dikkatinizi dağıtmadan ihtiyacınız olan medya bilgilerini ve kontrolleri gösterir.</p>
+      </div>
+
+      <div class="feature-grid">
+        <article class="feature-card feature-wide reveal">
+          <span class="feature-icon">⌁</span>
+          <h3 data-tr="Çentiğe göre kendini şekillendirir" data-en="Shapes itself around your notch">Çentiğe göre kendini şekillendirir</h3>
+          <p data-tr="Ekran geometrisini otomatik algılar. Kamera çentiği olan MacBook'larda onun devamı gibi görünür; harici ekranlarda kompakt bir yüzen pencere olur." data-en="It detects display geometry automatically. On notched MacBooks it feels like a natural extension; on external displays it becomes a compact floating window.">Ekran geometrisini otomatik algılar. Kamera çentiği olan MacBook'larda onun devamı gibi görünür; harici ekranlarda kompakt bir yüzen pencere olur.</p>
+          <div class="mini-island"><img src="assets/islandx-compact.png" alt="IslandX kompakt görünüm"></div>
+        </article>
+
+        <article class="feature-card reveal">
+          <span class="feature-icon">◐</span>
+          <h3 data-tr="Dört görünüm" data-en="Four appearances">Dört görünüm</h3>
+          <p data-tr="Sistem, Beyaz, Siyah ve desteklenen macOS sürümlerinde Liquid Glass. Görünümü ilk kurulumda veya istediğiniz zaman değiştirin." data-en="System, White, Black, and Liquid Glass on supported macOS versions. Choose during setup or change it any time.">Sistem, Beyaz, Siyah ve desteklenen macOS sürümlerinde Liquid Glass. Görünümü ilk kurulumda veya istediğiniz zaman değiştirin.</p>
+        </article>
+
+        <article class="feature-card reveal">
+          <span class="feature-icon">↻</span>
+          <h3 data-tr="Kendini güncel tutar" data-en="Keeps itself current">Kendini güncel tutar</h3>
+          <p data-tr="Sparkle tabanlı imzalı güncellemeler yeni GitHub sürümlerini denetler. Otomatik güncellemeyi ilk kurulumda seçebilirsiniz." data-en="Signed Sparkle updates check for new GitHub releases. You can opt into automatic updates during first-run setup.">Sparkle tabanlı imzalı güncellemeler yeni GitHub sürümlerini denetler. Otomatik güncellemeyi ilk kurulumda seçebilirsiniz.</p>
+        </article>
+
+        <article class="feature-card feature-wide reveal">
+          <span class="feature-icon">♫</span>
+          <h3 data-tr="Music ve Spotify, tek yerde" data-en="Music and Spotify, together">Music ve Spotify, tek yerde</h3>
+          <p data-tr="Kapak görseli, parça ve sanatçı bilgisi, ilerleme, oynat/duraklat, önceki/sonraki ve sistem sesi kontrolleri." data-en="Artwork, track and artist details, progress, play/pause, previous/next, and system volume controls.">Kapak görseli, parça ve sanatçı bilgisi, ilerleme, oynat/duraklat, önceki/sonraki ve sistem sesi kontrolleri.</p>
+          <img class="player-shot" src="assets/islandx-player.png" alt="IslandX genişletilmiş medya kontrolleri" loading="lazy">
+        </article>
+      </div>
+    </section>
+
+    <section id="install" class="install-section">
+      <div class="section-shell install-layout">
+        <div class="section-heading reveal">
+          <span class="eyebrow" data-tr="Birkaç dakikada hazır" data-en="Ready in minutes">Birkaç dakikada hazır</span>
+          <h2 data-tr="İndir, Uygulamalar'a taşı, müziğini aç." data-en="Download, move to Applications, press play.">İndir, Uygulamalar'a taşı, müziğini aç.</h2>
+          <p data-tr="IslandX şu anda bağımsız bir GitHub sürümü olarak dağıtılır. İlk açılışta macOS'un Automation iznini isteyebilir." data-en="IslandX is currently distributed as an independent GitHub release. macOS may request Automation access on first launch.">IslandX şu anda bağımsız bir GitHub sürümü olarak dağıtılır. İlk açılışta macOS'un Automation iznini isteyebilir.</p>
+          <a class="button button-primary" href="https://github.com/OzdmrYsn/IslandX/releases/latest" data-tr="GitHub Releases'ı aç" data-en="Open GitHub Releases">GitHub Releases'ı aç</a>
+        </div>
+
+        <ol class="steps reveal">
+          <li><span>1</span><div><strong data-tr="Son sürümü indirin" data-en="Download the latest release">Son sürümü indirin</strong><p data-tr="Releases sayfasındaki IslandX ZIP dosyasını indirin ve arşivden çıkarın." data-en="Download the IslandX ZIP from Releases and extract the archive.">Releases sayfasındaki IslandX ZIP dosyasını indirin ve arşivden çıkarın.</p></div></li>
+          <li><span>2</span><div><strong data-tr="Uygulamalar'a taşıyın" data-en="Move it to Applications">Uygulamalar'a taşıyın</strong><p data-tr="IslandX.app dosyasını Applications / Uygulamalar klasörüne sürükleyin." data-en="Drag IslandX.app into your Applications folder.">IslandX.app dosyasını Applications / Uygulamalar klasörüne sürükleyin.</p></div></li>
+          <li><span>3</span><div><strong data-tr="İlk kez güvenle açın" data-en="Open it safely the first time">İlk kez güvenle açın</strong><p data-tr="Uygulamaya Control-tıklayın, Aç'ı seçin ve macOS uyarısında yeniden Aç'a basın." data-en="Control-click the app, choose Open, then confirm Open in the macOS prompt.">Uygulamaya Control-tıklayın, Aç'ı seçin ve macOS uyarısında yeniden Aç'a basın.</p></div></li>
+          <li><span>4</span><div><strong data-tr="İzinleri tamamlayın" data-en="Complete permissions">İzinleri tamamlayın</strong><p data-tr="Music veya Spotify kontrolü için istenen Automation iznine onay verin." data-en="Approve the requested Automation access to control Music or Spotify.">Music veya Spotify kontrolü için istenen Automation iznine onay verin.</p></div></li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="gallery" class="section-shell content-section gallery-section">
+      <div class="section-heading reveal">
+        <span class="eyebrow" data-tr="İlk açılıştan ilk şarkıya" data-en="From first launch to first track">İlk açılıştan ilk şarkıya</span>
+        <h2 data-tr="Kendi tarzınıza göre ayarlayın." data-en="Make it feel like yours.">Kendi tarzınıza göre ayarlayın.</h2>
+      </div>
+      <div class="gallery-grid">
+        <figure class="gallery-onboarding reveal">
+          <img src="assets/islandx-onboarding.png" alt="IslandX tema seçim ekranı" loading="lazy">
+          <figcaption data-tr="Türkçe ve İngilizce kurulum rehberi; Sistem, Beyaz, Siyah ve Liquid Glass görünümü." data-en="A Turkish and English setup guide with System, White, Black, and Liquid Glass appearances.">Türkçe ve İngilizce kurulum rehberi; Sistem, Beyaz, Siyah ve Liquid Glass görünümü.</figcaption>
+        </figure>
+        <figure class="gallery-icon reveal">
+          <img src="assets/islandx-icon.png" alt="IslandX uygulama ikonu" loading="lazy">
+          <figcaption data-tr="Masaüstünüzde kendine özgü, neon IslandX ikonu." data-en="A distinctive neon IslandX icon for your desktop.">Masaüstünüzde kendine özgü, neon IslandX ikonu.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="closing section-shell reveal">
+      <img src="assets/islandx-icon.png" alt="" width="76" height="76">
+      <h2 data-tr="Müziğiniz için biraz daha iyi bir yer." data-en="A better little place for your music.">Müziğiniz için biraz daha iyi bir yer.</h2>
+      <p data-tr="IslandX GitHub'da geliştiriliyor." data-en="IslandX is developed on GitHub.">IslandX GitHub'da geliştiriliyor.</p>
+      <div class="hero-actions">
+        <a class="button button-primary" href="https://github.com/OzdmrYsn/IslandX/releases/latest" data-tr="IslandX'i indir" data-en="Download IslandX">IslandX'i indir</a>
+        <a class="button button-secondary" href="https://github.com/OzdmrYsn/IslandX/issues" data-tr="Geri bildirim paylaş" data-en="Share feedback">Geri bildirim paylaş</a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="footer-brand"><img src="assets/islandx-icon.png" alt="" width="30" height="30"><strong>IslandX</strong></div>
+    <p><a href="https://github.com/OzdmrYsn">github.com/OzdmrYsn</a> <span>|</span> Yasin Özdemir</p>
+    <p class="copyright">© <span id="year"></span> IslandX</p>
+  </footer>
+</body>
+</html>
