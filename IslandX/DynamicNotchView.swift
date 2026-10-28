@@ -71,9 +71,19 @@ struct NotchLayout: Equatable {
         hasCameraHousing ? notchBandHeight + 8 : 0
     }
 
-    func size(for state: NotchPresentationState) -> CGSize {
+    func size(
+        for state: NotchPresentationState,
+        idleMode: NotchIdleMode = .visibleIsland
+    ) -> CGSize {
         switch state {
         case .idle:
+            if hasCameraHousing, idleMode == .hiddenMini {
+                return CGSize(
+                    width: cameraHousingWidth,
+                    height: notchBandHeight
+                )
+            }
+
             return CGSize(
                 width: idleWidth,
                 height: idleHeight
@@ -153,7 +163,13 @@ struct DynamicNotchView: View {
             height: preferredSize.height,
             alignment: .top
         )
-        .background(notchBackground)
+        .background {
+            if isHiddenMiniIdle {
+                Color.clear
+            } else {
+                notchBackground
+            }
+        }
         .clipShape(notchShape)
         .overlay {
             if !layout.hasCameraHousing {
@@ -184,6 +200,17 @@ struct DynamicNotchView: View {
                 setPresentation(.idle)
             }
         }
+        .onChange(of: settings.notchIdleMode) { _ in
+            guard presentation == .idle else { return }
+            onPreferredSizeChange(preferredSize, !reduceMotion)
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .islandXExpand)
+        ) { _ in
+            hoverTask?.cancel()
+            isPinned = true
+            setPresentation(.expanded)
+        }
         .contextMenu {
             Menu(localized("Görünüm", "Appearance")) {
                 ForEach(AppTheme.allCases) { theme in
@@ -199,6 +226,21 @@ struct DynamicNotchView: View {
                         )
                     }
                     .disabled(!theme.isAvailable)
+                }
+            }
+
+            Menu(localized("Çentik Boşta Görünümü", "Notch Idle Appearance")) {
+                ForEach(NotchIdleMode.allCases) { mode in
+                    Button {
+                        settings.notchIdleMode = mode
+                    } label: {
+                        Label(
+                            mode.title(language: settings.language),
+                            systemImage: settings.notchIdleMode == mode
+                                ? "checkmark"
+                                : mode.symbolName
+                        )
+                    }
                 }
             }
 
@@ -228,7 +270,9 @@ struct DynamicNotchView: View {
             setPresentation(.expanded)
         } label: {
             Group {
-                if layout.hasCameraHousing {
+                if isHiddenMiniIdle {
+                    Color.clear
+                } else if layout.hasCameraHousing {
                     notchedCompactContent
                 } else {
                     standardCompactContent
@@ -756,7 +800,10 @@ struct DynamicNotchView: View {
         guard newValue != presentation else { return }
 
         onPreferredSizeChange(
-            layout.size(for: newValue),
+            layout.size(
+                for: newValue,
+                idleMode: settings.notchIdleMode
+            ),
             !reduceMotion
         )
 
@@ -769,7 +816,16 @@ struct DynamicNotchView: View {
     // MARK: - Derived Values
 
     private var preferredSize: CGSize {
-        layout.size(for: presentation)
+        layout.size(
+            for: presentation,
+            idleMode: settings.notchIdleMode
+        )
+    }
+
+    private var isHiddenMiniIdle: Bool {
+        layout.hasCameraHousing &&
+            settings.notchIdleMode == .hiddenMini &&
+            presentation == .idle
     }
 
     private var notchShape: AdaptiveNotchShape {

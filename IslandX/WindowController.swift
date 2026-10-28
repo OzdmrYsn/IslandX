@@ -23,7 +23,10 @@ final class FloatingNotchWindowController: NSWindowController {
         let targetScreen = NSScreen.screens.first ?? NSScreen.main
         let layout = NotchLayout(screen: targetScreen)
         self.layout = layout
-        currentSize = layout.size(for: .idle)
+        currentSize = layout.size(
+            for: .idle,
+            idleMode: settings.notchIdleMode
+        )
 
         let panel = FloatingNotchPanel(
             contentRect: NSRect(origin: .zero, size: currentSize),
@@ -162,7 +165,10 @@ final class FloatingNotchWindowController: NSWindowController {
         guard updatedLayout != layout else { return }
 
         layout = updatedLayout
-        currentSize = updatedLayout.size(for: .idle)
+        currentSize = updatedLayout.size(
+            for: .idle,
+            idleMode: settings.notchIdleMode
+        )
 
         if let panel = window as? FloatingNotchPanel {
             installRootView(in: panel)

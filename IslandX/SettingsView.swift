@@ -56,6 +56,25 @@ struct SettingsView: View {
                     language: settings.language
                 )
                     .padding(.vertical, 4)
+
+                Picker(
+                    text("Çentik boşta görünümü", "Notch idle appearance"),
+                    selection: $settings.notchIdleMode
+                ) {
+                    ForEach(NotchIdleMode.allCases) { mode in
+                        Text(mode.title(language: settings.language))
+                            .tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Text(
+                    settings.notchIdleMode.subtitle(
+                        language: settings.language
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
 
             Section(text("Etkileşim", "Interaction")) {
@@ -137,7 +156,7 @@ struct SettingsView: View {
 
                     Spacer()
 
-                    Text("IslandX 1.3")
+                    Text(versionText)
                         .foregroundStyle(.tertiary)
                 }
             }
@@ -164,6 +183,13 @@ struct SettingsView: View {
             get: { updateManager.automaticUpdatesEnabled },
             set: updateManager.setAutomaticUpdates
         )
+    }
+
+    private var versionText: String {
+        let version = Bundle.main.object(
+            forInfoDictionaryKey: "CFBundleShortVersionString"
+        ) as? String ?? "—"
+        return "IslandX \(version)"
     }
 }
 

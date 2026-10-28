@@ -96,6 +96,50 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     }
 }
 
+enum NotchIdleMode: String, CaseIterable, Identifiable {
+    case visibleIsland
+    case hiddenMini
+
+    var id: String { rawValue }
+
+    func title(language: AppLanguage) -> String {
+        switch self {
+        case .visibleIsland:
+            language.value(
+                turkish: "Görünür Ada",
+                english: "Visible Island"
+            )
+        case .hiddenMini:
+            language.value(
+                turkish: "Gizli Mini",
+                english: "Hidden Mini"
+            )
+        }
+    }
+
+    func subtitle(language: AppLanguage) -> String {
+        switch self {
+        case .visibleIsland:
+            language.value(
+                turkish: "Kapak ve oynatma dalgası çentiğin yanında kalır.",
+                english: "Artwork and the playback wave remain beside the notch."
+            )
+        case .hiddenMini:
+            language.value(
+                turkish: "Boştayken kamera çentiğinin içinde tamamen kaybolur.",
+                english: "Disappears completely into the camera notch while idle."
+            )
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .visibleIsland: "rectangle.expand.vertical"
+        case .hiddenMini: "eye.slash.fill"
+        }
+    }
+}
+
 @MainActor
 final class AppSettings: ObservableObject {
     static let shared = AppSettings()
@@ -103,6 +147,7 @@ final class AppSettings: ObservableObject {
     private enum Key {
         static let theme = "appearance.theme"
         static let language = "general.language"
+        static let notchIdleMode = "appearance.notchIdleMode"
         static let expandOnHover = "interaction.expandOnHover"
         static let collapseDelay = "interaction.collapseDelay"
         static let onboardingCompleted = "onboarding.completed"
@@ -120,6 +165,12 @@ final class AppSettings: ObservableObject {
     @Published var language: AppLanguage {
         didSet {
             defaults.set(language.rawValue, forKey: Key.language)
+        }
+    }
+
+    @Published var notchIdleMode: NotchIdleMode {
+        didSet {
+            defaults.set(notchIdleMode.rawValue, forKey: Key.notchIdleMode)
         }
     }
 
@@ -152,6 +203,10 @@ final class AppSettings: ObservableObject {
         language = AppLanguage(
             rawValue: defaults.string(forKey: Key.language) ?? ""
         ) ?? .turkish
+
+        notchIdleMode = NotchIdleMode(
+            rawValue: defaults.string(forKey: Key.notchIdleMode) ?? ""
+        ) ?? .visibleIsland
 
         if defaults.object(forKey: Key.expandOnHover) == nil {
             expandOnHover = true

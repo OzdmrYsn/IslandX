@@ -10,6 +10,8 @@ version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$info_
 build=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$info_plist")
 package_cache="$project_root/.sparkle-packages"
 derived_data=$(mktemp -d /tmp/IslandXRelease.XXXXXX)
+appcast_input=$(mktemp -d /tmp/IslandXAppcast.XXXXXX)
+trap 'rm -rf "$derived_data" "$appcast_input"' EXIT
 archive_name="IslandX-$version.zip"
 archive_path="$project_root/dist/$archive_name"
 
@@ -47,6 +49,7 @@ fi
 
 generate_appcast="$package_cache/artifacts/sparkle/Sparkle/bin/generate_appcast"
 download_prefix="https://github.com/$repository/releases/download/v$version/"
+cp "$archive_path" "$appcast_input/$archive_name"
 
 if [[ -n "${SPARKLE_PRIVATE_KEY:-}" ]]; then
     print -rn -- "$SPARKLE_PRIVATE_KEY" | "$generate_appcast" \
@@ -55,14 +58,14 @@ if [[ -n "${SPARKLE_PRIVATE_KEY:-}" ]]; then
         --link "https://github.com/$repository" \
         --maximum-versions 3 \
         -o "$project_root/appcast.xml" \
-        "$project_root/dist"
+        "$appcast_input"
 else
     "$generate_appcast" \
         --download-url-prefix "$download_prefix" \
         --link "https://github.com/$repository" \
         --maximum-versions 3 \
         -o "$project_root/appcast.xml" \
-        "$project_root/dist"
+        "$appcast_input"
 fi
 
 echo "IslandX $version ($build) hazır:"

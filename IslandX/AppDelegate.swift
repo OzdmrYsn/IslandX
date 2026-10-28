@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var onboardingWindowController: OnboardingWindowController?
     private var statusItem: NSStatusItem?
     private var themeMenuItems: [AppTheme: NSMenuItem] = [:]
+    private var notchModeMenuItems: [NotchIdleMode: NSMenuItem] = [:]
     private var expandOnHoverMenuItem: NSMenuItem?
     private var launchAtLoginMenuItem: NSMenuItem?
     private var checkForUpdatesMenuItem: NSMenuItem?
@@ -77,6 +78,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         for (theme, item) in themeMenuItems {
             item.state = settings.theme == theme ? .on : .off
         }
+        for (mode, item) in notchModeMenuItems {
+            item.state = settings.notchIdleMode == mode ? .on : .off
+        }
 
         expandOnHoverMenuItem?.state = settings.expandOnHover ? .on : .off
         launchAtLoginMenuItem?.state = settings.launchAtLogin ? .on : .off
@@ -118,6 +122,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             NSStatusBar.system.removeStatusItem(statusItem)
         }
         themeMenuItems.removeAll()
+        notchModeMenuItems.removeAll()
 
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = item.button {
@@ -156,6 +161,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         appearanceItem.submenu = appearanceMenu
         menu.addItem(appearanceItem)
+
+        let notchModeTitle = localized(
+            "Çentik Boşta Görünümü",
+            "Notch Idle Appearance"
+        )
+        let notchModeItem = NSMenuItem(
+            title: notchModeTitle,
+            action: nil,
+            keyEquivalent: ""
+        )
+        let notchModeMenu = NSMenu(title: notchModeTitle)
+        for (index, mode) in NotchIdleMode.allCases.enumerated() {
+            let modeItem = menuItem(
+                title: mode.title(language: settings.language),
+                action: #selector(selectNotchIdleMode(_:))
+            )
+            modeItem.tag = index
+            notchModeMenu.addItem(modeItem)
+            notchModeMenuItems[mode] = modeItem
+        }
+        notchModeItem.submenu = notchModeMenu
+        menu.addItem(notchModeItem)
 
         let hoverItem = menuItem(
             title: localized("Üzerine Gelince Genişlet", "Expand on Hover"),
@@ -234,6 +261,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc
     private func showIsland() {
         notchWindowController?.showWindow(nil)
+        NotificationCenter.default.post(name: .islandXExpand, object: nil)
     }
 
     @objc
@@ -247,6 +275,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc
     private func toggleExpandOnHover(_ sender: NSMenuItem) {
         settings.expandOnHover.toggle()
+    }
+
+    @objc
+    private func selectNotchIdleMode(_ sender: NSMenuItem) {
+        guard NotchIdleMode.allCases.indices.contains(sender.tag) else {
+            return
+        }
+        settings.notchIdleMode = NotchIdleMode.allCases[sender.tag]
     }
 
     @objc

@@ -13,6 +13,7 @@ IslandX, Music ve Spotify kontrollerini MacBook'un kamera çentiğiyle bütünle
 ### Özellikler
 
 - Kamera çentiğini ve ekran güvenli alanını otomatik algılama
+- Görünür Ada ve çentiğin içine tamamen saklanan Gizli Mini boşta modları
 - Akıcı kompakt/genişletilmiş görünüm geçişi
 - Music ve Spotify parça, sanatçı ve kapak bilgileri
 - Oynat/duraklat, önceki/sonraki, ilerleme ve sistem sesi kontrolleri
@@ -43,6 +44,7 @@ IslandX is a SwiftUI + AppKit app that blends Music and Spotify controls into th
 ### Features
 
 - Automatic camera-notch and safe-area detection
+- Visible Island and fully concealed Hidden Mini idle modes
 - Fluid compact/expanded transitions
 - Track, artist, and artwork from Music and Spotify
 - Play/pause, previous/next, progress, and system-volume controls

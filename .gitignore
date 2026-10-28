@@ -6,3 +6,4 @@ xcuserdata/
 .sparkle-packages/
 dist/*.previous
 dist/*.zip
+dist/*.delta

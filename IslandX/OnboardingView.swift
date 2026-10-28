@@ -170,7 +170,7 @@ struct OnboardingView: View {
     }
 
     private var appearancePage: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 18) {
             VStack(spacing: 8) {
                 Text(text("Tarzınızı seçin", "Make it yours"))
                     .font(.system(size: 27, weight: .bold, design: .rounded))
@@ -189,6 +189,36 @@ struct OnboardingView: View {
                 selection: $settings.theme,
                 language: settings.language
             )
+
+            VStack(spacing: 6) {
+                Text(text("Çentik boşta görünümü", "Notch idle appearance"))
+                    .font(.system(size: 13, weight: .semibold))
+
+                Picker(
+                    text("Çentik boşta görünümü", "Notch idle appearance"),
+                    selection: $settings.notchIdleMode
+                ) {
+                    ForEach(NotchIdleMode.allCases) { mode in
+                        Label(
+                            mode.title(language: settings.language),
+                            systemImage: mode.symbolName
+                        )
+                        .tag(mode)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 440)
+
+                Text(
+                    settings.notchIdleMode.subtitle(
+                        language: settings.language
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            }
 
             Toggle(
                 text(

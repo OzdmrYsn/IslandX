@@ -27,4 +27,8 @@ extension Notification.Name {
     static let islandXShowSettings = Notification.Name(
         "IslandX.showSettings"
     )
+
+    static let islandXExpand = Notification.Name(
+        "IslandX.expand"
+    )
 }
