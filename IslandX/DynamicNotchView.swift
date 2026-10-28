@@ -486,6 +486,15 @@ struct DynamicNotchView: View {
 
     private var compactPlaybackControls: some View {
         HStack(spacing: 3) {
+            compactPlaybackModeButton(
+                icon: "shuffle",
+                label: mediaManager.isShuffleEnabled
+                    ? localized("Karışık çalmayı kapat", "Turn shuffle off")
+                    : localized("Karışık çal", "Shuffle"),
+                isActive: mediaManager.isShuffleEnabled,
+                action: mediaManager.toggleShuffle
+            )
+
             compactMediaControlButton(
                 icon: "backward.fill",
                 label: localized("Önceki parça", "Previous track"),
@@ -507,6 +516,15 @@ struct DynamicNotchView: View {
                 icon: "forward.fill",
                 label: localized("Sonraki parça", "Next track"),
                 action: mediaManager.nextTrack
+            )
+
+            compactPlaybackModeButton(
+                icon: mediaManager.repeatMode == .one
+                    ? "repeat.1"
+                    : "repeat",
+                label: repeatControlLabel,
+                isActive: mediaManager.repeatMode != .off,
+                action: mediaManager.cycleRepeatMode
             )
         }
     }
@@ -568,10 +586,19 @@ struct DynamicNotchView: View {
     }
 
     private var playbackControls: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 6) {
+            playbackModeButton(
+                icon: "shuffle",
+                label: mediaManager.isShuffleEnabled
+                    ? localized("Karışık çalmayı kapat", "Turn shuffle off")
+                    : localized("Karışık çal", "Shuffle"),
+                isActive: mediaManager.isShuffleEnabled,
+                action: mediaManager.toggleShuffle
+            )
+
             mediaControlButton(
                 icon: "backward.fill",
-                label: "Previous track",
+                label: localized("Önceki parça", "Previous track"),
                 action: mediaManager.previousTrack
             )
 
@@ -597,9 +624,29 @@ struct DynamicNotchView: View {
 
             mediaControlButton(
                 icon: "forward.fill",
-                label: "Next track",
+                label: localized("Sonraki parça", "Next track"),
                 action: mediaManager.nextTrack
             )
+
+            playbackModeButton(
+                icon: mediaManager.repeatMode == .one
+                    ? "repeat.1"
+                    : "repeat",
+                label: repeatControlLabel,
+                isActive: mediaManager.repeatMode != .off,
+                action: mediaManager.cycleRepeatMode
+            )
+        }
+    }
+
+    private var repeatControlLabel: String {
+        switch mediaManager.repeatMode {
+        case .off:
+            localized("Tekrarı aç", "Turn repeat on")
+        case .all:
+            localized("Tümünü tekrarla", "Repeat all")
+        case .one:
+            localized("Bir parçayı tekrarla", "Repeat one")
         }
     }
 
@@ -720,6 +767,38 @@ struct DynamicNotchView: View {
         .help(label)
     }
 
+    private func playbackModeButton(
+        icon: String,
+        label: String,
+        isActive: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(
+                    isActive ? Color.green : primaryColor.opacity(0.62)
+                )
+                .frame(width: 26, height: 26)
+                .background(
+                    Circle().fill(
+                        isActive
+                            ? Color.green.opacity(0.16)
+                            : primaryColor.opacity(0.07)
+                    )
+                )
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!mediaManager.hasActiveTrack)
+        .opacity(mediaManager.hasActiveTrack ? 1 : 0.45)
+        .accessibilityLabel(Text(label))
+        .accessibilityValue(
+            Text(isActive ? localized("Açık", "On") : localized("Kapalı", "Off"))
+        )
+        .help(label)
+    }
+
     private func compactMediaControlButton(
         icon: String,
         label: String,
@@ -736,6 +815,31 @@ struct DynamicNotchView: View {
         .disabled(!mediaManager.hasActiveTrack)
         .opacity(mediaManager.hasActiveTrack ? 1 : 0.45)
         .accessibilityLabel(Text(label))
+        .help(label)
+    }
+
+    private func compactPlaybackModeButton(
+        icon: String,
+        label: String,
+        isActive: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(
+                    isActive ? Color.green : primaryColor.opacity(0.62)
+                )
+                .frame(width: 24, height: 27)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!mediaManager.hasActiveTrack)
+        .opacity(mediaManager.hasActiveTrack ? 1 : 0.45)
+        .accessibilityLabel(Text(label))
+        .accessibilityValue(
+            Text(isActive ? localized("Açık", "On") : localized("Kapalı", "Off"))
+        )
         .help(label)
     }
 

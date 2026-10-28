@@ -29,6 +29,12 @@ enum MediaSource: String, Sendable {
     ]
 }
 
+enum PlaybackRepeatMode: String, Sendable {
+    case off
+    case all
+    case one
+}
+
 private struct MediaSnapshot: Sendable {
     let source: MediaSource
     let trackName: String
@@ -39,6 +45,8 @@ private struct MediaSnapshot: Sendable {
     let duration: TimeInterval
     let artworkURL: URL?
     let trackIdentifier: String
+    let isShuffleEnabled: Bool
+    let repeatMode: PlaybackRepeatMode
 }
 
 private enum PlayerCommand: Sendable {
@@ -46,6 +54,8 @@ private enum PlayerCommand: Sendable {
     case next
     case previous
     case seek(TimeInterval)
+    case setShuffle(Bool)
+    case setRepeat(PlaybackRepeatMode)
 }
 
 private enum AppleScriptBridgeError: LocalizedError {
@@ -80,7 +90,7 @@ private enum AppleScriptBridgeError: LocalizedError {
 private actor AppleScriptBridge {
     func snapshot(for source: MediaSource) throws -> MediaSnapshot {
         let descriptor = try execute(scriptForSnapshot(source))
-        guard descriptor.numberOfItems >= 8 else {
+        guard descriptor.numberOfItems >= 10 else {
             throw AppleScriptBridgeError.invalidResponse
         }
 
@@ -102,6 +112,10 @@ private actor AppleScriptBridge {
             artworkURL = nil
         }
 
+        let repeatMode = PlaybackRepeatMode(
+            rawValue: string(in: descriptor, at: 10).lowercased()
+        ) ?? .off
+
         return MediaSnapshot(
             source: source,
             trackName: trackName,
@@ -113,7 +127,9 @@ private actor AppleScriptBridge {
             artworkURL: artworkURL,
             trackIdentifier: rawIdentifier.isEmpty
                 ? fallbackIdentifier
-                : rawIdentifier
+                : rawIdentifier,
+            isShuffleEnabled: descriptor.atIndex(9)?.booleanValue ?? false,
+            repeatMode: repeatMode
         )
     }
 
@@ -140,6 +156,21 @@ private actor AppleScriptBridge {
                 safeValue
             )
             commandText = "set player position to \(literal)"
+        case let .setShuffle(enabled):
+            if source == .appleMusic {
+                commandText = """
+                if \(enabled) then set shuffle mode to songs
+                set shuffle enabled to \(enabled)
+                """
+            } else {
+                commandText = "set shuffling to \(enabled)"
+            }
+        case let .setRepeat(mode):
+            if source == .appleMusic {
+                commandText = "set song repeat to \(mode.rawValue)"
+            } else {
+                commandText = "set repeating to \(mode != .off)"
+            }
         }
 
         _ = try execute(
@@ -248,7 +279,7 @@ private actor AppleScriptBridge {
                 try
                     set currentTrack to current track
                 on error
-                    return {"", "", "", stateText, 0, 0, "", ""}
+                    return {"", "", "", stateText, 0, 0, "", "", false, "off"}
                 end try
 
                 set trackName to ""
@@ -257,6 +288,8 @@ private actor AppleScriptBridge {
                 set playerPosition to 0
                 set trackDuration to 0
                 set trackID to ""
+                set shuffleState to false
+                set repeatState to "off"
 
                 try
                     set trackName to name of currentTrack as text
@@ -276,9 +309,16 @@ private actor AppleScriptBridge {
                 try
                     set trackID to persistent ID of currentTrack as text
                 end try
+                try
+                    set shuffleState to shuffle enabled
+                end try
+                try
+                    set repeatState to song repeat as text
+                end try
 
                 return {trackName, artistName, albumName, stateText, ¬
-                    playerPosition, trackDuration, "", trackID}
+                    playerPosition, trackDuration, "", trackID, ¬
+                    shuffleState, repeatState}
             end tell
             """
 
@@ -289,7 +329,7 @@ private actor AppleScriptBridge {
                 try
                     set currentTrack to current track
                 on error
-                    return {"", "", "", stateText, 0, 0, "", ""}
+                    return {"", "", "", stateText, 0, 0, "", "", false, "off"}
                 end try
 
                 set trackName to ""
@@ -299,6 +339,8 @@ private actor AppleScriptBridge {
                 set trackDuration to 0
                 set artworkURL to ""
                 set trackID to ""
+                set shuffleState to false
+                set repeatState to "off"
 
                 try
                     set trackName to name of currentTrack as text
@@ -321,14 +363,21 @@ private actor AppleScriptBridge {
                 try
                     set trackID to spotify url of currentTrack as text
                 end try
+                try
+                    set shuffleState to shuffling
+                end try
+                try
+                    if repeating then set repeatState to "all"
+                end try
 
                 return {trackName, artistName, albumName, stateText, ¬
-                    playerPosition, trackDuration, artworkURL, trackID}
+                    playerPosition, trackDuration, artworkURL, trackID, ¬
+                    shuffleState, repeatState}
             end tell
             """
 
         case .none:
-            return "return {\"\", \"\", \"\", \"stopped\", 0, 0, \"\", \"\"}"
+            return "return {\"\", \"\", \"\", \"stopped\", 0, 0, \"\", \"\", false, \"off\"}"
         }
     }
 }
@@ -344,6 +393,8 @@ final class MediaManager: ObservableObject {
     @Published private(set) var playbackPosition: TimeInterval = 0
     @Published private(set) var duration: TimeInterval = 0
     @Published private(set) var volume: Double = 0
+    @Published private(set) var isShuffleEnabled = false
+    @Published private(set) var repeatMode: PlaybackRepeatMode = .off
     @Published private(set) var lastError: String?
 
     private let bridge = AppleScriptBridge()
@@ -479,6 +530,29 @@ final class MediaManager: ObservableObject {
         perform(.seek(playbackPosition))
     }
 
+    func toggleShuffle() {
+        perform(.setShuffle(!isShuffleEnabled))
+    }
+
+    func cycleRepeatMode() {
+        let nextMode: PlaybackRepeatMode
+
+        switch (source, repeatMode) {
+        case (.appleMusic, .off):
+            nextMode = .all
+        case (.appleMusic, .all):
+            nextMode = .one
+        case (.appleMusic, .one):
+            nextMode = .off
+        case (_, .off):
+            nextMode = .all
+        case (_, .all), (_, .one):
+            nextMode = .off
+        }
+
+        perform(.setRepeat(nextMode))
+    }
+
     /// Changes the system output volume, not merely the Music/Spotify app volume.
     /// Rapid slider updates are coalesced to avoid flooding AppleScript.
     func setVolume(_ normalizedValue: Double) {
@@ -538,6 +612,8 @@ final class MediaManager: ObservableObject {
         isPlaying = snapshot.isPlaying
         playbackPosition = min(snapshot.position, max(snapshot.duration, 0))
         duration = snapshot.duration
+        isShuffleEnabled = snapshot.isShuffleEnabled
+        repeatMode = snapshot.repeatMode
 
         let nextArtworkKey = [
             snapshot.source.rawValue,
@@ -613,6 +689,8 @@ final class MediaManager: ObservableObject {
         isPlaying = false
         playbackPosition = 0
         duration = 0
+        isShuffleEnabled = false
+        repeatMode = .off
         artworkKey = nil
     }
 
