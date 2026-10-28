@@ -7,3 +7,4 @@ xcuserdata/
 dist/*.previous
 dist/*.zip
 dist/*.delta
+dist/*.dmg

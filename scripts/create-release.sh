@@ -14,6 +14,7 @@ appcast_input=$(mktemp -d /tmp/IslandXAppcast.XXXXXX)
 trap 'rm -rf "$derived_data" "$appcast_input"' EXIT
 archive_name="IslandX-$version.zip"
 archive_path="$project_root/dist/$archive_name"
+dmg_path="$project_root/dist/IslandX.dmg"
 
 mkdir -p "$project_root/dist"
 
@@ -47,6 +48,11 @@ fi
     "$release_app" \
     "$archive_path"
 
+"$project_root/scripts/create-dmg.sh" \
+    "$release_app" \
+    "$dmg_path" \
+    "$version"
+
 generate_appcast="$package_cache/artifacts/sparkle/Sparkle/bin/generate_appcast"
 download_prefix="https://github.com/$repository/releases/download/v$version/"
 cp "$archive_path" "$appcast_input/$archive_name"
@@ -70,5 +76,6 @@ fi
 
 echo "IslandX $version ($build) hazır:"
 echo "  $archive_path"
+echo "  $dmg_path"
 echo "  $project_root/appcast.xml"
-echo "Önce ZIP'i GitHub Release v$version'a yükleyin; ardından appcast.xml'i yayınlayın."
+echo "ZIP ve DMG'yi GitHub Release v$version'a yükleyin; ardından appcast.xml'i yayınlayın."

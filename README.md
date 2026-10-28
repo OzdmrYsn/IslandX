@@ -24,8 +24,8 @@ IslandX, Music ve Spotify kontrollerini MacBook'un kamera çentiğiyle bütünle
 
 ### Kurulum
 
-1. [En güncel sürümü](https://github.com/OzdmrYsn/IslandX/releases/latest) indirin.
-2. ZIP dosyasını açıp `IslandX.app` uygulamasını **Uygulamalar** klasörüne taşıyın.
+1. [IslandX DMG dosyasını](https://github.com/OzdmrYsn/IslandX/releases/latest/download/IslandX.dmg) indirin ve açın.
+2. `IslandX.app` uygulamasını aynı penceredeki **Applications / Uygulamalar** kısayoluna sürükleyin.
 3. İlk açılışta uygulamaya Control-tıklayıp **Aç** seçeneğini kullanın.
 4. Music veya Spotify kontrolü için macOS'un istediği **Automation** iznine onay verin.
 
@@ -55,8 +55,8 @@ IslandX is a SwiftUI + AppKit app that blends Music and Spotify controls into th
 
 ### Installation
 
-1. Download the [latest release](https://github.com/OzdmrYsn/IslandX/releases/latest).
-2. Extract the ZIP and move `IslandX.app` into **Applications**.
+1. Download and open the latest [IslandX DMG](https://github.com/OzdmrYsn/IslandX/releases/latest/download/IslandX.dmg).
+2. Drag `IslandX.app` onto the **Applications** shortcut in the same window.
 3. On first launch, Control-click the app and choose **Open**.
 4. Approve the macOS **Automation** request to control Music or Spotify.
 
@@ -85,7 +85,7 @@ To prepare a new release:
 
 1. Increase `CFBundleShortVersionString` and `CFBundleVersion`.
 2. Run `scripts/create-release.sh`.
-3. Upload `dist/IslandX-VERSION.zip` to a GitHub Release tagged `vVERSION`.
+3. Upload `dist/IslandX-VERSION.zip` and `dist/IslandX.dmg` to a GitHub Release tagged `vVERSION`.
 4. Commit and publish the regenerated `appcast.xml` after the ZIP is available.
 
 Developer ID signing and notarization are recommended for polished public distribution. The current ad-hoc signature is intended for development and early GitHub releases.
