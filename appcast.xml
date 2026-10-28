@@ -3,6 +3,15 @@
     <channel>
         <title>IslandX</title>
         <item>
+            <title>1.4.3</title>
+            <pubDate>Wed, 28 Oct 2026 16:50:06 +0300</pubDate>
+            <link>https://github.com/OzdmrYsn/IslandX</link>
+            <sparkle:version>8</sparkle:version>
+            <sparkle:shortVersionString>1.4.3</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/OzdmrYsn/IslandX/releases/download/v1.4.3/IslandX-1.4.3.zip" length="3796983" type="application/octet-stream" sparkle:edSignature="1ELz9a6S0aZLwZtHBaxTOxrST8iA47rgG+HcIP9yGGnQfqc6gTTDGrIJVFVR/p9pzXi8qp6qLjfc4fRqF069BA=="/>
+        </item>
+        <item>
             <title>1.4.2</title>
             <pubDate>Wed, 28 Oct 2026 16:46:14 +0300</pubDate>
             <link>https://github.com/OzdmrYsn/IslandX</link>
@@ -19,15 +28,6 @@
             <sparkle:shortVersionString>1.4.1</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
             <enclosure url="https://github.com/OzdmrYsn/IslandX/releases/download/v1.4.1/IslandX-1.4.1.zip" length="3704463" type="application/octet-stream" sparkle:edSignature="4KqCsYLwP/KXJAgx8CxOEMt+NPYVL32VG7d5h9+GOWL4xIFVvEsF77oKjQlGzz8xa3XstPpaN+M4s86JJRofBA=="/>
-        </item>
-        <item>
-            <title>1.4</title>
-            <pubDate>Wed, 28 Oct 2026 11:37:14 +0300</pubDate>
-            <link>https://github.com/OzdmrYsn/IslandX</link>
-            <sparkle:version>5</sparkle:version>
-            <sparkle:shortVersionString>1.4</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/OzdmrYsn/IslandX/releases/download/v1.4/IslandX-1.4.zip" length="3702938" type="application/octet-stream" sparkle:edSignature="pIlOj2BvhySL0xAShpk97idKq0i8DNJRzHXYwS8B2OPjvLVNBChn33RdE2IHKJOfsa9l0NfGCybBJ96wHoCTDg=="/>
         </item>
     </channel>
 </rss>
