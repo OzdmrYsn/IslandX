@@ -100,6 +100,41 @@ h1 { margin: 17px 0 24px; font-size: clamp(48px, 6vw, 78px); line-height: .98; l
 .marquee div { width: max-content; min-width: 100%; display: flex; align-items: center; justify-content: space-around; gap: 40px; color: #4e5870; font-size: 13px; font-weight: 750; letter-spacing: .04em; }
 .marquee i { width: 4px; height: 4px; border-radius: 50%; background: linear-gradient(135deg, var(--cyan), var(--purple)); }
 
+.smart-section { padding: 128px 0 20px; }
+.behavior-demo { overflow: hidden; border: 1px solid rgba(255,255,255,.94); border-radius: 34px; background: rgba(255,255,255,.78); box-shadow: var(--shadow); }
+.behavior-switch { width: max-content; max-width: calc(100% - 32px); margin: 24px auto 0; padding: 4px; display: flex; border: 1px solid var(--line); border-radius: 15px; background: #edf1f8; }
+.behavior-button { min-height: 38px; padding: 0 16px; border: 0; border-radius: 11px; color: var(--muted); background: transparent; font: inherit; font-size: 13px; font-weight: 750; cursor: pointer; transition: color .2s ease, background .2s ease, box-shadow .2s ease; }
+.behavior-button.active { color: var(--ink); background: white; box-shadow: 0 5px 16px rgba(28,41,84,.12); }
+.behavior-stage { position: relative; height: 360px; margin-top: 20px; overflow: hidden; background: linear-gradient(145deg, #eaf4ff, #f4efff); }
+.behavior-menubar { position: absolute; inset: 0 0 auto; height: 34px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-right: 28px; border-bottom: 1px solid rgba(20,30,60,.08); background: rgba(255,255,255,.5); }
+.behavior-menubar span { width: 7px; height: 7px; border-radius: 50%; background: rgba(26,35,62,.38); }
+.behavior-zone { position: absolute; top: 0; left: 50%; width: 360px; height: 88px; opacity: 0; transform: translateX(-50%); border: 1px dashed rgba(66,105,220,.34); border-radius: 0 0 30px 30px; background: rgba(83,133,255,.08); transition: opacity .25s ease; }
+.behavior-demo[data-demo-mode="zone"] .behavior-zone { opacity: 1; }
+.behavior-island { position: absolute; z-index: 2; top: 0; left: 50%; width: 236px; height: 42px; overflow: hidden; transform: translateX(-50%); color: white; border-radius: 0 0 20px 20px; background: #050506; box-shadow: 0 16px 38px rgba(4,9,22,.24); animation: behaviorIsland 5.4s cubic-bezier(.65,0,.25,1) infinite; }
+.behavior-camera { width: 128px; height: 28px; margin: 0 auto; border-radius: 0 0 14px 14px; background: #000; }
+.behavior-details { padding: 4px 20px 16px; display: grid; grid-template-columns: 58px 1fr 48px; align-items: center; gap: 14px; opacity: 0; animation: behaviorDetails 5.4s ease-in-out infinite; }
+.behavior-details img { border-radius: 14px; }
+.behavior-details strong, .behavior-details small, .behavior-details span { display: block; }
+.behavior-details strong { margin-bottom: 3px; font-size: 15px; white-space: nowrap; }
+.behavior-details small { margin-bottom: 9px; color: rgba(255,255,255,.56); }
+.behavior-details span { font-size: 12px; letter-spacing: .06em; }
+.behavior-wave { width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; gap: 3px; border-radius: 50%; background: rgba(255,255,255,.09); }
+.behavior-wave i { width: 3px; border-radius: 9px; background: white; animation: wave .8s ease-in-out infinite alternate; }
+.behavior-wave i:nth-child(1), .behavior-wave i:nth-child(4) { height: 11px; }
+.behavior-wave i:nth-child(2) { height: 23px; animation-delay: -.25s; }
+.behavior-wave i:nth-child(3) { height: 17px; animation-delay: -.5s; }
+.behavior-pointer { position: absolute; z-index: 4; left: calc(50% + 220px); top: 280px; width: 22px; height: 28px; filter: drop-shadow(0 3px 4px rgba(0,0,0,.25)); animation: behaviorPointer 5.4s ease-in-out infinite; }
+.behavior-pointer::before { content: ""; position: absolute; width: 0; height: 0; border-top: 22px solid white; border-right: 14px solid transparent; transform: rotate(-18deg); }
+.behavior-pointer::after { content: ""; position: absolute; left: 4px; top: 2px; width: 0; height: 0; border-top: 18px solid #111522; border-right: 11px solid transparent; transform: rotate(-18deg); }
+.behavior-pointer span { position: absolute; z-index: -1; left: -12px; top: -10px; width: 38px; height: 38px; opacity: 0; border: 2px solid rgba(72,104,246,.5); border-radius: 50%; animation: clickPulse 5.4s ease-out infinite; }
+.behavior-demo[data-demo-mode="hover"] .behavior-pointer span { display: none; }
+.behavior-caption { min-height: 24px; margin: 0; padding: 22px 24px 26px; color: var(--muted); text-align: center; font-size: 14px; }
+.smart-grid { margin-top: 18px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.smart-card { min-height: 210px; padding: 28px; display: flex; gap: 18px; border: 1px solid rgba(255,255,255,.92); border-radius: 26px; background: var(--surface); box-shadow: 0 16px 46px rgba(35,54,108,.07); }
+.smart-card > span { flex: 0 0 42px; width: 42px; height: 42px; display: grid; place-items: center; color: white; border-radius: 14px; background: linear-gradient(135deg, #1ecaff, #7553f4); font-size: 19px; font-weight: 800; }
+.smart-card h3 { margin: 4px 0 10px; font-size: 19px; letter-spacing: -.025em; }
+.smart-card p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.55; }
+
 .content-section { padding: 128px 0; }
 .section-heading { max-width: 720px; margin-bottom: 54px; }
 .section-heading h2, .closing h2 { margin: 13px 0 18px; font-size: clamp(38px, 5vw, 60px); line-height: 1.04; letter-spacing: -.05em; }
@@ -152,6 +187,10 @@ footer p span { margin: 0 5px; color: #a0a7b6; }
 @keyframes detailsReveal { 0%, 18%, 82%, 100% { opacity: 0; } 30%, 72% { opacity: 1; } }
 @keyframes float { 0%, 100% { transform: translate3d(-12px, 2px, 0) scale(1); } 50% { transform: translate3d(20px, -22px, 0) scale(1.08); } }
 @keyframes wave { from { transform: scaleY(.45); } to { transform: scaleY(1); } }
+@keyframes behaviorPointer { 0%, 12% { left: calc(50% + 220px); top: 280px; } 34%, 72% { left: calc(50% + 70px); top: 24px; } 92%, 100% { left: calc(50% + 220px); top: 280px; } }
+@keyframes behaviorIsland { 0%, 25%, 82%, 100% { width: 236px; height: 42px; border-radius: 0 0 20px 20px; } 40%, 72% { width: 460px; height: 154px; border-radius: 0 0 30px 30px; } }
+@keyframes behaviorDetails { 0%, 31%, 78%, 100% { opacity: 0; transform: translateY(-7px); } 43%, 70% { opacity: 1; transform: translateY(0); } }
+@keyframes clickPulse { 0%, 35%, 100% { opacity: 0; transform: scale(.45); } 39% { opacity: .9; transform: scale(.6); } 48% { opacity: 0; transform: scale(1.35); } }
 
 @media (max-width: 900px) {
   .site-header { grid-template-columns: 1fr auto; }
@@ -162,6 +201,7 @@ footer p span { margin: 0 5px; color: #a0a7b6; }
   .hero-stage { min-height: 470px; }
   .install-layout { grid-template-columns: 1fr; gap: 36px; }
   .gallery-grid { grid-template-columns: 1fr; }
+  .smart-grid { grid-template-columns: 1fr; }
   .gallery-icon img { max-width: 280px; }
   footer { grid-template-columns: 1fr; justify-items: center; gap: 15px; text-align: center; }
   .copyright { justify-self: center; }
@@ -180,12 +220,18 @@ footer p span { margin: 0 5px; color: #a0a7b6; }
   .feature-grid { grid-template-columns: 1fr; }
   .feature-wide { grid-column: span 1; }
   .feature-card { padding: 25px; border-radius: 24px; }
+  .smart-section { padding-top: 84px; }
+  .behavior-stage { height: 300px; }
+  .behavior-island { max-width: calc(100% - 24px); }
+  .behavior-pointer { animation-name: behaviorPointerMobile; }
+  .behavior-button { padding-inline: 11px; font-size: 12px; }
   .marquee div { animation: marquee 15s linear infinite; justify-content: flex-start; padding-left: 24px; }
   .closing { width: calc(100% - 28px); padding: 62px 22px; border-radius: 28px; }
   footer { width: calc(100% - 28px); }
 }
 
 @keyframes marquee { to { transform: translateX(-35%); } }
+@keyframes behaviorPointerMobile { 0%, 12% { left: calc(50% + 105px); top: 235px; } 34%, 72% { left: calc(50% + 55px); top: 24px; } 92%, 100% { left: calc(50% + 105px); top: 235px; } }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }

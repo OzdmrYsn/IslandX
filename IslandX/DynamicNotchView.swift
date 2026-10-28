@@ -738,6 +738,9 @@ struct DynamicNotchView: View {
             .font(.caption2.monospacedDigit())
             .foregroundStyle(primaryColor.opacity(0.52))
         }
+        // The timestamp row makes this stack taller than the volume control.
+        // Nudge the whole stack down so both slider tracks share one visual axis.
+        .offset(y: 8)
     }
 
     private var volumeSection: some View {

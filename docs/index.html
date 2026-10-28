@@ -27,6 +27,7 @@
     </a>
 
     <nav aria-label="Ana menü">
+      <a href="#smart" data-tr="Akıllı Açılma" data-en="Smart Activation">Akıllı Açılma</a>
       <a href="#features" data-tr="Özellikler" data-en="Features">Özellikler</a>
       <a href="#install" data-tr="Kurulum" data-en="Install">Kurulum</a>
       <a href="#gallery" data-tr="Görseller" data-en="Gallery">Görseller</a>
@@ -78,7 +79,45 @@
     </section>
 
     <section class="marquee" aria-label="Öne çıkan özellikler">
-      <div><span>Music</span><i></i><span>Spotify</span><i></i><span>Liquid Glass</span><i></i><span data-tr="Otomatik Güncelleme" data-en="Automatic Updates">Otomatik Güncelleme</span><i></i><span data-tr="Tüm Ekranlar" data-en="Every Display">Tüm Ekranlar</span></div>
+      <div><span>Music</span><i></i><span>Spotify</span><i></i><span data-tr="Akıllı Açılma" data-en="Smart Activation">Akıllı Açılma</span><i></i><span>Liquid Glass</span><i></i><span data-tr="Otomatik Güncelleme" data-en="Automatic Updates">Otomatik Güncelleme</span><i></i><span data-tr="Tüm Ekranlar" data-en="Every Display">Tüm Ekranlar</span></div>
+    </section>
+
+    <section id="smart" class="section-shell smart-section">
+      <div class="section-heading reveal">
+        <span class="eyebrow" data-tr="Size göre açılır" data-en="Opens your way">Size göre açılır</span>
+        <h2 data-tr="Çentiğe yaklaşın. Gerisini IslandX halletsin." data-en="Approach the notch. IslandX handles the rest.">Çentiğe yaklaşın. Gerisini IslandX halletsin.</h2>
+        <p data-tr="Hover, tıklama veya çentiğin orta bölgesi: IslandX'in ne zaman genişleyeceğini siz seçin. Aşağıdaki davranışları deneyin." data-en="Hover, click, or the center of the notch: you decide when IslandX expands. Try the behaviors below.">Hover, tıklama veya çentiğin orta bölgesi: IslandX'in ne zaman genişleyeceğini siz seçin. Aşağıdaki davranışları deneyin.</p>
+      </div>
+
+      <div class="behavior-demo reveal" data-demo-mode="hover">
+        <div class="behavior-switch" role="group" aria-label="IslandX açılma davranışı">
+          <button class="behavior-button active" type="button" data-behavior="hover" aria-pressed="true" data-tr="Üzerine gel" data-en="Hover">Üzerine gel</button>
+          <button class="behavior-button" type="button" data-behavior="click" aria-pressed="false" data-tr="Tıkla" data-en="Click">Tıkla</button>
+          <button class="behavior-button" type="button" data-behavior="zone" aria-pressed="false" data-tr="Orta bölge" data-en="Center zone">Orta bölge</button>
+        </div>
+
+        <div class="behavior-stage" aria-hidden="true">
+          <div class="behavior-menubar"><span></span><span></span><span></span></div>
+          <div class="behavior-zone"></div>
+          <div class="behavior-island">
+            <div class="behavior-camera"></div>
+            <div class="behavior-details">
+              <img src="assets/islandx-icon.png" alt="" width="58" height="58">
+              <div><strong>IslandX Sessions</strong><small>Now Playing</small><span>◀ &nbsp; ● &nbsp; ▶</span></div>
+              <div class="behavior-wave"><i></i><i></i><i></i><i></i></div>
+            </div>
+          </div>
+          <div class="behavior-pointer"><span></span></div>
+        </div>
+
+        <p class="behavior-caption" data-tr="İmleç çentiğe geldiğinde kontroller yumuşakça açılır." data-en="Controls expand smoothly when the pointer reaches the notch.">İmleç çentiğe geldiğinde kontroller yumuşakça açılır.</p>
+      </div>
+
+      <div class="smart-grid">
+        <article class="smart-card reveal"><span>♫</span><div><h3 data-tr="Şarkı değişince kısa bir bakış" data-en="A quick glance on track change">Şarkı değişince kısa bir bakış</h3><p data-tr="Yeni parçayı birkaç saniye gösterir, ardından dikkat dağıtmadan tekrar küçülür." data-en="Shows the new track for a few seconds, then quietly returns to its compact state.">Yeni parçayı birkaç saniye gösterir, ardından dikkat dağıtmadan tekrar küçülür.</p></div></article>
+        <article class="smart-card reveal"><span>↗</span><div><h3 data-tr="Kaynağı tek dokunuşla açın" data-en="Open the source in one tap">Kaynağı tek dokunuşla açın</h3><p data-tr="Kapak görseline veya kaynak simgesine tıklayın; Music ya da Spotify öne gelsin." data-en="Click the artwork or source icon to bring Music or Spotify to the front.">Kapak görseline veya kaynak simgesine tıklayın; Music ya da Spotify öne gelsin.</p></div></article>
+        <article class="smart-card reveal"><span>▣</span><div><h3 data-tr="Tam ekranda görünmez" data-en="Stays out of full screen">Tam ekranda görünmez</h3><p data-tr="İsterseniz tam ekran uygulamalarda otomatik gizlenir ve çalışma alanınızı size bırakır." data-en="Optionally hides itself in full-screen apps and leaves your workspace untouched.">İsterseniz tam ekran uygulamalarda otomatik gizlenir ve çalışma alanınızı size bırakır.</p></div></article>
+      </div>
     </section>
 
     <section id="features" class="section-shell content-section">

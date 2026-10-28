@@ -43,3 +43,53 @@ const observer = new IntersectionObserver((entries) => {
 }, { threshold: 0.12 });
 
 document.querySelectorAll('.reveal').forEach((element) => observer.observe(element));
+
+const behaviorDemo = document.querySelector('.behavior-demo');
+const behaviorButtons = document.querySelectorAll('[data-behavior]');
+const behaviorCaption = document.querySelector('.behavior-caption');
+const behaviorCopy = {
+  hover: {
+    tr: 'İmleç çentiğe geldiğinde kontroller yumuşakça açılır.',
+    en: 'Controls expand smoothly when the pointer reaches the notch.'
+  },
+  click: {
+    tr: 'Yalnızca siz tıkladığınızda açılır; çalışırken kapalı kalır.',
+    en: 'It opens only when you click and stays compact while you work.'
+  },
+  zone: {
+    tr: 'Çentiğin belirlediğiniz orta bölgesine yaklaşmanız yeterlidir.',
+    en: 'Simply move into the chosen center zone around the notch.'
+  }
+};
+let behaviorIndex = 0;
+let behaviorTimer;
+
+function setBehavior(mode, restart = true) {
+  if (!behaviorDemo || !behaviorCopy[mode]) return;
+  const selectedLanguage = document.documentElement.lang === 'en' ? 'en' : 'tr';
+  behaviorDemo.dataset.demoMode = mode;
+  behaviorIndex = ['hover', 'click', 'zone'].indexOf(mode);
+  behaviorButtons.forEach((button) => {
+    const isActive = button.dataset.behavior === mode;
+    button.classList.toggle('active', isActive);
+    button.setAttribute('aria-pressed', String(isActive));
+  });
+  behaviorCaption.textContent = behaviorCopy[mode][selectedLanguage];
+  const animatedParts = behaviorDemo.querySelectorAll('.behavior-island, .behavior-details, .behavior-pointer, .behavior-pointer span');
+  animatedParts.forEach((part) => { part.style.animationName = 'none'; });
+  void behaviorDemo.offsetWidth;
+  animatedParts.forEach((part) => { part.style.animationName = ''; });
+  if (restart && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    clearInterval(behaviorTimer);
+    behaviorTimer = setInterval(() => setBehavior(['hover', 'click', 'zone'][(behaviorIndex + 1) % 3], false), 5400);
+  }
+}
+
+behaviorButtons.forEach((button) => button.addEventListener('click', () => setBehavior(button.dataset.behavior)));
+setBehavior('hover');
+
+languageButtons.forEach((button) => {
+  button.addEventListener('click', () => {
+    if (behaviorDemo) setBehavior(behaviorDemo.dataset.demoMode, false);
+  });
+});
