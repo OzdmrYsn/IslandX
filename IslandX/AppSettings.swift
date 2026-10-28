@@ -188,6 +188,37 @@ enum NotchActivationMode: String, CaseIterable, Identifiable {
     }
 }
 
+enum IslandContentMode: String, CaseIterable, Identifiable {
+    case music
+    case dashboard
+
+    var id: String { rawValue }
+
+    func title(language: AppLanguage) -> String {
+        switch self {
+        case .music:
+            language.value(turkish: "Yalnızca Müzik", english: "Music Only")
+        case .dashboard:
+            language.value(turkish: "Genel", english: "General")
+        }
+    }
+
+    func subtitle(language: AppLanguage) -> String {
+        switch self {
+        case .music:
+            language.value(
+                turkish: "Kompakt medya denetimleri ve daha sade bir görünüm.",
+                english: "Compact media controls with a simpler layout."
+            )
+        case .dashboard:
+            language.value(
+                turkish: "Müzik, tarih, saat ve günlük özeti tek geniş görünümde birleştirir.",
+                english: "Combines music, date, time, and a daily summary in one wide view."
+            )
+        }
+    }
+}
+
 @MainActor
 final class AppSettings: ObservableObject {
     static let shared = AppSettings()
@@ -197,6 +228,7 @@ final class AppSettings: ObservableObject {
         static let language = "general.language"
         static let notchIdleMode = "appearance.notchIdleMode"
         static let activationMode = "interaction.activationMode"
+        static let contentMode = "appearance.contentMode"
         static let expandOnHover = "interaction.expandOnHover"
         static let collapseDelay = "interaction.collapseDelay"
         static let showOnTrackChange = "interaction.showOnTrackChange"
@@ -229,6 +261,12 @@ final class AppSettings: ObservableObject {
     @Published var activationMode: NotchActivationMode {
         didSet {
             defaults.set(activationMode.rawValue, forKey: Key.activationMode)
+        }
+    }
+
+    @Published var contentMode: IslandContentMode {
+        didSet {
+            defaults.set(contentMode.rawValue, forKey: Key.contentMode)
         }
     }
 
@@ -293,6 +331,10 @@ final class AppSettings: ObservableObject {
             ) == nil || defaults.bool(forKey: Key.expandOnHover)
             activationMode = legacyHoverEnabled ? .hover : .click
         }
+
+        contentMode = IslandContentMode(
+            rawValue: defaults.string(forKey: Key.contentMode) ?? ""
+        ) ?? .music
 
         if defaults.object(forKey: Key.collapseDelay) == nil {
             collapseDelay = 0.28
