@@ -3,6 +3,15 @@
     <channel>
         <title>IslandX</title>
         <item>
+            <title>1.4.1</title>
+            <pubDate>Wed, 28 Oct 2026 16:43:08 +0300</pubDate>
+            <link>https://github.com/OzdmrYsn/IslandX</link>
+            <sparkle:version>6</sparkle:version>
+            <sparkle:shortVersionString>1.4.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/OzdmrYsn/IslandX/releases/download/v1.4.1/IslandX-1.4.1.zip" length="3704463" type="application/octet-stream" sparkle:edSignature="4KqCsYLwP/KXJAgx8CxOEMt+NPYVL32VG7d5h9+GOWL4xIFVvEsF77oKjQlGzz8xa3XstPpaN+M4s86JJRofBA=="/>
+        </item>
+        <item>
             <title>1.4</title>
             <pubDate>Wed, 28 Oct 2026 11:37:14 +0300</pubDate>
             <link>https://github.com/OzdmrYsn/IslandX</link>
