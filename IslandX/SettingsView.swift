@@ -259,6 +259,7 @@ struct SettingsView: View {
 struct ThemeChoicePicker: View {
     @Binding var selection: AppTheme
     let language: AppLanguage
+    var compact = false
 
     private let columns = [
         GridItem(.flexible(), spacing: 12),
@@ -274,21 +275,21 @@ struct ThemeChoicePicker: View {
                         selection = theme
                     }
                 } label: {
-                    VStack(spacing: 8) {
+                    VStack(spacing: compact ? 4 : 8) {
                         Image(systemName: theme.symbolName)
-                            .font(.system(size: 22, weight: .semibold))
+                            .font(.system(size: compact ? 17 : 22, weight: .semibold))
 
                         Text(theme.title(language: language))
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: compact ? 11 : 13, weight: .semibold))
 
                         Text(theme.subtitle(language: language))
-                            .font(.caption)
+                            .font(.system(size: compact ? 9 : 11))
                             .foregroundStyle(cardSecondaryColor(for: theme))
                             .multilineTextAlignment(.center)
-                            .lineLimit(2)
+                            .lineLimit(compact ? 1 : 2)
                     }
-                    .frame(maxWidth: .infinity, minHeight: 104)
-                    .padding(10)
+                    .frame(maxWidth: .infinity, minHeight: compact ? 70 : 104)
+                    .padding(compact ? 6 : 10)
                     .background(
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
                             .fill(cardBackground(for: theme))

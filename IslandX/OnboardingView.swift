@@ -170,10 +170,10 @@ struct OnboardingView: View {
     }
 
     private var appearancePage: some View {
-        VStack(spacing: 18) {
-            VStack(spacing: 8) {
+        VStack(spacing: 12) {
+            VStack(spacing: 5) {
                 Text(text("Tarzınızı seçin", "Make it yours"))
-                    .font(.system(size: 27, weight: .bold, design: .rounded))
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
 
                 Text(
                     text(
@@ -187,72 +187,69 @@ struct OnboardingView: View {
 
             ThemeChoicePicker(
                 selection: $settings.theme,
-                language: settings.language
+                language: settings.language,
+                compact: true
             )
 
-            VStack(spacing: 6) {
-                Text(text("IslandX düzeni", "IslandX layout"))
-                    .font(.system(size: 13, weight: .semibold))
+            HStack(alignment: .top, spacing: 18) {
+                VStack(spacing: 5) {
+                    Text(text("IslandX düzeni", "IslandX layout"))
+                        .font(.system(size: 12, weight: .semibold))
 
-                Picker(
-                    text("IslandX düzeni", "IslandX layout"),
-                    selection: $settings.contentMode
-                ) {
-                    ForEach(IslandContentMode.allCases) { mode in
-                        Label(
-                            mode.title(language: settings.language),
-                            systemImage: mode == .music
-                                ? "music.note"
-                                : "rectangle.split.2x1.fill"
-                        )
-                        .tag(mode)
+                    Picker(
+                        text("IslandX düzeni", "IslandX layout"),
+                        selection: $settings.contentMode
+                    ) {
+                        ForEach(IslandContentMode.allCases) { mode in
+                            Label(
+                                mode.title(language: settings.language),
+                                systemImage: mode == .music
+                                    ? "music.note"
+                                    : "rectangle.split.2x1.fill"
+                            )
+                            .tag(mode)
+                        }
                     }
-                }
-                .labelsHidden()
-                .pickerStyle(.segmented)
-                .frame(maxWidth: 440)
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
 
-                Text(
-                    settings.contentMode.subtitle(
-                        language: settings.language
-                    )
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+                    Text(settings.contentMode.subtitle(language: settings.language))
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                }
+                .frame(maxWidth: .infinity)
+
+                VStack(spacing: 5) {
+                    Text(text("Çentik boşta görünümü", "Notch idle appearance"))
+                        .font(.system(size: 12, weight: .semibold))
+
+                    Picker(
+                        text("Çentik boşta görünümü", "Notch idle appearance"),
+                        selection: $settings.notchIdleMode
+                    ) {
+                        ForEach(NotchIdleMode.allCases) { mode in
+                            Label(
+                                mode.title(language: settings.language),
+                                systemImage: mode.symbolName
+                            )
+                            .tag(mode)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+
+                    Text(settings.notchIdleMode.subtitle(language: settings.language))
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                }
+                .frame(maxWidth: .infinity)
             }
 
-            VStack(spacing: 6) {
-                Text(text("Çentik boşta görünümü", "Notch idle appearance"))
-                    .font(.system(size: 13, weight: .semibold))
-
-                Picker(
-                    text("Çentik boşta görünümü", "Notch idle appearance"),
-                    selection: $settings.notchIdleMode
-                ) {
-                    ForEach(NotchIdleMode.allCases) { mode in
-                        Label(
-                            mode.title(language: settings.language),
-                            systemImage: mode.symbolName
-                        )
-                        .tag(mode)
-                    }
-                }
-                .labelsHidden()
-                .pickerStyle(.segmented)
-                .frame(maxWidth: 440)
-
-                Text(
-                    settings.notchIdleMode.subtitle(
-                        language: settings.language
-                    )
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-            }
-
-            VStack(spacing: 6) {
+            VStack(spacing: 4) {
                 HStack {
                     Text(text("Açılma davranışı", "Opening behavior"))
                         .font(.system(size: 13, weight: .semibold))

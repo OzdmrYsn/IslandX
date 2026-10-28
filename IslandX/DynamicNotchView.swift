@@ -22,6 +22,7 @@ struct NotchLayout: Equatable {
     let notchBandHeight: CGFloat
     let cameraHousingWidth: CGFloat
     let expandedWidth: CGFloat
+    let screenWidth: CGFloat
 
     private static let compactWingWidth: CGFloat = 52
 
@@ -31,9 +32,11 @@ struct NotchLayout: Equatable {
             notchBandHeight = 0
             cameraHousingWidth = 0
             expandedWidth = 460
+            screenWidth = 724
             return
         }
 
+        screenWidth = screen.frame.width
         expandedWidth = min(460, max(screen.frame.width - 24, 320))
 
         guard screen.safeAreaInsets.top > 0,
@@ -99,7 +102,7 @@ struct NotchLayout: Equatable {
         case .expanded:
             if contentMode == .dashboard {
                 return CGSize(
-                    width: min(700, max((NSScreen.main?.frame.width ?? 724) - 24, 600)),
+                    width: min(700, max(screenWidth - 24, 600)),
                     height: hasCameraHousing ? 216 : 204
                 )
             }
