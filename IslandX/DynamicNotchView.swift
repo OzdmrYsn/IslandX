@@ -784,8 +784,27 @@ struct DynamicNotchView: View {
             guard !Task.isCancelled, !isPinned, !isInteracting else {
                 return
             }
+
+            // Resizing the centered panel can briefly emit a false hover exit,
+            // especially near its right edge. Trust the pointer's real screen
+            // position once the resize animation has settled before collapsing.
+            if state == .idle, isPointerInsideFloatingWindow {
+                isPointerInside = true
+                return
+            }
+
             setPresentation(state)
         }
+    }
+
+    private var isPointerInsideFloatingWindow: Bool {
+        guard let window = NSApp.windows.first(where: {
+            $0 is NSPanel && $0.isVisible && $0.level == .statusBar
+        }) else {
+            return isPointerInside
+        }
+
+        return window.frame.contains(NSEvent.mouseLocation)
     }
 
     private func updateInteraction(_ active: Bool) {
