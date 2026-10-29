@@ -93,3 +93,29 @@ languageButtons.forEach((button) => {
     if (behaviorDemo) setBehavior(behaviorDemo.dataset.demoMode, false);
   });
 });
+
+const layoutShowcase = document.querySelector('.layout-showcase');
+const layoutButtons = document.querySelectorAll('[data-layout-choice]');
+let layoutTimer;
+
+function setLayout(layout, restart = true) {
+  if (!layoutShowcase || !['music', 'dashboard'].includes(layout)) return;
+  layoutShowcase.dataset.layout = layout;
+  layoutButtons.forEach((button) => {
+    const isActive = button.dataset.layoutChoice === layout;
+    button.classList.toggle('active', isActive);
+    button.setAttribute('aria-pressed', String(isActive));
+  });
+
+  if (restart && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    clearInterval(layoutTimer);
+    layoutTimer = setInterval(() => {
+      setLayout(layoutShowcase.dataset.layout === 'dashboard' ? 'music' : 'dashboard', false);
+    }, 7000);
+  }
+}
+
+layoutButtons.forEach((button) => {
+  button.addEventListener('click', () => setLayout(button.dataset.layoutChoice));
+});
+setLayout('dashboard');

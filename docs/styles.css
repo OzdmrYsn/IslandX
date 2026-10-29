@@ -100,6 +100,55 @@ h1 { margin: 17px 0 24px; font-size: clamp(48px, 6vw, 78px); line-height: .98; l
 .marquee div { width: max-content; min-width: 100%; display: flex; align-items: center; justify-content: space-around; gap: 40px; color: #4e5870; font-size: 13px; font-weight: 750; letter-spacing: .04em; }
 .marquee i { width: 4px; height: 4px; border-radius: 50%; background: linear-gradient(135deg, var(--cyan), var(--purple)); }
 
+.layouts-section { padding: 128px 0 20px; }
+.layout-showcase { overflow: hidden; border: 1px solid rgba(255,255,255,.94); border-radius: 34px; background: rgba(255,255,255,.78); box-shadow: var(--shadow); }
+.layout-switch { width: max-content; max-width: calc(100% - 32px); margin: 24px auto 0; padding: 4px; display: flex; border: 1px solid var(--line); border-radius: 15px; background: #edf1f8; }
+.layout-button { min-width: 150px; min-height: 38px; padding: 0 18px; border: 0; border-radius: 11px; color: var(--muted); background: transparent; font: inherit; font-size: 13px; font-weight: 750; cursor: pointer; transition: color .2s ease, background .2s ease, box-shadow .2s ease; }
+.layout-button.active { color: var(--ink); background: white; box-shadow: 0 5px 16px rgba(28,41,84,.12); }
+.layout-stage { position: relative; height: 430px; margin-top: 20px; overflow: hidden; background: linear-gradient(145deg, #eaf4ff, #f4efff); }
+.layout-menubar { position: absolute; inset: 0 0 auto; height: 34px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-right: 28px; border-bottom: 1px solid rgba(20,30,60,.08); background: rgba(255,255,255,.55); }
+.layout-menubar span { width: 7px; height: 7px; border-radius: 50%; background: rgba(26,35,62,.38); }
+.layout-island { position: absolute; z-index: 2; top: 0; left: 50%; width: min(700px, calc(100% - 50px)); height: 216px; overflow: hidden; transform: translateX(-50%); color: white; border-radius: 0 0 32px 32px; background: #050506; box-shadow: 0 22px 52px rgba(4,9,22,.28); transition: width .7s cubic-bezier(.22,1,.36,1), height .7s cubic-bezier(.22,1,.36,1), border-radius .7s ease; }
+.layout-camera { position: absolute; z-index: 3; top: 0; left: 50%; width: 160px; height: 34px; transform: translateX(-50%); border-radius: 0 0 17px 17px; background: #000; }
+.layout-toolbar { height: 58px; padding: 15px 20px 0; display: flex; align-items: flex-start; justify-content: space-between; opacity: 1; transition: opacity .25s ease; }
+.layout-tabs { display: flex; align-items: center; gap: 9px; }
+.layout-tabs b, .layout-toolbar > span { width: 31px; height: 31px; display: grid; place-items: center; border-radius: 50%; background: rgba(255,255,255,.09); font-size: 12px; }
+.layout-tabs b:first-child { width: 62px; border-radius: 16px; background: rgba(255,255,255,.15); }
+.layout-toolbar small { margin-left: auto; margin-right: 12px; color: rgba(255,255,255,.4); font-size: 9px; font-weight: 800; letter-spacing: .22em; }
+.layout-body { height: 158px; padding: 4px 20px 17px; display: grid; grid-template-columns: 1.9fr 1fr; gap: 19px; opacity: 1; transition: opacity .25s ease, transform .45s ease; }
+.layout-player { position: relative; min-width: 0; padding-right: 18px; display: grid; grid-template-columns: 64px 1fr; align-content: start; gap: 0 14px; border-right: 1px solid rgba(255,255,255,.18); }
+.layout-player img { grid-row: span 2; border-radius: 15px; }
+.layout-track strong, .layout-track small { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.layout-track strong { margin-top: 3px; font-size: 15px; }
+.layout-track small { margin: 3px 0 12px; color: rgba(255,255,255,.56); font-size: 11px; }
+.layout-track div { font-size: 11px; letter-spacing: .08em; }
+.layout-track div b { width: 25px; height: 25px; display: inline-grid; place-items: center; color: #050506; border-radius: 50%; background: white; font-size: 8px; }
+.layout-progress { position: absolute; right: 18px; bottom: 26px; left: 0; height: 3px; border-radius: 99px; background: rgba(255,255,255,.14); }
+.layout-progress i { display: block; width: 36%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--cyan), var(--purple)); }
+.layout-volume { position: absolute; right: 19px; bottom: 4px; display: flex; align-items: center; gap: 5px; color: rgba(255,255,255,.6); font-size: 8px; }
+.layout-volume i { width: 70px; height: 3px; border-radius: 99px; background: rgba(255,255,255,.18); }
+.layout-volume i b { display: block; width: 43%; height: 100%; border-radius: inherit; background: white; }
+.layout-widgets { display: grid; grid-template-rows: 38px 1fr 1fr; gap: 7px; }
+.layout-date { display: flex; align-items: baseline; gap: 8px; }
+.layout-date small { color: #ff666e; font-size: 9px; font-weight: 850; letter-spacing: .13em; }
+.layout-date strong { font-size: 18px; }
+.layout-date span { margin-left: auto; color: rgba(255,255,255,.55); font-size: 12px; font-weight: 650; }
+.layout-widgets button { width: 100%; min-width: 0; padding: 7px 9px; display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 8px; border: 0; border-radius: 12px; color: white; text-align: left; background: rgba(255,255,255,.075); font: inherit; }
+.layout-widgets button > i { width: 28px; height: 28px; display: grid; place-items: center; color: #54a7ff; border-radius: 50%; background: rgba(52,111,255,.14); font-style: normal; }
+.layout-widgets button b, .layout-widgets button small { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.layout-widgets button b { font-size: 10px; }
+.layout-widgets button small { margin-top: 2px; color: rgba(255,255,255,.5); font-size: 8px; }
+.layout-widgets button em { color: rgba(255,255,255,.35); font-size: 18px; font-style: normal; }
+.layout-pointer { position: absolute; z-index: 4; left: calc(50% + 270px); top: 315px; width: 22px; height: 28px; filter: drop-shadow(0 3px 4px rgba(0,0,0,.25)); animation: layoutPointer 7s ease-in-out infinite; }
+.layout-pointer::before { content: ""; position: absolute; width: 0; height: 0; border-top: 22px solid white; border-right: 14px solid transparent; transform: rotate(-18deg); }
+.layout-pointer::after { content: ""; position: absolute; left: 4px; top: 2px; width: 0; height: 0; border-top: 18px solid #111522; border-right: 11px solid transparent; transform: rotate(-18deg); }
+.layout-pointer span { position: absolute; z-index: -1; left: -11px; top: -10px; width: 38px; height: 38px; border: 2px solid rgba(72,104,246,.55); border-radius: 50%; animation: layoutClick 7s ease-out infinite; }
+.layout-showcase[data-layout="music"] .layout-island { width: min(460px, calc(100% - 40px)); height: 142px; border-radius: 0 0 27px 27px; }
+.layout-showcase[data-layout="music"] .layout-toolbar, .layout-showcase[data-layout="music"] .layout-widgets { opacity: 0; pointer-events: none; }
+.layout-showcase[data-layout="music"] .layout-body { height: 142px; padding-top: 42px; grid-template-columns: 1fr; transform: translateY(-46px); }
+.layout-showcase[data-layout="music"] .layout-player { padding-right: 0; border-right: 0; }
+.layout-caption { min-height: 24px; margin: 0; padding: 22px 24px 26px; color: var(--muted); text-align: center; font-size: 14px; }
+
 .smart-section { padding: 128px 0 20px; }
 .behavior-demo { overflow: hidden; border: 1px solid rgba(255,255,255,.94); border-radius: 34px; background: rgba(255,255,255,.78); box-shadow: var(--shadow); }
 .behavior-switch { width: max-content; max-width: calc(100% - 32px); margin: 24px auto 0; padding: 4px; display: flex; border: 1px solid var(--line); border-radius: 15px; background: #edf1f8; }
@@ -191,6 +240,8 @@ footer p span { margin: 0 5px; color: #a0a7b6; }
 @keyframes behaviorIsland { 0%, 25%, 82%, 100% { width: 236px; height: 42px; border-radius: 0 0 20px 20px; } 40%, 72% { width: 460px; height: 154px; border-radius: 0 0 30px 30px; } }
 @keyframes behaviorDetails { 0%, 31%, 78%, 100% { opacity: 0; transform: translateY(-7px); } 43%, 70% { opacity: 1; transform: translateY(0); } }
 @keyframes clickPulse { 0%, 35%, 100% { opacity: 0; transform: scale(.45); } 39% { opacity: .9; transform: scale(.6); } 48% { opacity: 0; transform: scale(1.35); } }
+@keyframes layoutPointer { 0%, 13% { left: calc(50% + 270px); top: 315px; } 31%, 64% { left: calc(50% + 195px); top: 148px; } 83%, 100% { left: calc(50% + 270px); top: 315px; } }
+@keyframes layoutClick { 0%, 30%, 100% { opacity: 0; transform: scale(.45); } 34% { opacity: .9; transform: scale(.6); } 43% { opacity: 0; transform: scale(1.35); } }
 
 @media (max-width: 900px) {
   .site-header { grid-template-columns: 1fr auto; }
@@ -202,6 +253,7 @@ footer p span { margin: 0 5px; color: #a0a7b6; }
   .install-layout { grid-template-columns: 1fr; gap: 36px; }
   .gallery-grid { grid-template-columns: 1fr; }
   .smart-grid { grid-template-columns: 1fr; }
+  .layout-stage { height: 390px; }
   .gallery-icon img { max-width: 280px; }
   footer { grid-template-columns: 1fr; justify-items: center; gap: 15px; text-align: center; }
   .copyright { justify-self: center; }
@@ -221,6 +273,14 @@ footer p span { margin: 0 5px; color: #a0a7b6; }
   .feature-wide { grid-column: span 1; }
   .feature-card { padding: 25px; border-radius: 24px; }
   .smart-section { padding-top: 84px; }
+  .layouts-section { padding-top: 84px; }
+  .layout-stage { height: 330px; }
+  .layout-button { min-width: 0; padding-inline: 14px; }
+  .layout-island { width: calc(100% - 24px); }
+  .layout-body { grid-template-columns: 1fr; }
+  .layout-widgets { display: none; }
+  .layout-player { padding-right: 0; border-right: 0; }
+  .layout-pointer { animation-name: layoutPointerMobile; }
   .behavior-stage { height: 300px; }
   .behavior-island { max-width: calc(100% - 24px); }
   .behavior-pointer { animation-name: behaviorPointerMobile; }
@@ -232,6 +292,7 @@ footer p span { margin: 0 5px; color: #a0a7b6; }
 
 @keyframes marquee { to { transform: translateX(-35%); } }
 @keyframes behaviorPointerMobile { 0%, 12% { left: calc(50% + 105px); top: 235px; } 34%, 72% { left: calc(50% + 55px); top: 24px; } 92%, 100% { left: calc(50% + 105px); top: 235px; } }
+@keyframes layoutPointerMobile { 0%, 13% { left: calc(50% + 105px); top: 265px; } 31%, 64% { left: calc(50% + 65px); top: 148px; } 83%, 100% { left: calc(50% + 105px); top: 265px; } }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
