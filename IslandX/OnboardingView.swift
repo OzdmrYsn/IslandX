@@ -8,7 +8,7 @@ struct OnboardingView: View {
 
     @State private var step = 0
 
-    private let pageCount = 4
+    private let pageCount = 7
 
     var body: some View {
         VStack(spacing: 0) {
@@ -81,6 +81,15 @@ struct OnboardingView: View {
                 .transition(pageTransition)
         case 2:
             appearancePage
+                .transition(pageTransition)
+        case 3:
+            layoutPage
+                .transition(pageTransition)
+        case 4:
+            idleAppearancePage
+                .transition(pageTransition)
+        case 5:
+            activationPage
                 .transition(pageTransition)
         default:
             startupAndUpdatesPage
@@ -170,117 +179,181 @@ struct OnboardingView: View {
     }
 
     private var appearancePage: some View {
-        VStack(spacing: 12) {
-            VStack(spacing: 5) {
+        VStack(spacing: 24) {
+            VStack(spacing: 8) {
                 Text(text("Tarzınızı seçin", "Make it yours"))
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .font(.system(size: 27, weight: .bold, design: .rounded))
 
                 Text(
                     text(
-                        "Görünümü şimdi seçin. Daha sonra menü çubuğundan veya Ayarlar'dan değiştirebilirsiniz.",
-                        "Choose an appearance now. You can change it later from the menu bar or Settings."
+                        "IslandX'in renk ve yüzey stilini seçin. Bu seçimi daha sonra Ayarlar'dan değiştirebilirsiniz.",
+                        "Choose IslandX's color and surface style. You can change it later in Settings."
                     )
                 )
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
+                    .frame(maxWidth: 500)
             }
 
             ThemeChoicePicker(
                 selection: $settings.theme,
-                language: settings.language,
-                compact: true
+                language: settings.language
             )
 
-            HStack(alignment: .top, spacing: 18) {
-                VStack(spacing: 5) {
-                    Text(text("IslandX düzeni", "IslandX layout"))
-                        .font(.system(size: 12, weight: .semibold))
+            Spacer(minLength: 0)
+        }
+    }
 
-                    Picker(
-                        text("IslandX düzeni", "IslandX layout"),
-                        selection: $settings.contentMode
+    private var layoutPage: some View {
+        choicePage(
+            title: text("Nasıl kullanacaksınız?", "How will you use it?"),
+            message: text(
+                "Sade medya kontrollerini veya günlük araçları da içeren Genel paneli seçin.",
+                "Choose focused media controls or the General dashboard with everyday tools."
+            )
+        ) {
+            HStack(spacing: 18) {
+                ForEach(IslandContentMode.allCases) { mode in
+                    selectionCard(
+                        symbol: mode == .music
+                            ? "music.note"
+                            : "rectangle.split.2x1.fill",
+                        title: mode.title(language: settings.language),
+                        message: mode.subtitle(language: settings.language),
+                        isSelected: settings.contentMode == mode
                     ) {
-                        ForEach(IslandContentMode.allCases) { mode in
-                            Label(
-                                mode.title(language: settings.language),
-                                systemImage: mode == .music
-                                    ? "music.note"
-                                    : "rectangle.split.2x1.fill"
-                            )
-                            .tag(mode)
-                        }
+                        settings.contentMode = mode
                     }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
-
-                    Text(settings.contentMode.subtitle(language: settings.language))
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(2)
                 }
-                .frame(maxWidth: .infinity)
+            }
+        }
+    }
 
-                VStack(spacing: 5) {
-                    Text(text("Çentik boşta görünümü", "Notch idle appearance"))
-                        .font(.system(size: 12, weight: .semibold))
-
-                    Picker(
-                        text("Çentik boşta görünümü", "Notch idle appearance"),
-                        selection: $settings.notchIdleMode
+    private var idleAppearancePage: some View {
+        choicePage(
+            title: text("Boştayken nasıl görünsün?", "How should it look while idle?"),
+            message: text(
+                "Çentiğin yanında küçük bir ada bırakın veya kamera alanının içine tamamen saklayın.",
+                "Keep a small island beside the notch or hide it completely inside the camera area."
+            )
+        ) {
+            HStack(spacing: 18) {
+                ForEach(NotchIdleMode.allCases) { mode in
+                    selectionCard(
+                        symbol: mode.symbolName,
+                        title: mode.title(language: settings.language),
+                        message: mode.subtitle(language: settings.language),
+                        isSelected: settings.notchIdleMode == mode
                     ) {
-                        ForEach(NotchIdleMode.allCases) { mode in
-                            Label(
-                                mode.title(language: settings.language),
-                                systemImage: mode.symbolName
-                            )
-                            .tag(mode)
-                        }
+                        settings.notchIdleMode = mode
                     }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
-
-                    Text(settings.notchIdleMode.subtitle(language: settings.language))
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(2)
                 }
-                .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    private var activationPage: some View {
+        choicePage(
+            title: text("Nasıl açılsın?", "How should it open?"),
+            message: text(
+                "IslandX'in genişletilmiş kontrolleri ne zaman göstereceğini belirleyin.",
+                "Choose when IslandX reveals its expanded controls."
+            )
+        ) {
+            HStack(spacing: 12) {
+                ForEach(NotchActivationMode.allCases) { mode in
+                    selectionCard(
+                        symbol: activationSymbol(for: mode),
+                        title: mode.title(language: settings.language),
+                        message: mode.subtitle(language: settings.language),
+                        isSelected: settings.activationMode == mode,
+                        compact: true
+                    ) {
+                        settings.activationMode = mode
+                    }
+                }
+            }
+        }
+    }
+
+    private func choicePage<Content: View>(
+        title: String,
+        message: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(spacing: 30) {
+            VStack(spacing: 9) {
+                Text(title)
+                    .font(.system(size: 27, weight: .bold, design: .rounded))
+
+                Text(message)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 520)
             }
 
-            VStack(spacing: 4) {
-                HStack {
-                    Text(text("Açılma davranışı", "Opening behavior"))
-                        .font(.system(size: 13, weight: .semibold))
-
-                    Spacer()
-
-                    Picker(
-                        text("Açılma davranışı", "Opening behavior"),
-                        selection: $settings.activationMode
-                    ) {
-                        ForEach(NotchActivationMode.allCases) { mode in
-                            Text(mode.title(language: settings.language))
-                                .tag(mode)
-                        }
-                    }
-                    .labelsHidden()
-                    .frame(width: 230)
-                }
-
-                Text(
-                    settings.activationMode.subtitle(
-                        language: settings.language
-                    )
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-            }
-            .frame(maxWidth: 460)
+            content()
 
             Spacer(minLength: 0)
+        }
+    }
+
+    private func selectionCard(
+        symbol: String,
+        title: String,
+        message: String,
+        isSelected: Bool,
+        compact: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                action()
+            }
+        } label: {
+            VStack(spacing: compact ? 10 : 14) {
+                Image(systemName: symbol)
+                    .font(.system(size: compact ? 25 : 32, weight: .semibold))
+                    .foregroundStyle(isSelected ? Color.accentColor : .primary)
+
+                Text(title)
+                    .font(.system(size: compact ? 13 : 16, weight: .semibold))
+                    .multilineTextAlignment(.center)
+
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(
+                maxWidth: .infinity,
+                minHeight: compact ? 190 : 220,
+                alignment: .top
+            )
+            .padding(compact ? 14 : 20)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color.primary.opacity(isSelected ? 0.09 : 0.045))
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(
+                        isSelected ? Color.accentColor : Color.primary.opacity(0.1),
+                        lineWidth: isSelected ? 2 : 1
+                    )
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private func activationSymbol(for mode: NotchActivationMode) -> String {
+        switch mode {
+        case .hover: "cursorarrow.motionlines"
+        case .click: "cursorarrow.click"
+        case .activationZone: "viewfinder"
         }
     }
 
