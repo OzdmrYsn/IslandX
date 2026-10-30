@@ -12,6 +12,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let keepAwakeManager = KeepAwakeManager()
     private let fileShelfManager = FileShelfManager()
     private let clipboardHistoryManager = ClipboardHistoryManager()
+    private lazy var systemHUDInterceptor = SystemHUDInterceptor(
+        onVolume: { [weak self] value in
+            self?.commandEchoManager.showHandledVolume(value)
+        },
+        onBrightness: { [weak self] value in
+            self?.commandEchoManager.showHandledBrightness(value)
+        }
+    )
     private var notchWindowController: FloatingNotchWindowController?
     private var settingsWindowController: SettingsWindowController?
     private var onboardingWindowController: OnboardingWindowController?
@@ -63,11 +71,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         commandEchoManager.stopMonitoring()
         clipboardHistoryManager.stopMonitoring()
         keepAwakeManager.setActive(false)
+        systemHUDInterceptor.setEnabled(false)
         NotificationCenter.default.removeObserver(self)
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
         settings.refreshLaunchAtLoginState()
+        settings.refreshPermissionState()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(
@@ -271,6 +281,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
                 self?.configureMenuBarItem()
+            }
+            .store(in: &cancellables)
+
+        // islo. only takes the volume and brightness keys over while it has
+        // its own HUD to show in place of the macOS one.
+        settings.$dashboardCommandEchoEnabled
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] enabled in
+                self?.systemHUDInterceptor.setEnabled(enabled)
             }
             .store(in: &cancellables)
     }

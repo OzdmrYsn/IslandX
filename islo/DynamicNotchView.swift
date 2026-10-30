@@ -23,7 +23,6 @@ struct NotchLayout: Equatable {
     let idleWidth: CGFloat
     let notchBandHeight: CGFloat
     let cameraHousingWidth: CGFloat
-    let expandedWidth: CGFloat
     let screenWidth: CGFloat
 
     private static let compactWingWidth: CGFloat = 50
@@ -33,13 +32,11 @@ struct NotchLayout: Equatable {
             idleWidth = 176
             notchBandHeight = 0
             cameraHousingWidth = 0
-            expandedWidth = 460
             screenWidth = 724
             return
         }
 
         screenWidth = screen.frame.width
-        expandedWidth = min(460, max(screen.frame.width - 24, 320))
 
         guard screen.safeAreaInsets.top > 0,
               let leftArea = screen.auxiliaryTopLeftArea,
@@ -79,14 +76,9 @@ struct NotchLayout: Equatable {
         hasCameraHousing ? notchBandHeight : 38
     }
 
-    var expandedShoulderHeight: CGFloat {
-        hasCameraHousing ? notchBandHeight + 8 : 0
-    }
-
     func size(
         for state: NotchPresentationState,
-        idleMode: NotchIdleMode = .visibleIsland,
-        contentMode: IslandContentMode = .music
+        idleMode: NotchIdleMode = .visibleIsland
     ) -> CGSize {
         switch state {
         case .idle:
@@ -102,21 +94,11 @@ struct NotchLayout: Equatable {
                 height: idleHeight
             )
         case .expanded:
-            if contentMode == .dashboard {
-                return CGSize(
-                    width: min(780, max(screenWidth - 24, 620)),
-                    height: hasCameraHousing ? 244 : 232
-                )
-            }
             return CGSize(
-                width: expandedWidth,
-                height: hasCameraHousing ? 136 : 124
+                width: min(780, max(screenWidth - 24, 620)),
+                height: hasCameraHousing ? 244 : 232
             )
         }
-    }
-
-    var expandedTopPadding: CGFloat {
-        hasCameraHousing ? expandedShoulderHeight + 2 : 8
     }
 }
 
@@ -138,9 +120,6 @@ struct DynamicNotchView: View {
     @Environment(\.accessibilityReduceTransparency)
     private var reduceTransparency
 
-    @Environment(\.colorScheme)
-    private var systemColorScheme
-
     @Namespace private var artworkNamespace
 
     @State private var presentation: NotchPresentationState = .idle
@@ -159,6 +138,19 @@ struct DynamicNotchView: View {
     @State private var isCommandEchoVisible = false
     @State private var commandEchoTask: Task<Void, Never>?
     @State private var pendingSkipDirection: MediaSkipDirection?
+    /// The visible silhouette. It animates inside a window that only ever
+    /// jumps in size, so the notch always grows from the top edge.
+    @State private var surfaceSize: CGSize = .zero
+    @State private var windowMargin: CGFloat = 0
+    @State private var windowSettleTask: Task<Void, Never>?
+    /// The resting island shows its wings only while music plays.
+    @State private var showsIdleWings = false
+    @State private var idleWingsTask: Task<Void, Never>?
+    /// Draws nothing over the camera housing once it has fully shrunk back.
+    @State private var isIdleSurfaceConcealed = true
+
+    /// Room around the surface for the Command Echo light to spread into.
+    private static let haloMargin: CGFloat = 22
 
     init(
         mediaManager: MediaManager,
@@ -194,13 +186,25 @@ struct DynamicNotchView: View {
                 compactContent
                     .transition(.opacity)
             } else {
-                expandedContent
+                dashboardExpandedContent
                     .transition(.opacity)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        // Content is laid out at its final size; the animated surface around
+        // it reveals it from the top instead of reflowing mid-animation.
+        .frame(
+            width: preferredSize.width,
+            height: preferredSize.height,
+            alignment: .top
+        )
+        .frame(
+            width: surfaceSize.width,
+            height: surfaceSize.height,
+            alignment: .top
+        )
         .background {
-            if isHiddenMiniIdle && !isCommandEchoVisible && !isFileDropTargeted {
+            if isHiddenMiniIdle && isIdleSurfaceConcealed
+                && !isCommandEchoVisible && !isFileDropTargeted {
                 Color.clear
             } else if isCommandEchoVisible || isFileDropTargeted {
                 notchShape.fill(Color.black)
@@ -215,9 +219,6 @@ struct DynamicNotchView: View {
                     .stroke(primaryColor.opacity(0.13), lineWidth: 0.5)
             }
         }
-        .overlay(alignment: .bottomLeading) {
-            if isCommandEchoVisible { commandEchoGlow }
-        }
         .overlay {
             if isFileDropTargeted {
                 notchShape
@@ -231,8 +232,7 @@ struct DynamicNotchView: View {
             of: [UTType.fileURL.identifier],
             isTargeted: $isFileDropTargeted
         ) { providers in
-            guard settings.contentMode == .dashboard,
-                  settings.dashboardFileShelfEnabled else { return false }
+            guard settings.dashboardFileShelfEnabled else { return false }
             let accepted = fileShelfManager.receive(providers)
             if accepted {
                 isPinned = true
@@ -243,18 +243,59 @@ struct DynamicNotchView: View {
         }
     }
 
+    /// A soft white light around the silhouette, like the reference HUD. It
+    /// sits outside the shape so the camera housing can't cut it in half.
+    private var commandEchoHalo: some View {
+        ZStack(alignment: .top) {
+            haloLayer(spread: 5).blur(radius: 11).opacity(0.75)
+            haloLayer(spread: 2).blur(radius: 3.5)
+        }
+        // Lay the light out at the surface's size and let it spill over.
+        // Its larger natural size would otherwise grow the root view past a
+        // margin-less window and AppKit would centre it, lifting the notch.
+        .frame(width: surfaceSize.width, height: surfaceSize.height, alignment: .top)
+        .opacity(isCommandEchoVisible ? 1 : 0)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    /// The silhouette grown by `spread` on the sides and bottom, so the
+    /// brightest part of the blur sits right at the visible edge.
+    private func haloLayer(spread: CGFloat) -> some View {
+        notchShape
+            .fill(Color.white)
+            .frame(
+                width: surfaceSize.width + spread * 2,
+                height: surfaceSize.height + spread
+            )
+    }
+
     var body: some View {
-        renderedSurface
-        .onContinuousHover(perform: handleContinuousHover)
+        ZStack(alignment: .top) {
+            commandEchoHalo
+
+            renderedSurface
+                .onContinuousHover(perform: handleContinuousHover)
+                .contextMenu { surfaceContextMenu }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onAppear {
             scrubValue = mediaManager.playbackPosition
             expansionProgress = presentation == .expanded ? 1 : 0
+            showsIdleWings = mediaManager.isPlaying
+            surfaceSize = preferredSize
+            isIdleSurfaceConcealed = true
             onPreferredSizeChange(preferredSize, false)
         }
         .onDisappear {
             hoverTask?.cancel()
             trackChangeTask?.cancel()
             commandEchoTask?.cancel()
+            windowSettleTask?.cancel()
+            idleWingsTask?.cancel()
+        }
+        .onReceive(mediaManager.$isPlaying.dropFirst().removeDuplicates()) { playing in
+            updateIdleWings(isPlaying: playing)
         }
         .onReceive(mediaManager.$playbackPosition) { newValue in
             guard !isScrubbing else { return }
@@ -274,11 +315,7 @@ struct DynamicNotchView: View {
         }
         .onChange(of: settings.notchIdleMode) { _ in
             guard presentation == .idle else { return }
-            onPreferredSizeChange(preferredSize, !reduceMotion)
-        }
-        .onChange(of: settings.contentMode) { _ in
-            guard presentation == .expanded else { return }
-            onPreferredSizeChange(preferredSize, !reduceMotion)
+            resizeSurface(to: preferredSize, animation: presentationAnimation)
         }
         .onReceive(
             NotificationCenter.default.publisher(for: .isloExpand)
@@ -305,11 +342,8 @@ struct DynamicNotchView: View {
         .onChange(of: settings.dashboardFileShelfEnabled) { enabled in
             if !enabled, dashboardSection == .shelf { dashboardSection = .home }
         }
-        .onChange(of: isFileDropTargeted) { targeted in
-            let nextSize = targeted
-                ? fileDropPreferredSize
-                : (isCommandEchoVisible ? commandEchoPreferredSize : basePreferredSize)
-            onPreferredSizeChange(nextSize, !reduceMotion)
+        .onChange(of: isFileDropTargeted) { _ in
+            resizeSurface(to: preferredSize, animation: presentationAnimation)
         }
         .onChange(of: settings.dashboardKeepAwakeEnabled) { enabled in
             if !enabled { keepAwakeManager.setActive(false) }
@@ -323,86 +357,71 @@ struct DynamicNotchView: View {
             isPinned = false
             setPresentation(.idle)
         }
-        .contextMenu {
-            Menu(localized("islo. Düzeni", "islo. Layout")) {
-                ForEach(IslandContentMode.allCases) { mode in
-                    Button {
-                        settings.contentMode = mode
-                    } label: {
-                        Label(
-                            mode.title(language: settings.language),
-                            systemImage: settings.contentMode == mode
-                                ? "checkmark"
-                                : (mode == .music
-                                    ? "music.note"
-                                    : "rectangle.split.2x1.fill")
-                        )
-                    }
-                }
-            }
-
-            Menu(localized("Görünüm", "Appearance")) {
-                ForEach(AppTheme.allCases) { theme in
-                    Button {
-                        guard theme.isAvailable else { return }
-                        settings.theme = theme
-                    } label: {
-                        Label(
-                            theme.title(language: settings.language),
-                            systemImage: settings.theme == theme
-                                ? "checkmark"
-                                : theme.symbolName
-                        )
-                    }
-                    .disabled(!theme.isAvailable)
-                }
-            }
-
-            Menu(localized("Çentik Boşta Görünümü", "Notch Idle Appearance")) {
-                ForEach(NotchIdleMode.allCases) { mode in
-                    Button {
-                        settings.notchIdleMode = mode
-                    } label: {
-                        Label(
-                            mode.title(language: settings.language),
-                            systemImage: settings.notchIdleMode == mode
-                                ? "checkmark"
-                                : mode.symbolName
-                        )
-                    }
-                }
-            }
-
-            Menu(localized("Açılma Davranışı", "Opening Behavior")) {
-                ForEach(NotchActivationMode.allCases) { mode in
-                    Button {
-                        settings.activationMode = mode
-                    } label: {
-                        Label(
-                            mode.title(language: settings.language),
-                            systemImage: settings.activationMode == mode
-                                ? "checkmark"
-                                : "cursorarrow.motionlines"
-                        )
-                    }
-                }
-            }
-
-            Button(localized("Ayarlar…", "Settings…")) {
-                NotificationCenter.default.post(
-                    name: .isloShowSettings,
-                    object: nil
-                )
-            }
-
-            Divider()
-
-            Button(localized("islo.'dan Çık", "Quit islo.")) {
-                NSApp.terminate(nil)
-            }
-        }
         .accessibilityElement(children: .contain)
         .preferredColorScheme(settings.theme.colorScheme)
+    }
+
+    @ViewBuilder
+    private var surfaceContextMenu: some View {
+        Menu(localized("Görünüm", "Appearance")) {
+            ForEach(AppTheme.allCases) { theme in
+                Button {
+                    guard theme.isAvailable else { return }
+                    settings.theme = theme
+                } label: {
+                    Label(
+                        theme.title(language: settings.language),
+                        systemImage: settings.theme == theme
+                            ? "checkmark"
+                            : theme.symbolName
+                    )
+                }
+                .disabled(!theme.isAvailable)
+            }
+        }
+
+        Menu(localized("Çentik Boşta Görünümü", "Notch Idle Appearance")) {
+            ForEach(NotchIdleMode.allCases) { mode in
+                Button {
+                    settings.notchIdleMode = mode
+                } label: {
+                    Label(
+                        mode.title(language: settings.language),
+                        systemImage: settings.notchIdleMode == mode
+                            ? "checkmark"
+                            : mode.symbolName
+                    )
+                }
+            }
+        }
+
+        Menu(localized("Açılma Davranışı", "Opening Behavior")) {
+            ForEach(NotchActivationMode.allCases) { mode in
+                Button {
+                    settings.activationMode = mode
+                } label: {
+                    Label(
+                        mode.title(language: settings.language),
+                        systemImage: settings.activationMode == mode
+                            ? "checkmark"
+                            : "cursorarrow.motionlines"
+                    )
+                }
+            }
+        }
+
+        Button(localized("Ayarlar…", "Settings…")) {
+            NotificationCenter.default.post(
+                name: .isloShowSettings,
+                object: nil
+            )
+        }
+
+        Divider()
+
+        Button(localized("islo.'dan Çık", "Quit islo.")) {
+            NSApp.terminate(nil)
+        }
     }
 
     // MARK: - Compact UI
@@ -416,10 +435,11 @@ struct DynamicNotchView: View {
             setPresentation(.expanded)
         } label: {
             Group {
-                if isHiddenMiniIdle {
-                    Color.clear
-                } else if layout.hasCameraHousing {
+                if layout.hasCameraHousing {
+                    // Fades with the wings as they slide into the notch.
                     notchedCompactContent
+                        .opacity(isHiddenMiniIdle ? 0 : 1)
+                        .accessibilityHidden(isHiddenMiniIdle)
                 } else {
                     standardCompactContent
                 }
@@ -436,7 +456,7 @@ struct DynamicNotchView: View {
     private var notchedCompactContent: some View {
         HStack(spacing: 0) {
             artwork(size: 27, cornerRadius: 7)
-                .frame(width: layout.compactWingWidth)
+                .frame(width: layout.compactWingWidth, alignment: .trailing)
 
             Color.clear
                 .frame(width: layout.cameraHousingWidth)
@@ -444,7 +464,7 @@ struct DynamicNotchView: View {
 
             PlaybackWaveform(isPlaying: mediaManager.isPlaying)
                 .foregroundStyle(playbackIndicatorColor)
-                .frame(width: layout.compactWingWidth)
+                .frame(width: layout.compactWingWidth, alignment: .leading)
                 .accessibilityHidden(true)
         }
     }
@@ -469,17 +489,6 @@ struct DynamicNotchView: View {
     }
 
     // MARK: - Expanded UI
-
-    @ViewBuilder
-    private var expandedContent: some View {
-        if settings.contentMode == .dashboard {
-            dashboardExpandedContent
-        } else if layout.hasCameraHousing {
-            notchedExpandedContent
-        } else {
-            standardExpandedContent
-        }
-    }
 
     private var dashboardExpandedContent: some View {
         VStack(spacing: 0) {
@@ -510,7 +519,7 @@ struct DynamicNotchView: View {
                 .frame(maxHeight: .infinity, alignment: .topLeading)
                 .background(dashboardGlassCard)
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, bodyPadding(16, gap: 12))
         .padding(.bottom, 16)
     }
 
@@ -569,7 +578,7 @@ struct DynamicNotchView: View {
 
         }
         .foregroundStyle(.white)
-        .padding(.horizontal, 18)
+        .padding(.horizontal, bodyPadding(18, gap: 12))
         .padding(.bottom, 14)
     }
 
@@ -1233,14 +1242,15 @@ struct DynamicNotchView: View {
             }
         }
         .foregroundStyle(.white)
-        .padding(.horizontal, 14)
+        .padding(.horizontal, bodyPadding(14, gap: 10))
         .padding(.bottom, 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .overlay {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(style: StrokeStyle(lineWidth: 1, dash: [5, 5]))
                 .foregroundStyle(.white.opacity(0.22))
-                .padding(8)
+                .padding(.horizontal, bodyPadding(8, gap: 4))
+                .padding(.vertical, 8)
         }
     }
 
@@ -1284,33 +1294,6 @@ struct DynamicNotchView: View {
         }
     }
 
-    private var commandEchoGlow: some View {
-        GeometryReader { proxy in
-            let progress = commandEchoValue ?? 1
-            TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
-                let phase = timeline.date.timeIntervalSinceReferenceDate
-                    .truncatingRemainder(dividingBy: 1.6) / 1.6
-                ZStack(alignment: .leading) {
-                    Capsule().fill(.white.opacity(0.08))
-                    Capsule()
-                        .fill(LinearGradient(colors: [.white.opacity(0.35), .white, .white.opacity(0.42)], startPoint: .leading, endPoint: .trailing))
-                        .frame(width: max(proxy.size.width * progress, 3))
-                        .shadow(color: .white.opacity(0.72), radius: 8, y: -2)
-
-                    Capsule()
-                        .fill(.white.opacity(commandEchoValue == nil ? 0.9 : 0.34))
-                        .frame(width: 46)
-                        .blur(radius: 5)
-                        .offset(x: (proxy.size.width + 46) * phase - 46)
-                        .mask(Capsule())
-                }
-                .animation(.spring(response: 0.24, dampingFraction: 0.88), value: progress)
-            }
-        }
-        .frame(height: 2)
-        .allowsHitTesting(false)
-    }
-
     private var commandEchoValue: Double? {
         switch commandEchoManager.event {
         case .volume(let value), .brightness(let value): value
@@ -1350,12 +1333,18 @@ struct DynamicNotchView: View {
     }
 
     private func showCommandEchoIfNeeded() {
-        guard settings.dashboardCommandEchoEnabled else { return }
+        // The open dashboard already shows volume and playback; swapping it
+        // for a HUD would yank it away mid-interaction.
+        guard settings.dashboardCommandEchoEnabled,
+              presentation == .idle else { return }
         commandEchoTask?.cancel()
-        withAnimation(.spring(response: 0.2, dampingFraction: 0.9)) {
+        let echoAnimation: Animation = reduceMotion
+            ? .easeOut(duration: 0.12)
+            : .spring(response: 0.3, dampingFraction: 0.86)
+        withAnimation(echoAnimation) {
             isCommandEchoVisible = true
         }
-        onPreferredSizeChange(commandEchoPreferredSize, !reduceMotion)
+        resizeSurface(to: preferredSize, animation: echoAnimation)
         commandEchoTask = Task {
             let duration: Duration
             if case .screenshot = commandEchoManager.event {
@@ -1368,10 +1357,10 @@ struct DynamicNotchView: View {
             try? await Task.sleep(for: duration)
             guard !Task.isCancelled else { return }
             await MainActor.run {
-                withAnimation(.easeIn(duration: 0.18)) {
+                withAnimation(echoAnimation) {
                     isCommandEchoVisible = false
                 }
-                onPreferredSizeChange(basePreferredSize, !reduceMotion)
+                resizeSurface(to: preferredSize, animation: echoAnimation)
             }
         }
     }
@@ -1457,104 +1446,6 @@ struct DynamicNotchView: View {
         return formatter.string(from: date)
     }
 
-    /// On a MacBook display the camera housing becomes the visual centre of the
-    /// control. Content lives in its two side wings, so expanding feels like the
-    /// physical notch widening instead of a card dropping down from it.
-    private var notchedExpandedContent: some View {
-        VStack(spacing: 4) {
-            notchAccessoryRow
-
-            HStack(spacing: 10) {
-                sourceArtwork(size: 52, cornerRadius: 14)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(trackTitle)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(primaryColor)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-
-                    Text(artistTitle)
-                        .font(.system(size: 10))
-                        .foregroundStyle(primaryColor.opacity(0.58))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-
-                    compactPlaybackControls
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                sourceTile
-            }
-            .padding(.horizontal, 16)
-            .frame(height: 52)
-
-            HStack(alignment: .center, spacing: 10) {
-                progressSection
-
-                Divider()
-                    .overlay(primaryColor.opacity(0.12))
-                    .frame(height: 24)
-
-                volumeSection
-                    .frame(width: 112)
-            }
-            .padding(.horizontal, 16)
-        }
-        .padding(.bottom, 6)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-    }
-
-    private var notchAccessoryRow: some View {
-        HStack(spacing: 0) {
-            HStack(spacing: 6) {
-                smallUtilityButton(
-                    icon: isPinned ? "pin.fill" : "pin",
-                    label: isPinned
-                        ? localized("Otomatik kapanmaya izin ver", "Allow automatic collapse")
-                        : localized("Açık tut", "Keep open")
-                ) {
-                    isPinned.toggle()
-                }
-
-                PlaybackWaveform(isPlaying: mediaManager.isPlaying)
-                    .foregroundStyle(playbackIndicatorColor)
-            }
-            .padding(.leading, 18)
-            .frame(width: notchWingWidth, alignment: .leading)
-
-            Color.clear
-                .frame(width: layout.cameraHousingWidth)
-                .accessibilityHidden(true)
-
-            HStack(spacing: 6) {
-                smallUtilityButton(
-                    icon: "gearshape.fill",
-                    label: localized("Ayarlar", "Settings")
-                ) {
-                    NotificationCenter.default.post(
-                        name: .isloShowSettings,
-                        object: nil
-                    )
-                }
-
-                smallUtilityButton(
-                    icon: "chevron.up",
-                    label: localized("Medya kontrollerini küçült", "Collapse media controls")
-                ) {
-                    hoverTask?.cancel()
-                    trackChangeTask?.cancel()
-                    isTemporaryTrackPreview = false
-                    isPinned = false
-                    setPresentation(.idle)
-                }
-            }
-            .padding(.trailing, 18)
-            .frame(width: notchWingWidth, alignment: .trailing)
-        }
-        .frame(height: max(layout.notchBandHeight + 4, 36))
-    }
-
     private var sourceTile: some View {
         Button(action: mediaManager.openSourceApplication) {
             VStack(spacing: 2) {
@@ -1603,30 +1494,6 @@ struct DynamicNotchView: View {
         }
     }
 
-    private var standardExpandedContent: some View {
-        VStack(spacing: 6) {
-            trackHeader
-            HStack(alignment: .center, spacing: 12) {
-                progressSection
-
-                Divider()
-                    .overlay(primaryColor.opacity(0.12))
-                    .frame(height: 28)
-
-                volumeSection
-                    .frame(width: 150)
-            }
-        }
-        .padding(.top, layout.expandedTopPadding)
-        .padding(.horizontal, 12)
-        .padding(.bottom, 8)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-    }
-
-    private var notchWingWidth: CGFloat {
-        max((layout.expandedWidth - layout.cameraHousingWidth) / 2, 0)
-    }
-
     private var compactPlaybackControls: some View {
         HStack(spacing: 3) {
             compactPlaybackModeButton(
@@ -1662,118 +1529,6 @@ struct DynamicNotchView: View {
             )
 
             compactPlaybackModeButton(
-                icon: mediaManager.repeatMode == .one
-                    ? "repeat.1"
-                    : "repeat",
-                label: repeatControlLabel,
-                isActive: mediaManager.repeatMode != .off,
-                action: mediaManager.cycleRepeatMode
-            )
-        }
-    }
-
-    private var trackHeader: some View {
-        HStack(alignment: .center, spacing: 10) {
-            sourceArtwork(size: 52, cornerRadius: 11)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(trackTitle)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(primaryColor)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-
-                Text(artistTitle)
-                    .font(.system(size: 11))
-                    .foregroundStyle(primaryColor.opacity(0.65))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-
-                if !mediaManager.albumName.isEmpty {
-                    Text(mediaManager.albumName)
-                        .font(.system(size: 11))
-                        .foregroundStyle(primaryColor.opacity(0.42))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                }
-
-                Text(mediaManager.source.displayName.uppercased())
-                    .font(.system(size: 8, weight: .semibold))
-                    .tracking(0.8)
-                    .foregroundStyle(primaryColor.opacity(0.4))
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityElement(children: .combine)
-
-            playbackControls
-
-            VStack(spacing: 6) {
-                smallUtilityButton(
-                    icon: isPinned ? "pin.fill" : "pin",
-                    label: isPinned ? "Allow automatic collapse" : "Keep open"
-                ) {
-                    isPinned.toggle()
-                }
-
-                smallUtilityButton(
-                    icon: "chevron.up",
-                    label: "Collapse media controls"
-                ) {
-                    hoverTask?.cancel()
-                    trackChangeTask?.cancel()
-                    isTemporaryTrackPreview = false
-                    isPinned = false
-                    setPresentation(.idle)
-                }
-            }
-        }
-        .frame(height: 52)
-    }
-
-    private var playbackControls: some View {
-        HStack(spacing: 6) {
-            playbackModeButton(
-                icon: "shuffle",
-                label: mediaManager.isShuffleEnabled
-                    ? localized("Karışık çalmayı kapat", "Turn shuffle off")
-                    : localized("Karışık çal", "Shuffle"),
-                isActive: mediaManager.isShuffleEnabled,
-                action: mediaManager.toggleShuffle
-            )
-
-            mediaControlButton(
-                icon: "backward.fill",
-                label: localized("Önceki parça", "Previous track"),
-                action: { skipTrack(.previous) }
-            )
-
-            Button(action: mediaManager.togglePlayPause) {
-                Image(
-                    systemName: mediaManager.isPlaying
-                        ? "pause.fill"
-                        : "play.fill"
-                )
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(panelColor)
-                .frame(width: 34, height: 34)
-                .background(Circle().fill(primaryColor))
-                .contentShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .disabled(!mediaManager.hasActiveTrack)
-            .opacity(mediaManager.hasActiveTrack ? 1 : 0.45)
-            .accessibilityLabel(
-                Text(mediaManager.isPlaying ? "Pause" : "Play")
-            )
-            .help(mediaManager.isPlaying ? "Pause" : "Play")
-
-            mediaControlButton(
-                icon: "forward.fill",
-                label: localized("Sonraki parça", "Next track"),
-                action: { skipTrack(.next) }
-            )
-
-            playbackModeButton(
                 icon: mediaManager.repeatMode == .one
                     ? "repeat.1"
                     : "repeat",
@@ -1907,57 +1662,6 @@ struct DynamicNotchView: View {
         .disabled(mediaManager.source == .none)
         .accessibilityLabel(Text(openSourceLabel))
         .help(openSourceLabel)
-    }
-
-    private func mediaControlButton(
-        icon: String,
-        label: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(primaryColor.opacity(0.88))
-                .frame(width: 32, height: 32)
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .disabled(!mediaManager.hasActiveTrack)
-        .opacity(mediaManager.hasActiveTrack ? 1 : 0.45)
-        .accessibilityLabel(Text(label))
-        .help(label)
-    }
-
-    private func playbackModeButton(
-        icon: String,
-        label: String,
-        isActive: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(
-                    isActive ? Color.green : primaryColor.opacity(0.62)
-                )
-                .frame(width: 26, height: 26)
-                .background(
-                    Circle().fill(
-                        isActive
-                            ? Color.green.opacity(0.16)
-                            : primaryColor.opacity(0.07)
-                    )
-                )
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .disabled(!mediaManager.hasActiveTrack)
-        .opacity(mediaManager.hasActiveTrack ? 1 : 0.45)
-        .accessibilityLabel(Text(label))
-        .accessibilityValue(
-            Text(isActive ? localized("Açık", "On") : localized("Kapalı", "Off"))
-        )
-        .help(label)
     }
 
     private func compactMediaControlButton(
@@ -2131,30 +1835,39 @@ struct DynamicNotchView: View {
                 return
             }
 
+            // The mirror case: after a collapse the panel shrinks under a
+            // pointer that hasn't moved, which reports a hover and would
+            // reopen it at once. Only expand over the island's resting frame.
+            if state == .expanded, !isPointer(insideFrameOf: preferredSize) {
+                return
+            }
+
             setPresentation(state)
         }
     }
 
     private var isPointerInsideFloatingWindow: Bool {
+        isPointer(insideFrameOf: layout.size(for: .expanded))
+    }
+
+    /// Checks the real pointer position against the frame the panel settles
+    /// at for `size`, ignoring any resize animation still in flight.
+    private func isPointer(insideFrameOf size: CGSize) -> Bool {
         guard let window = NSApp.windows.first(where: {
             $0.identifier?.rawValue == "isloFloatingNotch"
         }), let screen = window.screen ?? NSScreen.main else {
             return isPointerInside
         }
 
-        let expandedSize = layout.size(
-            for: .expanded,
-            contentMode: settings.contentMode
-        )
         let topGap: CGFloat = screen.safeAreaInsets.top > 0 ? 0 : 6
-        let expandedFrame = NSRect(
-            x: screen.frame.midX - expandedSize.width / 2,
-            y: screen.frame.maxY - topGap - expandedSize.height,
-            width: expandedSize.width,
-            height: expandedSize.height
+        let frame = NSRect(
+            x: screen.frame.midX - size.width / 2,
+            y: screen.frame.maxY - topGap - size.height,
+            width: size.width,
+            height: size.height
         )
 
-        return expandedFrame
+        return frame
             .insetBy(dx: -4, dy: -4)
             .contains(NSEvent.mouseLocation)
     }
@@ -2173,21 +1886,78 @@ struct DynamicNotchView: View {
         if newValue == .idle {
             trackChangeTask?.cancel()
             isTemporaryTrackPreview = false
+        } else {
+            // Opening replaces a system-change HUD instead of stretching it.
+            commandEchoTask?.cancel()
         }
-
-        onPreferredSizeChange(
-            layout.size(
-                for: newValue,
-                idleMode: settings.notchIdleMode,
-                contentMode: settings.contentMode
-            ),
-            !reduceMotion
-        )
 
         withAnimation(presentationAnimation) {
             presentation = newValue
             expansionProgress = newValue == .expanded ? 1 : 0
+            if newValue == .expanded { isCommandEchoVisible = false }
         }
+        resizeSurface(to: preferredSize, animation: presentationAnimation)
+    }
+
+    /// Animates the visible surface to `target`. The window jumps straight
+    /// to a size that holds both the old and the new surface, then settles
+    /// once the animation is over. Never animating the window keeps the
+    /// notch attached to the top edge and avoids AppKit layout loops.
+    private func resizeSurface(to target: CGSize, animation: Animation?) {
+        let margin = isCommandEchoVisible ? Self.haloMargin : 0
+        windowMargin = max(windowMargin, margin)
+        let envelope = CGSize(
+            width: max(surfaceSize.width, target.width),
+            height: max(surfaceSize.height, target.height)
+        )
+        onPreferredSizeChange(windowSize(for: envelope, margin: windowMargin), false)
+
+        if target != surfaceSize {
+            isIdleSurfaceConcealed = false
+        }
+        withAnimation(animation) {
+            surfaceSize = target
+        }
+
+        windowSettleTask?.cancel()
+        windowSettleTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 650_000_000)
+            guard !Task.isCancelled else { return }
+            let settledMargin = isCommandEchoVisible ? Self.haloMargin : 0
+            windowMargin = settledMargin
+            onPreferredSizeChange(windowSize(for: target, margin: settledMargin), false)
+            isIdleSurfaceConcealed = true
+        }
+    }
+
+    private func windowSize(for surface: CGSize, margin: CGFloat) -> CGSize {
+        CGSize(width: surface.width + margin * 2, height: surface.height + margin)
+    }
+
+    /// Shows the wings as soon as music plays; hides them only after a short
+    /// pause so skipping tracks doesn't make the notch flicker.
+    private func updateIdleWings(isPlaying: Bool) {
+        idleWingsTask?.cancel()
+        guard !isPlaying else {
+            setIdleWings(true)
+            return
+        }
+        idleWingsTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
+            guard !Task.isCancelled else { return }
+            setIdleWings(false)
+        }
+    }
+
+    private func setIdleWings(_ visible: Bool) {
+        guard visible != showsIdleWings else { return }
+        withAnimation(presentationAnimation) {
+            showsIdleWings = visible
+        }
+        guard presentation == .idle,
+              !isCommandEchoVisible,
+              !isFileDropTargeted else { return }
+        resizeSurface(to: preferredSize, animation: presentationAnimation)
     }
 
     // MARK: - Derived Values
@@ -2199,11 +1969,15 @@ struct DynamicNotchView: View {
     }
 
     private var basePreferredSize: CGSize {
-        layout.size(
-            for: presentation,
-            idleMode: settings.notchIdleMode,
-            contentMode: settings.contentMode
-        )
+        layout.size(for: presentation, idleMode: effectiveIdleMode)
+    }
+
+    /// Visible Island means "visible while music plays"; otherwise the notch
+    /// rests at the size of the camera housing.
+    private var effectiveIdleMode: NotchIdleMode {
+        settings.notchIdleMode == .hiddenMini || !showsIdleWings
+            ? .hiddenMini
+            : .visibleIsland
     }
 
     private var commandEchoPreferredSize: CGSize {
@@ -2232,9 +2006,32 @@ struct DynamicNotchView: View {
         return CGSize(width: width, height: height)
     }
 
+    /// On a notched display the shoulder curves pull the body in from both
+    /// panel edges; content must start inside that inset to stay visible.
+    private var bodyInset: CGFloat {
+        guard layout.hasCameraHousing else { return 0 }
+        return AdaptiveNotchShape.topFilletRadius(
+            progress: expansionProgress,
+            size: preferredSize
+        )
+    }
+
+    private var bodyBottomRadius: CGFloat {
+        guard layout.hasCameraHousing else { return 0 }
+        return AdaptiveNotchShape.bottomRadius(
+            progress: expansionProgress,
+            size: preferredSize
+        )
+    }
+
+    /// Edge padding that never drops below the original flat-edge value.
+    private func bodyPadding(_ minimum: CGFloat, gap: CGFloat) -> CGFloat {
+        max(minimum, bodyInset + gap)
+    }
+
     private var isHiddenMiniIdle: Bool {
         layout.hasCameraHousing &&
-            settings.notchIdleMode == .hiddenMini &&
+            effectiveIdleMode == .hiddenMini &&
             presentation == .idle
     }
 
@@ -2271,25 +2068,10 @@ struct DynamicNotchView: View {
         }
     }
 
-    private var effectiveColorScheme: ColorScheme {
-        settings.theme.colorScheme ?? systemColorScheme
-    }
+    /// The dashboard is always a dark surface, like the notch it grows from.
+    private var primaryColor: Color { .white }
 
-    private var isLightAppearance: Bool {
-        !usesNotchBlackSurface && effectiveColorScheme == .light
-    }
-
-    private var usesNotchBlackSurface: Bool {
-        layout.hasCameraHousing || settings.contentMode == .dashboard
-    }
-
-    private var primaryColor: Color {
-        isLightAppearance ? .black : .white
-    }
-
-    private var panelColor: Color {
-        usesNotchBlackSurface ? .black : (isLightAppearance ? .white : .black)
-    }
+    private var panelColor: Color { .black }
 
     private var panelOpacity: Double {
         if reduceTransparency || layout.hasCameraHousing {
@@ -2404,61 +2186,57 @@ private struct AdaptiveNotchShape: Shape {
         in rect: CGRect,
         progress: CGFloat
     ) -> Path {
-        let bottomRadius = min(
-            interpolate(from: 18, to: 30, progress: progress),
-            rect.width / 4,
-            rect.height / 2
-        )
+        let fillet = Self.topFilletRadius(progress: progress, size: rect.size)
+        let bottomRadius = Self.bottomRadius(progress: progress, size: rect.size)
+        let bodyLeft = rect.minX + fillet
+        let bodyRight = rect.maxX - fillet
 
-        // A notched Mac already has a physical black camera housing at the
-        // centre. Extending a perfectly flat software surface from the display
-        // edge removes the artificial sloped shoulders around it. Only the
-        // lower corners are rounded, matching a Dynamic Island attached to the
-        // top bezel.
-        let topRadius = min(
-            interpolate(from: 10, to: 16, progress: progress),
-            rect.height / 2
-        )
+        // Like the physical notch: the top edge meets the display edge, a
+        // small concave fillet turns it straight down, and the lower corners
+        // are convex. Tangent arcs keep every joint perfectly smooth.
         var path = Path()
-        path.move(to: CGPoint(x: rect.minX + topRadius, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX - topRadius, y: rect.minY))
-
-        // These are deliberately concave shoulders, not ordinary rounded
-        // rectangle corners. The edge first comes down from the top bezel and
-        // then opens outward into the software wings, so the notch feels
-        // attached to the display instead of looking like a floating pill.
-        path.addQuadCurve(
-            to: CGPoint(x: rect.maxX, y: rect.minY + topRadius),
-            control: CGPoint(
-                x: rect.maxX - topRadius,
-                y: rect.minY + topRadius
-            )
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.addArc(
+            tangent1End: CGPoint(x: bodyRight, y: rect.minY),
+            tangent2End: CGPoint(x: bodyRight, y: rect.maxY),
+            radius: fillet
         )
-        path.addLine(
-            to: CGPoint(x: rect.maxX, y: rect.maxY - bottomRadius)
+        path.addArc(
+            tangent1End: CGPoint(x: bodyRight, y: rect.maxY),
+            tangent2End: CGPoint(x: bodyLeft, y: rect.maxY),
+            radius: bottomRadius
         )
-        path.addQuadCurve(
-            to: CGPoint(x: rect.maxX - bottomRadius, y: rect.maxY),
-            control: CGPoint(x: rect.maxX, y: rect.maxY)
+        path.addArc(
+            tangent1End: CGPoint(x: bodyLeft, y: rect.maxY),
+            tangent2End: CGPoint(x: bodyLeft, y: rect.minY),
+            radius: bottomRadius
         )
-        path.addLine(
-            to: CGPoint(x: rect.minX + bottomRadius, y: rect.maxY)
-        )
-        path.addQuadCurve(
-            to: CGPoint(x: rect.minX, y: rect.maxY - bottomRadius),
-            control: CGPoint(x: rect.minX, y: rect.maxY)
-        )
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + topRadius))
-        path.addQuadCurve(
-            to: CGPoint(x: rect.minX + topRadius, y: rect.minY),
-            control: CGPoint(
-                x: rect.minX + topRadius,
-                y: rect.minY + topRadius
-            )
+        path.addArc(
+            tangent1End: CGPoint(x: bodyLeft, y: rect.minY),
+            tangent2End: CGPoint(x: rect.minX, y: rect.minY),
+            radius: fillet
         )
         path.closeSubpath()
 
         return path
+    }
+
+    /// Radius of the concave top fillets, which is also how far each side of
+    /// the body sits inside the panel edge. The view pads content by it.
+    static func topFilletRadius(progress: CGFloat, size: CGSize) -> CGFloat {
+        let progress = min(max(progress, 0), 1)
+        return max(0, min(6 + (14 - 6) * progress, size.width / 6, size.height / 3))
+    }
+
+    static func bottomRadius(progress: CGFloat, size: CGSize) -> CGFloat {
+        let progress = min(max(progress, 0), 1)
+        let fillet = topFilletRadius(progress: progress, size: size)
+        return max(0, min(
+            10 + (28 - 10) * progress,
+            (size.width - fillet * 2) / 2,
+            size.height - fillet
+        ))
     }
 
     private func interpolate(

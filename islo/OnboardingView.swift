@@ -7,7 +7,7 @@ struct OnboardingView: View {
     let onComplete: () -> Void
 
     @State private var step = 0
-    private let pageCount = 6
+    private let pageCount = 5
 
     var body: some View {
         VStack(spacing: 0) {
@@ -46,9 +46,8 @@ struct OnboardingView: View {
         switch step {
         case 0: welcomePage
         case 1: commandEchoPage
-        case 2: layoutPage
-        case 3: appearancePage
-        case 4: interactionPage
+        case 2: appearancePage
+        case 3: interactionPage
         default: finishPage
         }
     }
@@ -79,31 +78,13 @@ struct OnboardingView: View {
                 .font(.system(size: 15)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             permissionRow(symbol: "waveform.path", title: "Command Echo", message: text("İstediğiniz zaman Ayarlar'dan kapatabilirsiniz.", "You can turn it off any time in Settings."), isOn: $settings.dashboardCommandEchoEnabled)
             permissionRow(symbol: "tray.and.arrow.down", title: text("Dosya Rafı + AirDrop", "File Shelf + AirDrop"), message: text("Dosyaları çentiğe sürükleyin.", "Drag files onto the notch."), isOn: $settings.dashboardFileShelfEnabled)
-            Button(text("Yapıştırma ve medya tuşlarına izin ver", "Allow paste and media keys")) {
+            Button(text("macOS göstergesini gizlemek için izin ver", "Allow hiding the macOS indicator")) {
                 settings.requestAccessibilityPermission()
             }
             .buttonStyle(.bordered)
+            .disabled(settings.isAccessibilityTrusted)
         } preview: {
             CommandEchoPreview()
-        }
-    }
-
-    private var layoutPage: some View {
-        onboardingPage {
-            eyebrow(text("DÜZEN", "LAYOUT"))
-            Text(text("islo. sizin kadar\nsade veya güçlü.", "As focused or capable\nas you want."))
-                .font(.system(size: 38, weight: .bold, design: .rounded)).tracking(-0.8)
-            Text(text("Yalnızca müziğe odaklanan görünümü veya günlük araçları bir araya getiren Genel paneli seçin.", "Choose a focused music view or the General dashboard with everyday utilities."))
-                .font(.system(size: 15)).foregroundStyle(.secondary)
-            HStack(spacing: 12) {
-                ForEach(IslandContentMode.allCases) { mode in
-                    selectionCard(symbol: mode == .music ? "music.note" : "rectangle.split.2x1", title: mode.title(language: settings.language), subtitle: mode.subtitle(language: settings.language), selected: settings.contentMode == mode) {
-                        settings.contentMode = mode
-                    }
-                }
-            }
-        } preview: {
-            DashboardPreview(mode: settings.contentMode)
         }
     }
 
@@ -208,18 +189,6 @@ struct OnboardingView: View {
         }.padding(13).background(RoundedRectangle(cornerRadius: 14).fill(Color.primary.opacity(0.045)))
     }
 
-    private func selectionCard(symbol: String, title: String, subtitle: String, selected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 10) {
-                Image(systemName: symbol).font(.system(size: 23, weight: .semibold)).foregroundStyle(selected ? Color.accentColor : .secondary)
-                Text(title).font(.system(size: 14, weight: .semibold))
-                Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(3)
-            }.frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading).padding(14)
-                .background(RoundedRectangle(cornerRadius: 16).fill(Color.primary.opacity(selected ? 0.07 : 0.035)))
-                .overlay(RoundedRectangle(cornerRadius: 16).stroke(selected ? Color.accentColor : Color.primary.opacity(0.08), lineWidth: selected ? 2 : 1))
-        }.buttonStyle(.plain)
-    }
-
     private func wideChoice(symbol: String, title: String, subtitle: String, selected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 12) {
@@ -264,23 +233,6 @@ private struct CommandEchoPreview: View {
             VStack(spacing: 28) {
                 NotchLevelMockup(level: level)
                 HStack { Image(systemName: "speaker.fill"); Slider(value: $level); Text("\(Int(level * 100))%").monospacedDigit() }.padding(18).background(RoundedRectangle(cornerRadius: 18).fill(.thinMaterial))
-            }.padding(26)
-        }.clipShape(RoundedRectangle(cornerRadius: 32))
-    }
-}
-
-private struct DashboardPreview: View {
-    let mode: IslandContentMode
-    var body: some View {
-        ZStack {
-            Color.black
-            VStack(spacing: 16) {
-                NotchMockup(left: mode == .music ? "music.note" : "house.fill", right: "waveform")
-                if mode == .dashboard {
-                    HStack(spacing: 10) { previewTile("music.note", "Music"); previewTile("timer", "25:00"); previewTile("cloud.sun", "16°") }
-                } else {
-                    HStack { Image(systemName: "backward.fill"); Image(systemName: "play.circle.fill").font(.title); Image(systemName: "forward.fill") }.foregroundStyle(.white)
-                }
             }.padding(26)
         }.clipShape(RoundedRectangle(cornerRadius: 32))
     }
@@ -336,7 +288,3 @@ private struct NotchLevelMockup: View {
 }
 
 private var previewBackground: some View { LinearGradient(colors: [Color(nsColor: .controlBackgroundColor), Color.accentColor.opacity(0.08), Color.pink.opacity(0.07)], startPoint: .topLeading, endPoint: .bottomTrailing) }
-
-private func previewTile(_ symbol: String, _ text: String) -> some View {
-    VStack(alignment: .leading) { Image(systemName: symbol); Spacer(); Text(text).font(.headline) }.foregroundStyle(.white).padding(12).frame(width: 96, height: 92, alignment: .leading).background(RoundedRectangle(cornerRadius: 18).fill(.white.opacity(0.11)))
-}

@@ -1,7 +1,7 @@
 import SwiftUI
 
 private enum SettingsDestination: String, CaseIterable, Identifiable {
-    case general, appearance, interaction, modules, updates, about
+    case general, appearance, interaction, modules, permissions, updates, about
     var id: String { rawValue }
 
     func title(_ language: AppLanguage) -> String {
@@ -10,6 +10,7 @@ private enum SettingsDestination: String, CaseIterable, Identifiable {
         case .appearance: language.value(turkish: "Görünüm", english: "Appearance")
         case .interaction: language.value(turkish: "Çentik ve Etkileşim", english: "Notch & Interaction")
         case .modules: language.value(turkish: "Araçlar", english: "Utilities")
+        case .permissions: language.value(turkish: "İzinler", english: "Permissions")
         case .updates: language.value(turkish: "Güncellemeler", english: "Updates")
         case .about: language.value(turkish: "islo. Hakkında", english: "About islo.")
         }
@@ -21,6 +22,7 @@ private enum SettingsDestination: String, CaseIterable, Identifiable {
         case .appearance: "circle.lefthalf.filled"
         case .interaction: "macbook.and.iphone"
         case .modules: "square.grid.2x2"
+        case .permissions: "lock.shield"
         case .updates: "arrow.triangle.2.circlepath"
         case .about: "info.circle"
         }
@@ -109,6 +111,7 @@ struct SettingsView: View {
         case .appearance: appearancePage
         case .interaction: interactionPage
         case .modules: modulesPage
+        case .permissions: permissionsPage
         case .updates: updatesPage
         case .about: aboutPage
         }
@@ -132,14 +135,6 @@ struct SettingsView: View {
                 noticeCard(symbol: "exclamationmark.triangle.fill", message: text("Başlangıç izni macOS onayı bekliyor.", "Launch permission is waiting for macOS approval."), buttonTitle: text("Giriş Öğelerini Aç", "Open Login Items"), action: settings.openLoginItemsSettings)
             } else if let error = settings.launchAtLoginError {
                 noticeCard(symbol: "xmark.octagon.fill", message: error)
-            }
-
-            settingsCard(title: text("Varsayılan düzen", "Default layout")) {
-                settingsRow(symbol: "rectangle.split.2x1", title: text("islo. düzeni", "islo. layout"), subtitle: settings.contentMode.subtitle(language: settings.language)) {
-                    Picker("", selection: $settings.contentMode) {
-                        ForEach(IslandContentMode.allCases) { mode in Text(mode.title(language: settings.language)).tag(mode) }
-                    }.labelsHidden().frame(width: 180)
-                }
             }
         }
     }
@@ -210,15 +205,49 @@ struct SettingsView: View {
                 toggleRow(symbol: "cup.and.saucer.fill", title: text("Uyanık Tut", "Keep Awake"), subtitle: text("İstediğiniz sürece Mac'in uykuya geçmesini engeller.", "Prevents your Mac from sleeping while you need it."), isOn: $settings.dashboardKeepAwakeEnabled)
                 rowDivider
                 toggleRow(symbol: "tray.full.fill", title: text("Dosya Rafı + AirDrop", "File Shelf + AirDrop"), subtitle: text("Dosyaları çentiğe bırakın, taşıyın veya AirDrop ile gönderin.", "Drop files on the notch, move them, or send them with AirDrop."), isOn: $settings.dashboardFileShelfEnabled)
-                rowDivider
-                settingsRow(symbol: "hand.raised.fill", title: text("Klavye olayları", "Keyboard events"), subtitle: text("Yapıştırma ve medya tuşlarını algılamak için Erişilebilirlik izni gerekir.", "Accessibility permission is required to detect paste and media keys.")) {
-                    Button(settings.isAccessibilityTrusted ? text("İzin verildi", "Allowed") : text("İzin ver", "Allow")) {
-                        settings.requestAccessibilityPermission()
-                    }
-                    .disabled(settings.isAccessibilityTrusted)
-                }
             }
             HStack { Spacer(); Button(text("Araç varsayılanlarını geri yükle", "Restore utility defaults")) { settings.resetDashboardFeatureDefaults() } }
+        }
+    }
+
+    private var permissionsPage: some View {
+        VStack(spacing: 16) {
+            settingsCard(title: text("Sistem izinleri", "System permissions")) {
+                settingsRow(symbol: "hand.raised.fill", title: text("Erişilebilirlik", "Accessibility"), subtitle: text("Ses ve parlaklık tuşlarında macOS'un kendi göstergesini gizleyip yalnızca islo.'yu göstermek, yapıştırma ve medya tuşlarını algılamak için gerekir.", "Needed to hide macOS's own volume and brightness indicator so only islo. shows, and to detect paste and media keys.")) {
+                    permissionStatus(granted: settings.isAccessibilityTrusted) {
+                        settings.requestAccessibilityPermission()
+                        settings.openAccessibilitySettings()
+                    }
+                }
+                rowDivider
+                settingsRow(symbol: "music.note", title: text("Otomasyon: Music ve Spotify", "Automation: Music and Spotify"), subtitle: text("Çalan parçayı göstermek ve kontrol etmek için. macOS bu izni Music veya Spotify ilk açıldığında kendisi sorar.", "To show and control the current track. macOS asks for this itself the first time Music or Spotify runs.")) {
+                    Button(text("Ayarları aç", "Open Settings")) {
+                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                }
+            }
+            if !settings.isAccessibilityTrusted {
+                noticeCard(symbol: "info.circle.fill", message: text("İzni verdikten sonra ayar burada kendiliğinden güncellenir; uygulamayı yeniden başlatmanız gerekmez.", "Once you grant access, this page updates by itself; no restart needed."))
+            }
+        }
+        .onAppear(perform: settings.refreshPermissionState)
+        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
+            settings.refreshPermissionState()
+        }
+    }
+
+    private func permissionStatus(granted: Bool, request: @escaping () -> Void) -> some View {
+        Group {
+            if granted {
+                Label(text("İzin verildi", "Allowed"), systemImage: "checkmark.circle.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.green)
+            } else {
+                Button(text("İzin ver", "Allow"), action: request)
+                    .buttonStyle(.borderedProminent)
+            }
         }
     }
 
@@ -276,6 +305,7 @@ struct SettingsView: View {
         case .appearance: text("Çentiği masaüstünüze ve tarzınıza uydurun.", "Make the notch feel at home on your desktop.")
         case .interaction: text("Ne zaman açılacağını ve nasıl kapanacağını seçin.", "Choose when it opens and how it collapses.")
         case .modules: text("Yalnızca kullanmak istediğiniz özellikleri açık tutun.", "Keep only the features you want to use.")
+        case .permissions: text("islo.'nun macOS'tan istediği izinler ve durumları.", "The macOS permissions islo. uses and their status.")
         case .updates: text("Yeni sürümleri güvenli ve zahmetsiz biçimde alın.", "Receive new releases safely and effortlessly.")
         case .about: text("Yasin Özdemir tarafından geliştirildi.", "Built by Yasin Özdemir.")
         }

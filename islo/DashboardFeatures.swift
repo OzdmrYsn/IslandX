@@ -1,6 +1,8 @@
 import AppKit
+import ApplicationServices
 import Combine
 import CoreAudio
+import Darwin
 import IOKit.graphics
 import UniformTypeIdentifiers
 
@@ -88,6 +90,18 @@ final class CommandEchoManager: ObservableObject {
 
     func showTrackChanged(_ title: String, direction: MediaSkipDirection?) {
         publish(.trackChanged(title, direction))
+    }
+
+    /// For key presses islo. handled itself. Also primes the pollers so the
+    /// same change isn't announced a second time.
+    func showHandledVolume(_ value: Double) {
+        lastVolume = Self.readSystemVolume()
+        publish(.volume(min(max(value, 0), 1)))
+    }
+
+    func showHandledBrightness(_ value: Double) {
+        lastBrightness = Self.readBrightness()
+        publish(.brightness(min(max(value, 0), 1)))
     }
 
     private func startInputMonitoring() {
@@ -218,52 +232,369 @@ final class CommandEchoManager: ObservableObject {
     }
 
     private static func readSystemVolume() -> Double? {
+        SystemAudioOutput.volume()
+    }
+}
+
+/// The default output device's volume and mute state through CoreAudio.
+enum SystemAudioOutput {
+    private static let channelElements: [AudioObjectPropertyElement] = [
+        kAudioObjectPropertyElementMain,
+        AudioObjectPropertyElement(1),
+        AudioObjectPropertyElement(2)
+    ]
+
+    static func defaultDevice() -> AudioDeviceID? {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDefaultOutputDevice,
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
         var device = AudioDeviceID(0)
-        var deviceSize = UInt32(MemoryLayout<AudioDeviceID>.size)
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
         guard AudioObjectGetPropertyData(
             AudioObjectID(kAudioObjectSystemObject),
             &address,
             0,
             nil,
-            &deviceSize,
+            &size,
             &device
         ) == noErr, device != 0 else { return nil }
+        return device
+    }
 
+    static func volume() -> Double? {
+        guard let device = defaultDevice() else { return nil }
         var values: [Double] = []
-        for element in [
-            kAudioObjectPropertyElementMain,
-            AudioObjectPropertyElement(1),
-            AudioObjectPropertyElement(2)
-        ] {
-            address = AudioObjectPropertyAddress(
-                mSelector: kAudioDevicePropertyVolumeScalar,
-                mScope: kAudioDevicePropertyScopeOutput,
-                mElement: element
-            )
+        for element in channelElements {
+            var address = volumeAddress(element)
             guard AudioObjectHasProperty(device, &address) else { continue }
             var value = Float32(0)
-            var valueSize = UInt32(MemoryLayout<Float32>.size)
-            if AudioObjectGetPropertyData(
-                device,
-                &address,
-                0,
-                nil,
-                &valueSize,
-                &value
-            ) == noErr {
+            var size = UInt32(MemoryLayout<Float32>.size)
+            if AudioObjectGetPropertyData(device, &address, 0, nil, &size, &value) == noErr {
                 values.append(Double(value))
                 if element == kAudioObjectPropertyElementMain { break }
             }
         }
         guard !values.isEmpty else { return nil }
-        let average = values.reduce(0, +) / Double(values.count)
-        return min(max(average, 0), 1)
+        return min(max(values.reduce(0, +) / Double(values.count), 0), 1)
     }
+
+    /// Sets the main volume, or each stereo channel when the device has no
+    /// main control. Returns false when the device can't be adjusted.
+    @discardableResult
+    static func setVolume(_ value: Double) -> Bool {
+        guard let device = defaultDevice() else { return false }
+        var scalar = Float32(min(max(value, 0), 1))
+        let settable = channelElements.filter { isSettable(device, volumeAddress($0)) }
+        let targets = settable.contains(kAudioObjectPropertyElementMain)
+            ? [kAudioObjectPropertyElementMain]
+            : settable
+        guard !targets.isEmpty else { return false }
+        for element in targets {
+            var address = volumeAddress(element)
+            AudioObjectSetPropertyData(
+                device,
+                &address,
+                0,
+                nil,
+                UInt32(MemoryLayout<Float32>.size),
+                &scalar
+            )
+        }
+        return true
+    }
+
+    static var canSetVolume: Bool {
+        guard let device = defaultDevice() else { return false }
+        return channelElements.contains { isSettable(device, volumeAddress($0)) }
+    }
+
+    static func isMuted() -> Bool? {
+        guard let device = defaultDevice() else { return nil }
+        var address = muteAddress
+        guard AudioObjectHasProperty(device, &address) else { return nil }
+        var muted = UInt32(0)
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        guard AudioObjectGetPropertyData(device, &address, 0, nil, &size, &muted) == noErr
+        else { return nil }
+        return muted != 0
+    }
+
+    @discardableResult
+    static func setMuted(_ muted: Bool) -> Bool {
+        guard let device = defaultDevice(), isSettable(device, muteAddress) else {
+            return false
+        }
+        var address = muteAddress
+        var value = UInt32(muted ? 1 : 0)
+        return AudioObjectSetPropertyData(
+            device,
+            &address,
+            0,
+            nil,
+            UInt32(MemoryLayout<UInt32>.size),
+            &value
+        ) == noErr
+    }
+
+    private static var muteAddress: AudioObjectPropertyAddress {
+        AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyMute,
+            mScope: kAudioDevicePropertyScopeOutput,
+            mElement: kAudioObjectPropertyElementMain
+        )
+    }
+
+    private static func volumeAddress(
+        _ element: AudioObjectPropertyElement
+    ) -> AudioObjectPropertyAddress {
+        AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyVolumeScalar,
+            mScope: kAudioDevicePropertyScopeOutput,
+            mElement: element
+        )
+    }
+
+    private static func isSettable(
+        _ device: AudioDeviceID,
+        _ address: AudioObjectPropertyAddress
+    ) -> Bool {
+        var address = address
+        guard AudioObjectHasProperty(device, &address) else { return false }
+        var settable = DarwinBoolean(false)
+        return AudioObjectIsPropertySettable(device, &address, &settable) == noErr
+            && settable.boolValue
+    }
+}
+
+/// The built-in display's brightness. macOS has no public API for this on
+/// Apple Silicon, so DisplayServices is loaded at runtime; if it's missing,
+/// islo. leaves the brightness keys to macOS.
+enum BuiltInDisplayBrightness {
+    private typealias Getter = @convention(c) (
+        CGDirectDisplayID,
+        UnsafeMutablePointer<Float>
+    ) -> Int32
+    private typealias Setter = @convention(c) (CGDirectDisplayID, Float) -> Int32
+
+    private static let framework = dlopen(
+        "/System/Library/PrivateFrameworks/DisplayServices.framework/DisplayServices",
+        RTLD_LAZY
+    )
+    private static let getter: Getter? = symbol("DisplayServicesGetBrightness")
+    private static let setter: Setter? = symbol("DisplayServicesSetBrightness")
+
+    private static func symbol<T>(_ name: String) -> T? {
+        guard let framework, let pointer = dlsym(framework, name) else { return nil }
+        return unsafeBitCast(pointer, to: T.self)
+    }
+
+    static var displayID: CGDirectDisplayID? {
+        var count: UInt32 = 0
+        guard CGGetActiveDisplayList(0, nil, &count) == .success, count > 0 else {
+            return nil
+        }
+        var displays = [CGDirectDisplayID](repeating: 0, count: Int(count))
+        guard CGGetActiveDisplayList(count, &displays, &count) == .success else {
+            return nil
+        }
+        return displays.first { CGDisplayIsBuiltin($0) != 0 }
+    }
+
+    static func brightness() -> Double? {
+        guard let getter, let display = displayID else { return nil }
+        var value: Float = 0
+        guard getter(display, &value) == 0 else { return nil }
+        return min(max(Double(value), 0), 1)
+    }
+
+    @discardableResult
+    static func setBrightness(_ value: Double) -> Bool {
+        guard let setter, let display = displayID else { return false }
+        return setter(display, Float(min(max(value, 0), 1))) == 0
+    }
+}
+
+private enum HUDKey: Int {
+    case soundUp = 0
+    case soundDown = 1
+    case brightnessUp = 2
+    case brightnessDown = 3
+    case mute = 7
+}
+
+/// Takes over the hardware volume and brightness keys so macOS doesn't draw
+/// its own HUD next to islo.'s. Needs Accessibility access. Without it, or
+/// for an output or display islo. can't adjust, the keys pass through and
+/// macOS handles them as usual.
+final class SystemHUDInterceptor {
+    private let onVolume: (Double) -> Void
+    private let onBrightness: (Double) -> Void
+    private var eventTap: CFMachPort?
+    private var runLoopSource: CFRunLoopSource?
+    private var retryTimer: Timer?
+    private var isEnabled = false
+
+    init(
+        onVolume: @escaping (Double) -> Void,
+        onBrightness: @escaping (Double) -> Void
+    ) {
+        self.onVolume = onVolume
+        self.onBrightness = onBrightness
+    }
+
+    deinit {
+        stop()
+    }
+
+    func setEnabled(_ enabled: Bool) {
+        guard enabled != isEnabled else { return }
+        isEnabled = enabled
+        guard enabled else {
+            stop()
+            return
+        }
+        installTapIfPossible()
+        // Accessibility can be granted while islo. runs; keep trying so the
+        // takeover starts without a relaunch.
+        retryTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) {
+            [weak self] _ in
+            self?.installTapIfPossible()
+        }
+    }
+
+    private func installTapIfPossible() {
+        guard isEnabled else { return }
+        if let eventTap {
+            if !CGEvent.tapIsEnabled(tap: eventTap) {
+                CGEvent.tapEnable(tap: eventTap, enable: true)
+            }
+            return
+        }
+        guard AXIsProcessTrusted() else { return }
+
+        // NX_SYSDEFINED carries the media and brightness keys.
+        let systemDefinedMask = CGEventMask(1) << 14
+        guard let tap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: .defaultTap,
+            eventsOfInterest: systemDefinedMask,
+            callback: systemHUDTapCallback,
+            userInfo: Unmanaged.passUnretained(self).toOpaque()
+        ) else { return }
+
+        let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
+        CGEvent.tapEnable(tap: tap, enable: true)
+        eventTap = tap
+        runLoopSource = source
+    }
+
+    private func stop() {
+        retryTimer?.invalidate()
+        retryTimer = nil
+        if let eventTap {
+            CGEvent.tapEnable(tap: eventTap, enable: false)
+            CFMachPortInvalidate(eventTap)
+        }
+        if let runLoopSource {
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
+        }
+        eventTap = nil
+        runLoopSource = nil
+    }
+
+    fileprivate func handle(
+        _ type: CGEventType,
+        _ event: CGEvent
+    ) -> Unmanaged<CGEvent>? {
+        let passThrough = Unmanaged.passUnretained(event)
+
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            if let eventTap { CGEvent.tapEnable(tap: eventTap, enable: true) }
+            return passThrough
+        }
+
+        guard type.rawValue == 14,
+              let systemEvent = NSEvent(cgEvent: event),
+              systemEvent.subtype.rawValue == 8 else {
+            return passThrough
+        }
+
+        let data = UInt32(bitPattern: Int32(truncatingIfNeeded: systemEvent.data1))
+        guard let key = HUDKey(rawValue: Int((data & 0xFFFF_0000) >> 16)) else {
+            return passThrough
+        }
+        let isKeyDown = (data & 0xFF00) >> 8 == 0x0A
+        // Option-Shift gives quarter steps, as it does in macOS.
+        let isFineStep = systemEvent.modifierFlags.contains([.option, .shift])
+
+        // Swallow both halves of a press islo. can handle; act on key-down
+        // (including key repeat) only.
+        guard canHandle(key) else { return passThrough }
+        if isKeyDown { perform(key, fineStep: isFineStep) }
+        return nil
+    }
+
+    private func canHandle(_ key: HUDKey) -> Bool {
+        switch key {
+        case .soundUp, .soundDown, .mute:
+            return SystemAudioOutput.canSetVolume
+        case .brightnessUp, .brightnessDown:
+            return BuiltInDisplayBrightness.brightness() != nil
+        }
+    }
+
+    private func perform(_ key: HUDKey, fineStep: Bool) {
+        let step = fineStep ? 1.0 / 64 : 1.0 / 16
+
+        switch key {
+        case .soundUp, .soundDown:
+            let current = SystemAudioOutput.volume() ?? 0
+            let direction: Double = key == .soundUp ? 1 : -1
+            let next = stepped(current, by: step, direction: direction)
+            if key == .soundUp, SystemAudioOutput.isMuted() == true {
+                SystemAudioOutput.setMuted(false)
+            }
+            SystemAudioOutput.setVolume(next)
+            report(onVolume, value: next)
+
+        case .mute:
+            let muted = !(SystemAudioOutput.isMuted() ?? false)
+            SystemAudioOutput.setMuted(muted)
+            report(onVolume, value: muted ? 0 : SystemAudioOutput.volume() ?? 0)
+
+        case .brightnessUp, .brightnessDown:
+            guard let current = BuiltInDisplayBrightness.brightness() else { return }
+            let direction: Double = key == .brightnessUp ? 1 : -1
+            let next = stepped(current, by: step, direction: direction)
+            BuiltInDisplayBrightness.setBrightness(next)
+            report(onBrightness, value: next)
+        }
+    }
+
+    private func stepped(_ value: Double, by step: Double, direction: Double) -> Double {
+        min(max(((value / step).rounded() + direction) * step, 0), 1)
+    }
+
+    private func report(_ callback: @escaping (Double) -> Void, value: Double) {
+        DispatchQueue.main.async { callback(value) }
+    }
+}
+
+private func systemHUDTapCallback(
+    proxy: CGEventTapProxy,
+    type: CGEventType,
+    event: CGEvent,
+    userInfo: UnsafeMutableRawPointer?
+) -> Unmanaged<CGEvent>? {
+    guard let userInfo else { return Unmanaged.passUnretained(event) }
+    let interceptor = Unmanaged<SystemHUDInterceptor>
+        .fromOpaque(userInfo)
+        .takeUnretainedValue()
+    return interceptor.handle(type, event)
 }
 
 struct ClipboardEntry: Identifiable, Equatable {

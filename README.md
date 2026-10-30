@@ -13,9 +13,9 @@ islo., medya kontrollerini ve günlük araçları MacBook'un kamera çentiğiyle
 ### Özellikler
 
 - Kamera çentiğini ve ekran güvenli alanını otomatik algılama
-- Görünür Ada ve çentiğin içine tamamen saklanan Gizli Mini boşta modları
+- Müzik çalarken hafifçe genişleyen, çalmadığında standart çentiğe dönen ada; isteğe bağlı her zaman gizli Gizli Mini modu
 - Akıcı kompakt/genişletilmiş görünüm geçişi
-- Yalnızca Müzik veya medya, tarih, saat, Takvim, Zamanlayıcı ve Pil kısayollarını birleştiren Genel panel
+- Medya, tarih, saat, Takvim, Zamanlayıcı ve Pil kısayollarını birleştiren Genel panel
 - Music ve Spotify parça, sanatçı ve kapak bilgileri
 - Oynat/duraklat, önceki/sonraki, karışık çal, tekrar, ilerleme ve sistem sesi kontrolleri
 - Üzerine gelme, tıklama veya çentiğin orta etkin alanıyla seçilebilir açılma davranışı
@@ -24,7 +24,7 @@ islo., medya kontrollerini ve günlük araçları MacBook'un kamera çentiğiyle
 - Sistem, Beyaz, Siyah ve desteklenen macOS sürümlerinde Liquid Glass görünümü
 - Türkçe/İngilizce ilk kurulum rehberi
 - Açılışta başlatma ve Sparkle tabanlı imzalı güncellemeler
-- İsteğe bağlı Command Echo, Pomodoro, Uyanık Tut ve Dosya Rafı + AirDrop modülleri
+- İsteğe bağlı Command Echo (macOS'un kendi ses/parlaklık göstergesinin yerine), Pomodoro, Uyanık Tut ve Dosya Rafı + AirDrop modülleri
 - Dock simgesi olmadan menü çubuğunda çalışma
 - Tüm Spaces ve tam ekran uygulamalarla çalışma
 
@@ -50,9 +50,9 @@ islo. is a SwiftUI + AppKit app that blends media controls and everyday utilitie
 ### Features
 
 - Automatic camera-notch and safe-area detection
-- Visible Island and fully concealed Hidden Mini idle modes
+- An island that widens slightly while music plays and returns to the standard notch otherwise, plus an always-concealed Hidden Mini mode
 - Fluid compact/expanded transitions
-- Music Only or a General dashboard combining media, date, time, Calendar, Timer, and Battery shortcuts
+- A General dashboard combining media, date, time, Calendar, Timer, and Battery shortcuts
 - Track, artist, and artwork from Music and Spotify
 - Play/pause, previous/next, shuffle, repeat, progress, and system-volume controls
 - Selectable hover, click, or center-zone opening behavior
@@ -61,7 +61,7 @@ islo. is a SwiftUI + AppKit app that blends media controls and everyday utilitie
 - System, White, Black, and Liquid Glass appearances on supported macOS versions
 - Turkish and English first-run guide
 - Launch at login and signed Sparkle updates
-- Optional Command Echo, Pomodoro, Keep Awake, and File Shelf + AirDrop modules
+- Optional Command Echo (replaces the macOS volume and brightness indicator), Pomodoro, Keep Awake, and File Shelf + AirDrop modules
 - Menu-bar operation without a Dock icon
 - Works across Spaces and over full-screen apps
 

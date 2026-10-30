@@ -159,10 +159,21 @@ final class FloatingNotchWindowController: NSWindowController {
             self?.resizeWindow(to: preferredSize, animated: animated)
         }
 
-        let hostingController = NSHostingController(rootView: rootView)
-        hostingController.view.wantsLayer = true
-        hostingController.view.layer?.backgroundColor = NSColor.clear.cgColor
-        panel.contentViewController = hostingController
+        // Keep the hosting view out of the window's content-view slot. When it
+        // is the content view, SwiftUI also resizes the panel during layout
+        // while this controller animates the frame; near the notch every
+        // resize changes the safe area, and the loop makes AppKit abort.
+        let hostingView = NSHostingView(rootView: rootView)
+        hostingView.sizingOptions = []
+        hostingView.translatesAutoresizingMaskIntoConstraints = true
+        hostingView.autoresizingMask = [.width, .height]
+
+        let container = NSView(frame: NSRect(origin: .zero, size: currentSize))
+        container.wantsLayer = true
+        container.layer?.backgroundColor = NSColor.clear.cgColor
+        hostingView.frame = container.bounds
+        container.addSubview(hostingView)
+        panel.contentView = container
     }
 
     private func resizeWindow(to size: CGSize, animated: Bool) {
