@@ -219,6 +219,42 @@ enum IslandContentMode: String, CaseIterable, Identifiable {
     }
 }
 
+enum HomeWidgetStyle: String, CaseIterable, Identifiable {
+    case balanced
+    case media
+    case focus
+    case day
+
+    var id: String { rawValue }
+
+    func title(language: AppLanguage) -> String {
+        switch self {
+        case .balanced: language.value(turkish: "Dengeli", english: "Balanced")
+        case .media: language.value(turkish: "Müzik", english: "Music")
+        case .focus: language.value(turkish: "Odak", english: "Focus")
+        case .day: language.value(turkish: "Günüm", english: "My Day")
+        }
+    }
+}
+
+enum NotchSceneStyle: String, CaseIterable, Identifiable {
+    case graphite
+    case ember
+    case aurora
+    case album
+
+    var id: String { rawValue }
+
+    func title(language: AppLanguage) -> String {
+        switch self {
+        case .graphite: "Graphite"
+        case .ember: "Ember"
+        case .aurora: "Aurora"
+        case .album: language.value(turkish: "Albüm", english: "Album")
+        }
+    }
+}
+
 @MainActor
 final class AppSettings: ObservableObject {
     static let shared = AppSettings()
@@ -238,6 +274,8 @@ final class AppSettings: ObservableObject {
         static let dashboardFocusTimerEnabled = "dashboard.focusTimer.enabled"
         static let dashboardKeepAwakeEnabled = "dashboard.keepAwake.enabled"
         static let dashboardFileShelfEnabled = "dashboard.fileShelf.enabled"
+        static let homeWidgetStyle = "dashboard.homeWidgetStyle"
+        static let notchSceneStyle = "appearance.notchSceneStyle"
         static let onboardingCompleted = "onboarding.completed"
     }
 
@@ -317,6 +355,14 @@ final class AppSettings: ObservableObject {
 
     @Published var dashboardFileShelfEnabled: Bool {
         didSet { defaults.set(dashboardFileShelfEnabled, forKey: Key.dashboardFileShelfEnabled) }
+    }
+
+    @Published var homeWidgetStyle: HomeWidgetStyle {
+        didSet { defaults.set(homeWidgetStyle.rawValue, forKey: Key.homeWidgetStyle) }
+    }
+
+    @Published var notchSceneStyle: NotchSceneStyle {
+        didSet { defaults.set(notchSceneStyle.rawValue, forKey: Key.notchSceneStyle) }
     }
 
     @Published private(set) var onboardingCompleted: Bool
@@ -406,6 +452,12 @@ final class AppSettings: ObservableObject {
             defaults: defaults,
             fallback: true
         )
+        homeWidgetStyle = HomeWidgetStyle(
+            rawValue: defaults.string(forKey: Key.homeWidgetStyle) ?? ""
+        ) ?? .balanced
+        notchSceneStyle = NotchSceneStyle(
+            rawValue: defaults.string(forKey: Key.notchSceneStyle) ?? ""
+        ) ?? .graphite
 
         onboardingCompleted = defaults.bool(
             forKey: Key.onboardingCompleted

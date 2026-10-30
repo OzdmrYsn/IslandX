@@ -104,8 +104,8 @@ struct NotchLayout: Equatable {
         case .expanded:
             if contentMode == .dashboard {
                 return CGSize(
-                    width: min(700, max(screenWidth - 24, 600)),
-                    height: hasCameraHousing ? 216 : 204
+                    width: min(780, max(screenWidth - 24, 620)),
+                    height: hasCameraHousing ? 292 : 280
                 )
             }
             return CGSize(
@@ -153,6 +153,7 @@ struct DynamicNotchView: View {
     @State private var isScrubbing = false
     @State private var expansionProgress: CGFloat = 0
     @State private var dashboardSection: DashboardSection = .home
+    @State private var isCustomizingDashboard = false
     @State private var isFileDropTargeted = false
     @State private var isCommandEchoVisible = false
     @State private var commandEchoTask: Task<Void, Never>?
@@ -492,30 +493,163 @@ struct DynamicNotchView: View {
         VStack(spacing: 0) {
             dashboardNavigationRow
 
-            HStack(spacing: 18) {
-                Group {
-                    switch dashboardSection {
-                    case .timer where settings.dashboardFocusTimerEnabled:
-                        dashboardFocusPane
-                    case .shelf where settings.dashboardFileShelfEnabled:
-                        dashboardShelfPane
-                    default:
-                        dashboardMediaPane
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                Divider()
-                    .overlay(primaryColor.opacity(0.13))
-                    .padding(.vertical, 4)
-
-                dashboardSidePane
-                    .frame(width: 210)
+            if isCustomizingDashboard {
+                dashboardCustomizer
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+            } else {
+                dashboardStage
+                    .transition(.opacity)
             }
-            .padding(.horizontal, 18)
-            .padding(.bottom, 12)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(dashboardSceneBackground)
+    }
+
+    private var dashboardStage: some View {
+        HStack(spacing: 14) {
+            dashboardPrimaryPane
+            .padding(14)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(dashboardGlassCard)
+
+            dashboardSidePane
+                .padding(14)
+                .frame(width: dashboardSideWidth)
+                .frame(maxHeight: .infinity, alignment: .topLeading)
+                .background(dashboardGlassCard)
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 16)
+    }
+
+    @ViewBuilder
+    private var dashboardPrimaryPane: some View {
+        switch dashboardSection {
+        case .timer where settings.dashboardFocusTimerEnabled:
+            dashboardFocusPane
+        case .shelf where settings.dashboardFileShelfEnabled:
+            dashboardShelfPane
+        case .home where settings.homeWidgetStyle == .focus && settings.dashboardFocusTimerEnabled:
+            dashboardFocusPane
+        default:
+            dashboardMediaPane
+        }
+    }
+
+    private var dashboardSideWidth: CGFloat {
+        guard dashboardSection == .home else { return 238 }
+        switch settings.homeWidgetStyle {
+        case .media: return 190
+        case .day: return 310
+        case .balanced, .focus: return 238
+        }
+    }
+
+    private var dashboardCustomizer: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(localized("Ana ekranı özelleştir", "Customize Home"))
+                        .font(.system(size: 14, weight: .bold))
+                    Text(localized("Bir yerleşim ve sahne seçin.", "Choose a layout and a scene."))
+                        .font(.system(size: 9))
+                        .foregroundStyle(.white.opacity(0.45))
+                }
+                Spacer()
+                Button(localized("Bitti", "Done")) {
+                    withAnimation(.easeInOut(duration: 0.2)) { isCustomizingDashboard = false }
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(.black)
+                .padding(.horizontal, 13)
+                .frame(height: 25)
+                .background(Capsule().fill(.white))
+            }
+
+            HStack(spacing: 9) {
+                ForEach(HomeWidgetStyle.allCases) { style in
+                    dashboardLayoutChoice(style)
+                }
+            }
+
+            Text(localized("SAHNE", "SCENE"))
+                .font(.system(size: 8, weight: .bold))
+                .tracking(1.4)
+                .foregroundStyle(.white.opacity(0.38))
+
+            HStack(spacing: 9) {
+                ForEach(NotchSceneStyle.allCases) { style in
+                    dashboardSceneChoice(style)
+                }
+            }
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 18)
+        .padding(.bottom, 14)
+    }
+
+    private func dashboardLayoutChoice(_ style: HomeWidgetStyle) -> some View {
+        Button { settings.homeWidgetStyle = style } label: {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 5) {
+                    RoundedRectangle(cornerRadius: 6).fill(.white.opacity(0.18))
+                    VStack(spacing: 4) {
+                        RoundedRectangle(cornerRadius: 3).fill(.white.opacity(0.34)).frame(height: 6)
+                        RoundedRectangle(cornerRadius: 3).fill(.white.opacity(0.12)).frame(height: 6)
+                    }
+                }
+                .frame(height: 42)
+                Text(style.title(language: settings.language))
+                    .font(.system(size: 9, weight: .semibold))
+            }
+            .padding(9)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 13).fill(.white.opacity(0.075)))
+            .overlay(RoundedRectangle(cornerRadius: 13).stroke(settings.homeWidgetStyle == style ? Color.white : .white.opacity(0.1), lineWidth: settings.homeWidgetStyle == style ? 1.5 : 0.7))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func dashboardSceneChoice(_ style: NotchSceneStyle) -> some View {
+        Button { settings.notchSceneStyle = style } label: {
+            VStack(spacing: 5) {
+                RoundedRectangle(cornerRadius: 9)
+                    .fill(sceneGradient(for: style))
+                    .frame(height: 32)
+                Text(style.title(language: settings.language))
+                    .font(.system(size: 8, weight: .medium))
+            }
+            .padding(5)
+            .background(RoundedRectangle(cornerRadius: 11).stroke(settings.notchSceneStyle == style ? Color.white : .clear, lineWidth: 1.5))
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity)
+    }
+
+    private var dashboardGlassCard: some ShapeStyle {
+        LinearGradient(colors: [.white.opacity(0.115), .white.opacity(0.055)], startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+
+    private var dashboardSceneBackground: some View {
+        ZStack {
+            Color.black
+            sceneGradient(for: settings.notchSceneStyle).opacity(0.38)
+            LinearGradient(colors: [.clear, .black.opacity(0.48)], startPoint: .top, endPoint: .bottom)
+        }
+    }
+
+    private func sceneGradient(for style: NotchSceneStyle) -> LinearGradient {
+        switch style {
+        case .graphite:
+            LinearGradient(colors: [Color(white: 0.17), .black], startPoint: .topLeading, endPoint: .bottomTrailing)
+        case .ember:
+            LinearGradient(colors: [Color(red: 0.55, green: 0.16, blue: 0.09), .black], startPoint: .topLeading, endPoint: .bottomTrailing)
+        case .aurora:
+            LinearGradient(colors: [Color.indigo, Color.teal.opacity(0.7), .black], startPoint: .topLeading, endPoint: .bottomTrailing)
+        case .album:
+            LinearGradient(colors: [Color.orange.opacity(0.72), Color.purple.opacity(0.55), .black], startPoint: .topLeading, endPoint: .bottomTrailing)
+        }
     }
 
     private var dashboardNavigationRow: some View {
@@ -588,10 +722,12 @@ struct DynamicNotchView: View {
 
     private var dashboardNavigationTrailing: some View {
         HStack(spacing: 8) {
-            Text(localized("GENEL", "GENERAL"))
-                .font(.system(size: 8, weight: .bold))
-                .tracking(1.4)
-                .foregroundStyle(primaryColor.opacity(0.38))
+            smallUtilityButton(
+                icon: "slider.horizontal.3",
+                label: localized("Özelleştir", "Customize")
+            ) {
+                withAnimation(.easeInOut(duration: 0.2)) { isCustomizingDashboard.toggle() }
+            }
 
             smallUtilityButton(
                 icon: "gearshape.fill",
@@ -2119,7 +2255,11 @@ struct DynamicNotchView: View {
     }
 
     private var isLightAppearance: Bool {
-        effectiveColorScheme == .light
+        !usesNotchBlackSurface && effectiveColorScheme == .light
+    }
+
+    private var usesNotchBlackSurface: Bool {
+        layout.hasCameraHousing || settings.contentMode == .dashboard
     }
 
     private var primaryColor: Color {
@@ -2127,7 +2267,7 @@ struct DynamicNotchView: View {
     }
 
     private var panelColor: Color {
-        isLightAppearance ? .white : .black
+        usesNotchBlackSurface ? .black : (isLightAppearance ? .white : .black)
     }
 
     private var panelOpacity: Double {

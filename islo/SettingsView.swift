@@ -147,6 +147,23 @@ struct SettingsView: View {
     private var appearancePage: some View {
         VStack(spacing: 16) {
             notchPreview
+            settingsCard(title: text("Ana ekran", "Home")) {
+                settingsRow(symbol: "rectangle.grid.2x2", title: text("Widget düzeni", "Widget layout"), subtitle: text("Genişleyen çentikte hangi bilginin öne çıkacağını seçin.", "Choose what takes priority in the expanded notch.")) {
+                    Picker("", selection: $settings.homeWidgetStyle) {
+                        ForEach(HomeWidgetStyle.allCases) { style in
+                            Text(style.title(language: settings.language)).tag(style)
+                        }
+                    }.labelsHidden().frame(width: 150)
+                }
+                rowDivider
+                settingsRow(symbol: "sparkles.rectangle.stack", title: text("Sahne", "Scene"), subtitle: text("Koyu yüzeyin ışık ve renk karakteri.", "The light and color character of the dark surface.")) {
+                    Picker("", selection: $settings.notchSceneStyle) {
+                        ForEach(NotchSceneStyle.allCases) { style in
+                            Text(style.title(language: settings.language)).tag(style)
+                        }
+                    }.labelsHidden().frame(width: 150)
+                }
+            }
             settingsCard(title: text("Pencere görünümü", "Window appearance")) {
                 ThemeChoicePicker(selection: $settings.theme, language: settings.language).padding(.vertical, 4)
             }

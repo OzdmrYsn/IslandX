@@ -308,7 +308,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.8.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.ozdmrysn.IslandX;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ozdmrysn.islo;
 				PRODUCT_NAME = islo;
 				SUPPORTED_PLATFORMS = macosx;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -334,7 +334,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.8.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.ozdmrysn.IslandX;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ozdmrysn.islo;
 				PRODUCT_NAME = islo;
 				SUPPORTED_PLATFORMS = macosx;
 				SWIFT_EMIT_LOC_STRINGS = YES;
