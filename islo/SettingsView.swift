@@ -53,7 +53,7 @@ struct SettingsView: View {
         .frame(width: 940, height: 690)
         .background(Color(nsColor: .windowBackgroundColor))
         .preferredColorScheme(settings.theme.colorScheme)
-        .tint(.accentColor)
+        .tint(accent)
     }
 
     private var sidebar: some View {
@@ -78,10 +78,15 @@ struct SettingsView: View {
                             .font(.system(size: 13, weight: selection == destination ? .semibold : .medium))
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 12).frame(height: 36)
-                            .foregroundStyle(selection == destination ? Color.accentColor : .primary)
-                            .background(RoundedRectangle(cornerRadius: 9).fill(selection == destination ? Color.accentColor.opacity(0.12) : .clear))
+                            .foregroundStyle(selection == destination ? accent : .primary)
+                            .background(RoundedRectangle(cornerRadius: 9).fill(selection == destination ? accent.opacity(0.12) : .clear))
+                            // A clear background isn't hit-testable; make the
+                            // whole row clickable, not just its text.
+                            .contentShape(RoundedRectangle(cornerRadius: 9))
                     }
                     .buttonStyle(.plain)
+                    // The focus ring on the first row read as a second selection.
+                    .modifier(NoFocusRing())
                 }
             }
             .padding(.horizontal, 12)
@@ -142,6 +147,15 @@ struct SettingsView: View {
     private var appearancePage: some View {
         VStack(spacing: 16) {
             notchPreview
+            settingsCard(title: text("Tema", "Theme")) {
+                stackedRow(symbol: "paintpalette.fill", title: text("Renk", "Color"), subtitle: text("Çentikteki simgeler, ilerleme halkası, çalma dalgası ve bu pencere bu rengi kullanır. Seçili: ", "Used by the notch icons, progress ring, playback wave, and this window. Selected: ") + settings.accentTheme.title(language: settings.language)) {
+                    AccentSwatchPicker(selection: $settings.accentTheme, language: settings.language)
+                }
+                rowDivider
+                stackedRow(symbol: "drop.halffull", title: text("Ton", "Tone"), subtitle: text("Rengin genişleyen çentiğin koyu yüzeyine ne kadar sineceği. Kamera çentiğinin yanı her zaman siyah kalır.", "How much the color tints the dark surface of the open notch. The area next to the camera always stays black.")) {
+                    SurfaceTonePicker(selection: $settings.surfaceTone, accent: accent, language: settings.language)
+                }
+            }
             settingsCard(title: text("Ana ekran", "Home")) {
                 settingsRow(symbol: "rectangle.grid.2x2", title: text("Widget düzeni", "Widget layout"), subtitle: text("Genişleyen çentikte hangi bilginin öne çıkacağını seçin.", "Choose what takes priority in the expanded notch.")) {
                     Picker("", selection: $settings.homeWidgetStyle) {
@@ -150,26 +164,28 @@ struct SettingsView: View {
                         }
                     }.labelsHidden().frame(width: 150)
                 }
-                rowDivider
-                settingsRow(symbol: "sparkles.rectangle.stack", title: text("Sahne", "Scene"), subtitle: text("Koyu yüzeyin ışık ve renk karakteri.", "The light and color character of the dark surface.")) {
-                    Picker("", selection: $settings.notchSceneStyle) {
-                        ForEach(NotchSceneStyle.allCases) { style in
-                            Text(style.title(language: settings.language)).tag(style)
-                        }
-                    }.labelsHidden().frame(width: 150)
-                }
             }
             settingsCard(title: text("Pencere görünümü", "Window appearance")) {
-                ThemeChoicePicker(selection: $settings.theme, language: settings.language).padding(.vertical, 4)
-            }
-            settingsCard(title: text("Boştaki çentik", "Idle notch")) {
-                settingsRow(symbol: "rectangle.tophalf.inset.filled", title: text("Boşta görünümü", "Idle appearance"), subtitle: settings.notchIdleMode.subtitle(language: settings.language)) {
-                    Picker("", selection: $settings.notchIdleMode) {
-                        ForEach(NotchIdleMode.allCases) { mode in Text(mode.title(language: settings.language)).tag(mode) }
-                    }.labelsHidden().frame(width: 190)
-                }
+                Text(text("Ayarlar ve tanıtım pencerelerinin açık/koyu görünümü. Liquid Glass çentiğe de cam efekti verir.", "Light or dark look for the Settings and welcome windows. Liquid Glass also gives the notch a glass finish."))
+                    .font(.caption).foregroundStyle(.secondary).padding(.bottom, 8)
+                ThemeChoicePicker(selection: $settings.theme, language: settings.language, accent: accent).padding(.vertical, 4)
             }
         }
+    }
+
+    /// A settings row whose control is too wide to sit beside the title.
+    private func stackedRow<Content: View>(symbol: String, title: String, subtitle: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 14) {
+                rowIcon(symbol)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title).font(.system(size: 14, weight: .semibold))
+                    Text(subtitle).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            content().padding(.leading, 48)
+        }
+        .padding(.vertical, 10)
     }
 
     private var interactionPage: some View {
@@ -206,6 +222,19 @@ struct SettingsView: View {
                 rowDivider
                 toggleRow(symbol: "tray.full.fill", title: text("Dosya Rafı + AirDrop", "File Shelf + AirDrop"), subtitle: text("Dosyaları çentiğe bırakın, taşıyın veya AirDrop ile gönderin.", "Drop files on the notch, move them, or send them with AirDrop."), isOn: $settings.dashboardFileShelfEnabled)
             }
+            settingsCard(title: text("Bildirimler", "Notifications")) {
+                toggleRow(symbol: "bell.badge.fill", title: text("Bildirimleri çentikte göster", "Show notifications in the notch"), subtitle: text("Gelen bildirim çentiği genişletir; tıklayınca Bildirimler sekmesi açılır. Erişilebilirlik izni gerekir.", "A new notification widens the notch; click it to open the Notifications tab. Needs Accessibility access."), isOn: $settings.dashboardNotificationsEnabled)
+                if settings.dashboardNotificationsEnabled {
+                    rowDivider
+                    settingsRow(symbol: "text.bubble.fill", title: text("Bildirim önizlemesi", "Notification preview"), subtitle: text("Çentik genişlediğinde bildirimin içeriği mi, yalnızca yeni bildirim olduğu mu görünsün?", "Show the notification's content when the notch widens, or only that one arrived?")) {
+                        Picker("", selection: $settings.notificationPreviewStyle) {
+                            ForEach(NotificationPreviewStyle.allCases) { style in
+                                Text(style.title(language: settings.language)).tag(style)
+                            }
+                        }.labelsHidden().frame(width: 210)
+                    }
+                }
+            }
             HStack { Spacer(); Button(text("Araç varsayılanlarını geri yükle", "Restore utility defaults")) { settings.resetDashboardFeatureDefaults() } }
         }
     }
@@ -213,7 +242,7 @@ struct SettingsView: View {
     private var permissionsPage: some View {
         VStack(spacing: 16) {
             settingsCard(title: text("Sistem izinleri", "System permissions")) {
-                settingsRow(symbol: "hand.raised.fill", title: text("Erişilebilirlik", "Accessibility"), subtitle: text("Ses ve parlaklık tuşlarında macOS'un kendi göstergesini gizleyip yalnızca islo.'yu göstermek, yapıştırma ve medya tuşlarını algılamak için gerekir.", "Needed to hide macOS's own volume and brightness indicator so only islo. shows, and to detect paste and media keys.")) {
+                settingsRow(symbol: "hand.raised.fill", title: text("Erişilebilirlik", "Accessibility"), subtitle: text("Bildirimleri çentikte göstermek, ses ve parlaklıkta macOS'un kendi göstergesini gizlemek, yapıştırma ve medya tuşlarını algılamak için gerekir.", "Needed to show notifications in the notch, hide macOS's own volume and brightness indicator, and detect paste and media keys.")) {
                     permissionStatus(granted: settings.isAccessibilityTrusted) {
                         settings.requestAccessibilityPermission()
                         settings.openAccessibilitySettings()
@@ -267,7 +296,7 @@ struct SettingsView: View {
     private var aboutPage: some View {
         VStack(spacing: 18) {
             Image(nsImage: NSApp.applicationIconImage).resizable().scaledToFit().frame(width: 112, height: 112)
-                .shadow(color: Color.accentColor.opacity(0.2), radius: 24)
+                .shadow(color: accent.opacity(0.2), radius: 24)
             Text("islo.").font(.system(size: 34, weight: .bold, design: .rounded))
             Text(versionText).foregroundStyle(.secondary)
             Text(text("Mac'inizin üstünde, gününüzün yanında.", "At the top of your Mac, close to your day."))
@@ -285,14 +314,10 @@ struct SettingsView: View {
     private var notchPreview: some View {
         VStack(spacing: 14) {
             ZStack(alignment: .top) {
-                LinearGradient(colors: [Color.pink.opacity(0.12), Color.blue.opacity(0.08)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                HStack(spacing: 0) {
-                    RoundedRectangle(cornerRadius: 8).fill(.black).frame(width: 52, height: 48).overlay(Image(systemName: "music.note").foregroundStyle(.white.opacity(0.85)))
-                    Rectangle().fill(.black).frame(width: 118, height: 32)
-                    RoundedRectangle(cornerRadius: 8).fill(.black).frame(width: 52, height: 48).overlay(Image(systemName: "waveform").foregroundStyle(.orange))
-                }
+                LinearGradient(colors: [accent.opacity(0.14), Color.primary.opacity(0.04)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                ThemePreviewNotch(accent: accent, tone: settings.surfaceTone, language: settings.language)
             }
-            .frame(height: 92).clipShape(RoundedRectangle(cornerRadius: 18))
+            .frame(height: 118).clipShape(RoundedRectangle(cornerRadius: 18))
             Text(text("Değişiklikleri anında çentikte göreceksiniz.", "Your changes appear in the notch immediately."))
                 .font(.caption).foregroundStyle(.secondary)
         }
@@ -344,8 +369,8 @@ struct SettingsView: View {
     }
 
     private func rowIcon(_ symbol: String) -> some View {
-        Image(systemName: symbol).font(.system(size: 15, weight: .semibold)).foregroundStyle(Color.accentColor)
-            .frame(width: 34, height: 34).background(Circle().fill(Color.accentColor.opacity(0.11)))
+        Image(systemName: symbol).font(.system(size: 15, weight: .semibold)).foregroundStyle(accent)
+            .frame(width: 34, height: 34).background(Circle().fill(accent.opacity(0.11)))
     }
 
     private var rowDivider: some View { Divider().padding(.leading, 48) }
@@ -364,6 +389,7 @@ struct SettingsView: View {
     }
 
     private func text(_ turkish: String, _ english: String) -> String { settings.language.value(turkish: turkish, english: english) }
+    private var accent: Color { settings.accentTheme.color }
     private var launchAtLoginBinding: Binding<Bool> { Binding(get: { settings.launchAtLogin }, set: settings.setLaunchAtLogin) }
     private var automaticUpdatesBinding: Binding<Bool> { Binding(get: { updateManager.automaticUpdatesEnabled }, set: updateManager.setAutomaticUpdates) }
     private var versionText: String {
@@ -375,6 +401,7 @@ struct SettingsView: View {
 struct ThemeChoicePicker: View {
     @Binding var selection: AppTheme
     let language: AppLanguage
+    var accent: Color = .accentColor
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 4)
 
     var body: some View {
@@ -390,8 +417,9 @@ struct ThemeChoicePicker: View {
                     }
                     .frame(maxWidth: .infinity, minHeight: 82)
                     .background(RoundedRectangle(cornerRadius: 14).fill(cardBackground(for: theme)))
-                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(selection == theme ? Color.accentColor : Color.primary.opacity(0.08), lineWidth: selection == theme ? 2 : 1))
+                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(selection == theme ? accent : Color.primary.opacity(0.08), lineWidth: selection == theme ? 2 : 1))
                     .foregroundStyle(cardForegroundColor(for: theme))
+                    .contentShape(RoundedRectangle(cornerRadius: 14))
                 }
                 .buttonStyle(.plain).disabled(!theme.isAvailable).opacity(theme.isAvailable ? 1 : 0.45)
                 .accessibilityAddTraits(selection == theme ? .isSelected : [])
@@ -404,11 +432,169 @@ struct ThemeChoicePicker: View {
         case .system: Color(nsColor: .windowBackgroundColor)
         case .light: .white
         case .dark: Color(red: 0.06, green: 0.065, blue: 0.08)
-        case .liquidGlass: Color.accentColor.opacity(0.12)
+        case .liquidGlass: accent.opacity(0.12)
         }
     }
 
     private func cardForegroundColor(for theme: AppTheme) -> Color {
         switch theme { case .light: .black; case .dark: .white; case .system, .liquidGlass: .primary }
+    }
+}
+
+private struct NoFocusRing: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 14.0, *) {
+            content.focusEffectDisabled()
+        } else {
+            content
+        }
+    }
+}
+
+/// A row of colour swatches for the theme colour.
+struct AccentSwatchPicker: View {
+    @Binding var selection: AccentTheme
+    let language: AppLanguage
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(AccentTheme.allCases) { theme in
+                let isSelected = selection == theme
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) { selection = theme }
+                } label: {
+                    Circle()
+                        .fill(theme.color)
+                        .frame(width: 24, height: 24)
+                        .overlay {
+                            if isSelected {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 10, weight: .heavy))
+                                    .foregroundStyle(theme == .yellow || theme == .mint ? Color.black : Color.white)
+                            }
+                        }
+                        .padding(3)
+                        .overlay(Circle().stroke(isSelected ? theme.color : Color.clear, lineWidth: 2))
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .help(theme.title(language: language))
+                .accessibilityLabel(Text(theme.title(language: language)))
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+            }
+        }
+    }
+}
+
+/// Cards that preview each tone with the current theme colour.
+struct SurfaceTonePicker: View {
+    @Binding var selection: SurfaceTone
+    let accent: Color
+    let language: AppLanguage
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 4)
+
+    var body: some View {
+        LazyVGrid(columns: columns, spacing: 10) {
+            ForEach(SurfaceTone.allCases) { tone in
+                let isSelected = selection == tone
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) { selection = tone }
+                } label: {
+                    VStack(spacing: 7) {
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .fill(Color.black)
+                            .overlay {
+                                LinearGradient(
+                                    colors: [accent.opacity(tone.tintOpacity), accent.opacity(tone.tintOpacity * 0.35), .black],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                            }
+                            .frame(height: 40)
+                        Text(tone.title(language: language))
+                            .font(.system(size: 12, weight: .semibold))
+                            .lineLimit(1)
+                    }
+                    .padding(7)
+                    .background(RoundedRectangle(cornerRadius: 14).fill(Color.primary.opacity(0.04)))
+                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(isSelected ? accent : Color.primary.opacity(0.08), lineWidth: isSelected ? 2 : 1))
+                    .contentShape(RoundedRectangle(cornerRadius: 14))
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+            }
+        }
+    }
+}
+
+/// A small open-notch mock that shows the theme colour and tone live.
+private struct ThemePreviewNotch: View {
+    let accent: Color
+    let tone: SurfaceTone
+    let language: AppLanguage
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            Color.black
+            LinearGradient(
+                colors: [accent.opacity(tone.tintOpacity), accent.opacity(tone.tintOpacity * 0.35), .black],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .mask {
+                LinearGradient(
+                    stops: [.init(color: .clear, location: 0), .init(color: .clear, location: 0.2), .init(color: .black, location: 0.55)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
+
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 6) {
+                    Label(language.value(turkish: "Ana", english: "Home"), systemImage: "house.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                        .padding(.horizontal, 9)
+                        .frame(height: 22)
+                        .background(Capsule().fill(Color.white.opacity(0.16)))
+                    ForEach(["calendar", "timer", "tray.full.fill"], id: \.self) { symbol in
+                        Image(systemName: symbol)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.5))
+                            .frame(width: 22, height: 22)
+                    }
+                }
+                HStack(spacing: 10) {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(accent.opacity(0.85))
+                        .frame(width: 34, height: 34)
+                        .overlay(Image(systemName: "music.note").foregroundStyle(.white))
+                    VStack(alignment: .leading, spacing: 6) {
+                        Capsule().fill(Color.white.opacity(0.85)).frame(width: 96, height: 6)
+                        Capsule().fill(Color.white.opacity(0.35)).frame(width: 64, height: 5)
+                    }
+                    Spacer(minLength: 8)
+                    HStack(alignment: .center, spacing: 2.5) {
+                        ForEach([8.0, 15, 10, 13], id: \.self) { height in
+                            Capsule().fill(accent).frame(width: 2.5, height: height)
+                        }
+                    }
+                    Circle()
+                        .trim(from: 0, to: 0.68)
+                        .stroke(accent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                        .frame(width: 22, height: 22)
+                }
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 16)
+            .padding(.top, 34)
+        }
+        .frame(width: 330, height: 118 + 22)
+        // Only the lower corners show; the top runs under the card's edge
+        // like the notch under the display edge.
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .offset(y: -22)
+        .animation(.easeInOut(duration: 0.2), value: tone)
     }
 }

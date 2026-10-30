@@ -8,8 +8,18 @@ enum NotchPresentationState: Equatable {
     case expanded
 }
 
+private enum ShelfFilter { case all, images, documents }
+
+private enum ClipboardFilter { case all, text, links }
+
+private enum FileDropTarget {
+    case shelf
+    case airDrop
+}
+
 private enum DashboardSection: String, CaseIterable {
     case home
+    case notifications
     case calendar
     case timer
     case shelf
@@ -110,6 +120,7 @@ struct DynamicNotchView: View {
     @ObservedObject private var keepAwakeManager: KeepAwakeManager
     @ObservedObject private var fileShelfManager: FileShelfManager
     @ObservedObject private var clipboardHistoryManager: ClipboardHistoryManager
+    @ObservedObject private var notificationMonitor: NotificationMonitor
 
     private let layout: NotchLayout
     private let onPreferredSizeChange: (CGSize, Bool) -> Void
@@ -121,6 +132,7 @@ struct DynamicNotchView: View {
     private var reduceTransparency
 
     @Namespace private var artworkNamespace
+    @Namespace private var navigationNamespace
 
     @State private var presentation: NotchPresentationState = .idle
     @State private var isPinned = false
@@ -135,6 +147,12 @@ struct DynamicNotchView: View {
     @State private var dashboardSection: DashboardSection = .home
     @State private var isCustomizingDashboard = false
     @State private var isFileDropTargeted = false
+    @State private var isShelfTileTargeted = false
+    @State private var isAirDropTileTargeted = false
+    @State private var shelfFilter: ShelfFilter = .all
+    @State private var clipboardFilter: ClipboardFilter = .all
+    @State private var selectedClipboardID: UUID?
+    @State private var notificationFilter: String?
     @State private var isCommandEchoVisible = false
     @State private var commandEchoTask: Task<Void, Never>?
     @State private var pendingSkipDirection: MediaSkipDirection?
@@ -160,6 +178,7 @@ struct DynamicNotchView: View {
         keepAwakeManager: KeepAwakeManager,
         fileShelfManager: FileShelfManager,
         clipboardHistoryManager: ClipboardHistoryManager,
+        notificationMonitor: NotificationMonitor,
         layout: NotchLayout,
         onPreferredSizeChange: @escaping (CGSize, Bool) -> Void = { _, _ in }
     ) {
@@ -170,13 +189,14 @@ struct DynamicNotchView: View {
         _keepAwakeManager = ObservedObject(wrappedValue: keepAwakeManager)
         _fileShelfManager = ObservedObject(wrappedValue: fileShelfManager)
         _clipboardHistoryManager = ObservedObject(wrappedValue: clipboardHistoryManager)
+        _notificationMonitor = ObservedObject(wrappedValue: notificationMonitor)
         self.layout = layout
         self.onPreferredSizeChange = onPreferredSizeChange
     }
 
     private var renderedSurface: some View {
         ZStack(alignment: .top) {
-            if isFileDropTargeted {
+            if isFileDropHUDVisible {
                 fileDropHUD
                     .transition(.opacity)
             } else if isCommandEchoVisible {
@@ -202,11 +222,12 @@ struct DynamicNotchView: View {
             height: surfaceSize.height,
             alignment: .top
         )
+        .animation(presentationAnimation, value: isFileDropHUDVisible)
         .background {
             if isHiddenMiniIdle && isIdleSurfaceConcealed
-                && !isCommandEchoVisible && !isFileDropTargeted {
+                && !isCommandEchoVisible && !isFileDropHUDVisible {
                 Color.clear
-            } else if isCommandEchoVisible || isFileDropTargeted {
+            } else if isCommandEchoVisible || isFileDropHUDVisible {
                 notchShape.fill(Color.black)
             } else {
                 notchBackground
@@ -219,20 +240,36 @@ struct DynamicNotchView: View {
                     .stroke(primaryColor.opacity(0.13), lineWidth: 0.5)
             }
         }
-        .overlay {
-            if isFileDropTargeted {
-                notchShape
-                    .stroke(Color.accentColor, lineWidth: 2)
-                    .padding(2)
-                    .allowsHitTesting(false)
-            }
-        }
         .contentShape(notchShape)
+        // Anywhere outside the two tiles counts as the shelf.
         .onDrop(
             of: [UTType.fileURL.identifier],
             isTargeted: $isFileDropTargeted
         ) { providers in
-            guard settings.dashboardFileShelfEnabled else { return false }
+            handleFileDrop(providers, to: .shelf)
+        }
+    }
+
+    /// Shown the moment files are picked up anywhere, so the notch can be
+    /// aimed at, and while files hover over it.
+    private var isFileDropHUDVisible: Bool {
+        settings.dashboardFileShelfEnabled && (
+            isFileDropTargeted || isShelfTileTargeted || isAirDropTileTargeted ||
+                (fileShelfManager.isFileDragActive && presentation == .idle)
+        )
+    }
+
+    private var showsHalo: Bool {
+        isCommandEchoVisible || isFileDropHUDVisible
+    }
+
+    private func handleFileDrop(
+        _ providers: [NSItemProvider],
+        to target: FileDropTarget
+    ) -> Bool {
+        guard settings.dashboardFileShelfEnabled else { return false }
+        switch target {
+        case .shelf:
             let accepted = fileShelfManager.receive(providers)
             if accepted {
                 isPinned = true
@@ -240,6 +277,8 @@ struct DynamicNotchView: View {
                 selectDashboardSection(.shelf)
             }
             return accepted
+        case .airDrop:
+            return fileShelfManager.sendViaAirDrop(providers)
         }
     }
 
@@ -254,7 +293,8 @@ struct DynamicNotchView: View {
         // Its larger natural size would otherwise grow the root view past a
         // margin-less window and AppKit would centre it, lifting the notch.
         .frame(width: surfaceSize.width, height: surfaceSize.height, alignment: .top)
-        .opacity(isCommandEchoVisible ? 1 : 0)
+        .opacity(showsHalo ? 1 : 0)
+        .animation(.easeOut(duration: 0.2), value: showsHalo)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
@@ -342,7 +382,23 @@ struct DynamicNotchView: View {
         .onChange(of: settings.dashboardFileShelfEnabled) { enabled in
             if !enabled, dashboardSection == .shelf { dashboardSection = .home }
         }
-        .onChange(of: isFileDropTargeted) { _ in
+        .onChange(of: settings.dashboardNotificationsEnabled) { enabled in
+            if !enabled, dashboardSection == .notifications { dashboardSection = .home }
+        }
+        .onChange(of: dashboardSection) { section in
+            if section == .notifications { notificationMonitor.markAllRead() }
+        }
+        .onReceive(notificationMonitor.$announcementRevision.dropFirst()) { _ in
+            guard settings.dashboardNotificationsEnabled,
+                  let latest = notificationMonitor.latest else { return }
+            if presentation == .expanded {
+                // Already reading them; don't count it as unread.
+                if dashboardSection == .notifications { notificationMonitor.markAllRead() }
+                return
+            }
+            commandEchoManager.showNotification(latest)
+        }
+        .onChange(of: isFileDropHUDVisible) { _ in
             resizeSurface(to: preferredSize, animation: presentationAnimation)
         }
         .onChange(of: settings.dashboardKeepAwakeEnabled) { enabled in
@@ -484,7 +540,7 @@ struct DynamicNotchView: View {
 
     private var playbackIndicatorColor: Color {
         mediaManager.isPlaying
-            ? .green
+            ? accent
             : primaryColor.opacity(0.55)
     }
 
@@ -506,46 +562,833 @@ struct DynamicNotchView: View {
         .background(dashboardSceneBackground)
     }
 
-    private var dashboardStage: some View {
-        HStack(spacing: 14) {
-            dashboardPrimaryPane
-            .padding(14)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(dashboardGlassCard)
+    // MARK: - Dashboard sections
 
-            dashboardSidePane
-                .padding(14)
-                .frame(width: dashboardSideWidth)
-                .frame(maxHeight: .infinity, alignment: .topLeading)
-                .background(dashboardGlassCard)
+    private var dashboardCardShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: 20, style: .continuous)
+    }
+
+    private var dashboardGlassCard: LinearGradient {
+        LinearGradient(
+            colors: [.white.opacity(0.11), .white.opacity(0.05)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    /// The rounded glass card every section is built from, so the inside of
+    /// the notch follows its soft outline instead of square panes.
+    private func dashboardCard<Content: View>(
+        padding: CGFloat = 14,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        content()
+            .padding(padding)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(dashboardCardShape.fill(dashboardGlassCard))
+            .overlay(dashboardCardShape.strokeBorder(Color.white.opacity(0.07), lineWidth: 0.5))
+            .clipShape(dashboardCardShape)
+    }
+
+    /// Home keeps the summary column on the right; every other section uses
+    /// the full width for its own layout.
+    private var dashboardStage: some View {
+        Group {
+            switch dashboardSection {
+            case .home: dashboardHomeSection
+            case .notifications: dashboardNotificationsSection
+            case .calendar: dashboardCalendarSection
+            case .timer: dashboardCard { dashboardFocusPane }
+            case .shelf: dashboardShelfSection
+            case .clipboard: dashboardClipboardSection
+            }
         }
         .padding(.horizontal, bodyPadding(16, gap: 12))
         .padding(.bottom, 16)
     }
 
-    @ViewBuilder
-    private var dashboardPrimaryPane: some View {
-        switch dashboardSection {
-        case .timer where settings.dashboardFocusTimerEnabled:
-            dashboardFocusPane
-        case .shelf where settings.dashboardFileShelfEnabled:
-            dashboardShelfPane
-        case .clipboard:
-            dashboardClipboardPane
-        case .home where settings.homeWidgetStyle == .focus && settings.dashboardFocusTimerEnabled:
-            dashboardFocusPane
-        default:
-            dashboardMediaPane
+    private func sectionLabel(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(primaryColor.opacity(0.5))
+    }
+
+    private func filterChip(
+        _ title: String,
+        isSelected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 10, weight: .semibold))
+                .lineLimit(1)
+                .foregroundStyle(isSelected ? Color.black : primaryColor.opacity(0.75))
+                .padding(.horizontal, 11)
+                .frame(height: 24)
+                .background(Capsule().fill(isSelected ? Color.white : Color.clear))
+                .overlay(
+                    Capsule().strokeBorder(
+                        isSelected ? Color.clear : primaryColor.opacity(0.18),
+                        lineWidth: 1
+                    )
+                )
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func roundIconButton(
+        _ symbol: String,
+        label: String,
+        filled: Bool = false,
+        size: CGFloat = 28,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: size * 0.38, weight: .bold))
+                .foregroundStyle(filled ? Color.black : primaryColor.opacity(0.85))
+                .frame(width: size, height: size)
+                .background(Circle().fill(filled ? Color.white : primaryColor.opacity(0.1)))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .help(label)
+        .accessibilityLabel(Text(label))
+    }
+
+    private func emptyState(_ symbol: String, _ text: String) -> some View {
+        VStack(spacing: 8) {
+            Image(systemName: symbol)
+                .font(.system(size: 22, weight: .light))
+            Text(text)
+                .font(.system(size: 10, weight: .medium))
+                .multilineTextAlignment(.center)
+        }
+        .foregroundStyle(primaryColor.opacity(0.42))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: Home
+
+    private var dashboardHomeSection: some View {
+        HStack(spacing: 14) {
+            dashboardCard {
+                if settings.homeWidgetStyle == .focus && settings.dashboardFocusTimerEnabled {
+                    dashboardFocusPane
+                } else {
+                    dashboardMediaPane
+                }
+            }
+
+            dashboardCard { dashboardSidePane }
+                .frame(width: dashboardSideWidth)
         }
     }
 
     private var dashboardSideWidth: CGFloat {
-        guard dashboardSection == .home else { return 238 }
         switch settings.homeWidgetStyle {
-        case .media: return 190
-        case .day: return 310
-        case .balanced, .focus: return 238
+        case .media: 190
+        case .day: 310
+        case .balanced, .focus: 238
         }
+    }
+
+    private var dashboardSidePane: some View {
+        TimelineView(.periodic(from: .now, by: 60)) { context in
+            VStack(alignment: .leading, spacing: 7) {
+                Text(dashboardWeekday(context.date).uppercased())
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(1.2)
+                    .foregroundStyle(Color.red.opacity(0.85))
+
+                HStack(alignment: .firstTextBaseline) {
+                    Text(dashboardDate(context.date))
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(primaryColor)
+                        .lineLimit(1)
+                    Spacer()
+                    Text(dashboardTime(context.date))
+                        .font(.system(size: 13, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(primaryColor.opacity(0.58))
+                }
+
+                dashboardSummaryCard(
+                    icon: "calendar.badge.checkmark",
+                    title: localized("Bugün için hazırsın", "You're clear for today"),
+                    subtitle: localized("Takvimi aç", "Open Calendar"),
+                    action: openCalendar
+                )
+
+                Text(localized("Sıradaki", "Up next"))
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(primaryColor.opacity(0.4))
+
+                dashboardSummaryCard(
+                    icon: "plus",
+                    title: localized("Yeni etkinlik", "New event"),
+                    subtitle: localized("Takvim'de oluştur", "Create in Calendar"),
+                    action: openCalendar
+                )
+            }
+        }
+    }
+
+    // MARK: Calendar
+
+    private var dashboardCalendarSection: some View {
+        TimelineView(.periodic(from: .now, by: 60)) { context in
+            HStack(spacing: 14) {
+                dashboardCard {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(dashboardWeekday(context.date).uppercased())
+                            .font(.system(size: 10, weight: .bold))
+                            .tracking(1.2)
+                            .foregroundStyle(Color.red.opacity(0.85))
+                        Text(formatted(context.date, template: "d"))
+                            .font(.system(size: 50, weight: .bold, design: .rounded))
+                            .foregroundStyle(primaryColor)
+                        Text(formatted(context.date, template: "MMMMyyyy"))
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(primaryColor.opacity(0.6))
+                        Spacer(minLength: 0)
+                        Text(dashboardTime(context.date))
+                            .font(.system(size: 20, weight: .semibold, design: .rounded).monospacedDigit())
+                            .foregroundStyle(primaryColor.opacity(0.85))
+                    }
+                }
+                .frame(width: 190)
+
+                dashboardCard {
+                    VStack(alignment: .leading, spacing: 12) {
+                        sectionLabel(localized("Bu hafta", "This week"))
+                        weekStrip(for: context.date)
+                        Spacer(minLength: 0)
+                        HStack(spacing: 10) {
+                            dashboardSummaryCard(
+                                icon: "calendar",
+                                title: localized("Takvimi aç", "Open Calendar"),
+                                subtitle: dashboardLongDate(context.date),
+                                action: openCalendar
+                            )
+                            dashboardSummaryCard(
+                                icon: "plus",
+                                title: localized("Yeni etkinlik", "New event"),
+                                subtitle: localized("Takvim'de oluştur", "Create in Calendar"),
+                                action: openCalendar
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func weekStrip(for date: Date) -> some View {
+        let calendar = Calendar.current
+        let start = calendar.dateInterval(of: .weekOfYear, for: date)?.start ?? date
+        let days = (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
+
+        return HStack(spacing: 6) {
+            ForEach(days, id: \.self) { day in
+                let isToday = calendar.isDate(day, inSameDayAs: date)
+                VStack(spacing: 4) {
+                    Text(formatted(day, template: "EEE"))
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(isToday ? Color.white : primaryColor.opacity(0.45))
+                    Text("\(calendar.component(.day, from: day))")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundStyle(isToday ? Color.white : primaryColor.opacity(0.8))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 7)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(isToday ? accent : primaryColor.opacity(0.05))
+                )
+            }
+        }
+    }
+
+    private func formatted(_ date: Date, template: String) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: settings.language == .turkish ? "tr_TR" : "en_US")
+        formatter.setLocalizedDateFormatFromTemplate(template)
+        return formatter.string(from: date)
+    }
+
+    // MARK: Timer
+
+    private var dashboardFocusPane: some View {
+        HStack(spacing: 22) {
+            focusRing
+                .frame(width: 126, height: 126)
+
+            VStack(alignment: .leading, spacing: 12) {
+                focusModeSwitch
+                if focusTimerManager.mode == .timer {
+                    timerPresets
+                } else {
+                    pomodoroPhases
+                }
+                Spacer(minLength: 0)
+                focusControls
+            }
+            .frame(maxHeight: .infinity, alignment: .top)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+    }
+
+    private var focusRing: some View {
+        ZStack {
+            Circle()
+                .stroke(primaryColor.opacity(0.08), lineWidth: 10)
+            Circle()
+                .trim(from: 0, to: max(focusTimerManager.progress, 0.004))
+                .stroke(
+                    LinearGradient(colors: [accent, accent.opacity(0.6)], startPoint: .top, endPoint: .bottom),
+                    style: StrokeStyle(lineWidth: 10, lineCap: .round)
+                )
+                .rotationEffect(.degrees(-90))
+                .shadow(color: accent.opacity(0.5), radius: 6)
+                .animation(.linear(duration: 0.25), value: focusTimerManager.progress)
+
+            VStack(spacing: 4) {
+                Text(focusTimerManager.formattedTime)
+                    .font(.system(size: 28, weight: .semibold, design: .rounded).monospacedDigit())
+                    .foregroundStyle(primaryColor)
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(focusTimerManager.isRunning ? accent : primaryColor.opacity(0.35))
+                        .frame(width: 5, height: 5)
+                    Text(focusPhaseLabel)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(primaryColor.opacity(0.55))
+                }
+            }
+        }
+    }
+
+    private var focusPhaseLabel: String {
+        switch focusTimerManager.mode {
+        case .timer: localized("Zamanlayıcı", "Timer")
+        case .pomodoro:
+            focusTimerManager.isBreak ? localized("Mola", "Break") : localized("Odak", "Focus")
+        }
+    }
+
+    /// A capsule switch in the notch's own style instead of a system control.
+    private var focusModeSwitch: some View {
+        HStack(spacing: 2) {
+            ForEach(FocusTimerMode.allCases) { mode in
+                let isSelected = focusTimerManager.mode == mode
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                        focusTimerManager.mode = mode
+                    }
+                } label: {
+                    Text(mode == .timer ? localized("Zamanlayıcı", "Timer") : "Pomodoro")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(isSelected ? Color.black : primaryColor.opacity(0.65))
+                        .padding(.horizontal, 13)
+                        .frame(height: 26)
+                        .background {
+                            if isSelected {
+                                Capsule()
+                                    .fill(Color.white)
+                                    .matchedGeometryEffect(id: "focusMode", in: navigationNamespace)
+                            }
+                        }
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(3)
+        .background(Capsule().fill(primaryColor.opacity(0.08)))
+    }
+
+    private var timerPresets: some View {
+        HStack(spacing: 6) {
+            ForEach([5, 10, 15, 25, 45], id: \.self) { minutes in
+                let isSelected = focusTimerManager.timerMinutes == minutes
+                Button {
+                    focusTimerManager.timerMinutes = minutes
+                    focusTimerManager.reset()
+                } label: {
+                    Text(localized("\(minutes) dk", "\(minutes) min"))
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(isSelected ? accent : primaryColor.opacity(0.7))
+                        .padding(.horizontal, 10)
+                        .frame(height: 24)
+                        .background(Capsule().fill(isSelected ? accent.opacity(0.16) : primaryColor.opacity(0.06)))
+                        .overlay(Capsule().strokeBorder(isSelected ? accent.opacity(0.6) : Color.clear, lineWidth: 1))
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var pomodoroPhases: some View {
+        HStack(spacing: 6) {
+            phaseChip(localized("Odak · 25 dk", "Focus · 25 min"), isActive: !focusTimerManager.isBreak)
+            phaseChip(localized("Mola · 5 dk", "Break · 5 min"), isActive: focusTimerManager.isBreak)
+        }
+    }
+
+    private func phaseChip(_ title: String, isActive: Bool) -> some View {
+        Text(title)
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(isActive ? accent : primaryColor.opacity(0.5))
+            .padding(.horizontal, 10)
+            .frame(height: 24)
+            .background(Capsule().fill(isActive ? accent.opacity(0.16) : primaryColor.opacity(0.06)))
+    }
+
+    private var focusControls: some View {
+        HStack(spacing: 10) {
+            roundIconButton(
+                focusTimerManager.isRunning ? "pause.fill" : "play.fill",
+                label: focusTimerManager.isRunning ? localized("Duraklat", "Pause") : localized("Başlat", "Start"),
+                filled: true,
+                size: 44,
+                action: focusTimerManager.toggle
+            )
+            roundIconButton(
+                "arrow.counterclockwise",
+                label: localized("Sıfırla", "Reset"),
+                size: 34,
+                action: focusTimerManager.reset
+            )
+            if focusTimerManager.mode == .pomodoro {
+                roundIconButton(
+                    "forward.end.fill",
+                    label: localized("Sonraki aşama", "Next phase"),
+                    size: 34,
+                    action: focusTimerManager.skipPhase
+                )
+            }
+            if focusTimerManager.isRunning {
+                Text(
+                    localized("Bitiş ", "Ends ")
+                        + dashboardTime(Date().addingTimeInterval(TimeInterval(focusTimerManager.remainingSeconds)))
+                )
+                .font(.system(size: 10, weight: .medium).monospacedDigit())
+                .foregroundStyle(primaryColor.opacity(0.5))
+                .padding(.leading, 4)
+            }
+        }
+    }
+
+    // MARK: Shelf
+
+    private var dashboardShelfSection: some View {
+        let items = fileShelfManager.items
+        let imageCount = items.filter { fileShelfManager.details(for: $0).isImage }.count
+        let filtered = items.filter { url in
+            switch shelfFilter {
+            case .all: true
+            case .images: fileShelfManager.details(for: url).isImage
+            case .documents: !fileShelfManager.details(for: url).isImage
+            }
+        }
+
+        return HStack(spacing: 14) {
+            dashboardCard {
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(alignment: .top) {
+                        sectionLabel(localized("Rafta", "On the shelf"))
+                        Spacer()
+                        roundIconButton(
+                            "xmark",
+                            label: localized("Rafı temizle (dosyalar silinmez)", "Clear the shelf (files aren't deleted)")
+                        ) {
+                            withAnimation(.easeInOut(duration: 0.2)) { fileShelfManager.clear() }
+                        }
+                        .disabled(items.isEmpty)
+                        .opacity(items.isEmpty ? 0.35 : 1)
+                    }
+                    Spacer(minLength: 0)
+                    Text("\(items.count)")
+                        .font(.system(size: 44, weight: .semibold, design: .rounded))
+                        .foregroundStyle(primaryColor)
+                    Text(localized("dosya elinin altında", "files within reach"))
+                        .font(.system(size: 10))
+                        .foregroundStyle(primaryColor.opacity(0.55))
+                    Rectangle()
+                        .fill(primaryColor.opacity(0.1))
+                        .frame(height: 0.5)
+                        .padding(.vertical, 8)
+                    Text(localized("\(imageCount) görsel · \(items.count - imageCount) belge", "\(imageCount) images · \(items.count - imageCount) documents"))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(primaryColor.opacity(0.6))
+                }
+            }
+            .frame(width: 180)
+
+            dashboardCard(padding: 12) {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 6) {
+                        filterChip(localized("Tümü · \(items.count)", "All · \(items.count)"), isSelected: shelfFilter == .all) { shelfFilter = .all }
+                        filterChip(localized("Görseller · \(imageCount)", "Images · \(imageCount)"), isSelected: shelfFilter == .images) { shelfFilter = .images }
+                        filterChip(localized("Belgeler · \(items.count - imageCount)", "Documents · \(items.count - imageCount)"), isSelected: shelfFilter == .documents) { shelfFilter = .documents }
+                    }
+
+                    if filtered.isEmpty {
+                        emptyState(
+                            "arrow.down.doc",
+                            items.isEmpty
+                                ? localized("Dosyaları çentiğe sürükleyerek rafa ekleyin.", "Drag files onto the notch to add them.")
+                                : localized("Bu filtrede dosya yok.", "No files in this filter.")
+                        )
+                    } else {
+                        ScrollView(.vertical, showsIndicators: true) {
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 108), spacing: 8)], spacing: 8) {
+                                ForEach(filtered, id: \.self) { url in
+                                    shelfTile(url)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func shelfTile(_ url: URL) -> some View {
+        let details = fileShelfManager.details(for: url)
+        let tileShape = RoundedRectangle(cornerRadius: 13, style: .continuous)
+
+        return VStack(alignment: .leading, spacing: 5) {
+            ZStack {
+                if let thumbnail = fileShelfManager.thumbnails[url] {
+                    Image(nsImage: thumbnail)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    primaryColor.opacity(0.06)
+                    Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
+                        .resizable()
+                        .scaledToFit()
+                        .padding(8)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+
+            Text(url.lastPathComponent)
+                .font(.system(size: 9.5, weight: .semibold))
+                .foregroundStyle(primaryColor.opacity(0.9))
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Text([shelfKindLabel(details.kind), details.size].compactMap { $0 }.joined(separator: " · "))
+                .font(.system(size: 8))
+                .foregroundStyle(primaryColor.opacity(0.45))
+                .lineLimit(1)
+        }
+        .padding(6)
+        .background(tileShape.fill(primaryColor.opacity(0.06)))
+        .contentShape(tileShape)
+        .onDrag { NSItemProvider(contentsOf: url) ?? NSItemProvider() }
+        .onTapGesture { fileShelfManager.reveal(url) }
+        .help(url.lastPathComponent)
+        .contextMenu {
+            Button(localized("Aç", "Open")) { NSWorkspace.shared.open(url) }
+            Button(localized("AirDrop ile Gönder", "Send via AirDrop")) { fileShelfManager.sendViaAirDrop(url) }
+            Button(localized("Finder'da Göster", "Show in Finder")) { fileShelfManager.reveal(url) }
+            Divider()
+            Button(localized("Raftan Kaldır", "Remove from Shelf")) {
+                withAnimation(.easeInOut(duration: 0.2)) { fileShelfManager.remove(url) }
+            }
+        }
+    }
+
+    private func shelfKindLabel(_ kind: String) -> String {
+        switch kind {
+        case "image": localized("Görsel", "Image")
+        case "pdf": "PDF"
+        case "video": "Video"
+        case "audio": localized("Ses", "Audio")
+        case "archive": localized("Arşiv", "Archive")
+        case "text": localized("Metin", "Text")
+        case "folder": localized("Klasör", "Folder")
+        default: localized("Dosya", "File")
+        }
+    }
+
+    // MARK: Clipboard
+
+    private var dashboardClipboardSection: some View {
+        let entries = clipboardHistoryManager.entries
+        let selected = entries.first { $0.id == selectedClipboardID } ?? entries.first
+        let linkCount = entries.filter { $0.linkURL != nil }.count
+        let filtered = entries.filter { entry in
+            switch clipboardFilter {
+            case .all: true
+            case .text: entry.linkURL == nil
+            case .links: entry.linkURL != nil
+            }
+        }
+
+        return HStack(spacing: 14) {
+            dashboardCard {
+                if let selected {
+                    selectedClipboardCard(selected)
+                } else {
+                    emptyState("list.clipboard", localized("Kopyaladığınız metinler burada görünür.", "Copied text appears here."))
+                }
+            }
+            .frame(width: 230)
+
+            dashboardCard(padding: 12) {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 6) {
+                        filterChip(localized("Tümü · \(entries.count)", "All · \(entries.count)"), isSelected: clipboardFilter == .all) { clipboardFilter = .all }
+                        filterChip(localized("Metin · \(entries.count - linkCount)", "Text · \(entries.count - linkCount)"), isSelected: clipboardFilter == .text) { clipboardFilter = .text }
+                        filterChip(localized("Bağlantı · \(linkCount)", "Links · \(linkCount)"), isSelected: clipboardFilter == .links) { clipboardFilter = .links }
+                        Spacer(minLength: 0)
+                        roundIconButton("trash", label: localized("Geçmişi temizle", "Clear history"), size: 24) {
+                            withAnimation(.easeInOut(duration: 0.2)) { clipboardHistoryManager.clear() }
+                        }
+                        .disabled(entries.isEmpty)
+                        .opacity(entries.isEmpty ? 0.35 : 1)
+                    }
+
+                    if filtered.isEmpty {
+                        emptyState("list.clipboard", localized("Burada henüz bir şey yok.", "Nothing here yet."))
+                    } else {
+                        ScrollView(.vertical, showsIndicators: true) {
+                            LazyVGrid(
+                                columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)],
+                                spacing: 8
+                            ) {
+                                ForEach(filtered) { entry in
+                                    clipboardTile(entry, isSelected: entry.id == selected?.id)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func selectedClipboardCard(_ entry: ClipboardEntry) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top) {
+                sectionLabel(localized("Seçili öğe", "Selected item"))
+                Spacer()
+                if let url = entry.linkURL {
+                    roundIconButton("arrow.up.right", label: localized("Bağlantıyı aç", "Open link"), filled: true, size: 30) {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+                roundIconButton("doc.on.doc.fill", label: localized("Kopyala", "Copy"), filled: entry.linkURL == nil, size: 30) {
+                    clipboardHistoryManager.copy(entry)
+                }
+            }
+            Text(entry.text)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(primaryColor)
+                .lineLimit(4)
+            Spacer(minLength: 0)
+            Text(clipboardKind(entry) + " · " + entry.source)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(primaryColor.opacity(0.45))
+                .lineLimit(1)
+        }
+    }
+
+    private func clipboardTile(_ entry: ClipboardEntry, isSelected: Bool) -> some View {
+        let tileShape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+
+        return Button {
+            selectedClipboardID = entry.id
+        } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Image(systemName: entry.linkURL == nil ? "text.alignleft" : "link")
+                        .font(.system(size: 9, weight: .bold))
+                        .frame(width: 22, height: 22)
+                        .background(Circle().fill(primaryColor.opacity(0.08)))
+                    Spacer(minLength: 0)
+                    Text(clipboardKind(entry) + " · " + entry.source)
+                        .font(.system(size: 8, weight: .medium))
+                        .foregroundStyle(primaryColor.opacity(0.4))
+                        .lineLimit(1)
+                }
+                Text(entry.text)
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(primaryColor.opacity(0.85))
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(9)
+            .frame(height: 74, alignment: .topLeading)
+            .background(tileShape.fill(primaryColor.opacity(isSelected ? 0.1 : 0.06)))
+            .overlay(tileShape.strokeBorder(isSelected ? accent : Color.clear, lineWidth: 1.5))
+            .contentShape(tileShape)
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button(localized("Kopyala", "Copy")) { clipboardHistoryManager.copy(entry) }
+            if let url = entry.linkURL {
+                Button(localized("Bağlantıyı Aç", "Open Link")) { NSWorkspace.shared.open(url) }
+            }
+            Divider()
+            Button(localized("Geçmişten Kaldır", "Remove from History")) {
+                clipboardHistoryManager.remove(entry)
+            }
+        }
+    }
+
+    private func clipboardKind(_ entry: ClipboardEntry) -> String {
+        entry.linkURL == nil ? localized("Metin", "Text") : localized("Bağlantı", "Link")
+    }
+
+    // MARK: Notifications
+
+    private var dashboardNotificationsSection: some View {
+        let items = notificationMonitor.items
+        var appNames: [String] = []
+        for item in items where !appNames.contains(item.appName) && appNames.count < 3 {
+            appNames.append(item.appName)
+        }
+        let filtered = notificationFilter.map { name in items.filter { $0.appName == name } } ?? items
+
+        return HStack(spacing: 14) {
+            dashboardCard {
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(alignment: .top) {
+                        sectionLabel(localized("Son bildirimler", "Recent notifications"))
+                        Spacer()
+                        roundIconButton("xmark", label: localized("Bildirimleri temizle", "Clear notifications")) {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                notificationMonitor.clear()
+                                notificationFilter = nil
+                            }
+                        }
+                        .disabled(items.isEmpty)
+                        .opacity(items.isEmpty ? 0.35 : 1)
+                    }
+                    Spacer(minLength: 0)
+                    Text("\(items.count)")
+                        .font(.system(size: 44, weight: .semibold, design: .rounded))
+                        .foregroundStyle(primaryColor)
+                    Text(
+                        settings.isAccessibilityTrusted
+                            ? localized("bu oturumda gelen bildirim", "notifications this session")
+                            : localized("Ayarlar › İzinler'den Erişilebilirlik izni verin.", "Allow Accessibility in Settings › Permissions.")
+                    )
+                    .font(.system(size: 10))
+                    .foregroundStyle(primaryColor.opacity(0.55))
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(width: 180)
+
+            dashboardCard(padding: 12) {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 6) {
+                        filterChip(localized("Tümü", "All"), isSelected: notificationFilter == nil) { notificationFilter = nil }
+                        ForEach(appNames, id: \.self) { name in
+                            filterChip(name, isSelected: notificationFilter == name) { notificationFilter = name }
+                        }
+                    }
+
+                    if filtered.isEmpty {
+                        emptyState("bell", localized("Yeni bildirimler burada toplanır.", "New notifications collect here."))
+                    } else {
+                        TimelineView(.periodic(from: .now, by: 30)) { _ in
+                            ScrollView(.vertical, showsIndicators: true) {
+                                LazyVStack(spacing: 7) {
+                                    ForEach(filtered) { item in
+                                        notificationRow(item)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func notificationRow(_ item: CapturedNotification) -> some View {
+        let rowShape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+
+        return Button {
+            notificationMonitor.openApplication(for: item)
+        } label: {
+            HStack(spacing: 10) {
+                notificationAppIcon(item)
+                    .frame(width: 30, height: 30)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(item.appName)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(primaryColor)
+                            .lineLimit(1)
+                        Text(relativeTime(item.date))
+                            .font(.system(size: 9))
+                            .foregroundStyle(primaryColor.opacity(0.4))
+                    }
+                    Text(item.headline)
+                        .font(.system(size: 10.5, weight: .medium))
+                        .foregroundStyle(primaryColor.opacity(0.85))
+                        .lineLimit(1)
+                    if !item.detail.isEmpty {
+                        Text(item.detail)
+                            .font(.system(size: 9.5))
+                            .foregroundStyle(primaryColor.opacity(0.5))
+                            .lineLimit(1)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(rowShape.fill(primaryColor.opacity(0.06)))
+            .contentShape(rowShape)
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button(localized("Kaldır", "Remove")) { notificationMonitor.remove(item) }
+        }
+    }
+
+    @ViewBuilder
+    private func notificationAppIcon(_ item: CapturedNotification) -> some View {
+        if let bundleIdentifier = item.bundleIdentifier,
+           let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) {
+            Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
+                .resizable()
+                .scaledToFit()
+        } else {
+            Image(systemName: "bell.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(accent)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Circle().fill(accent.opacity(0.15)))
+        }
+    }
+
+    private func relativeTime(_ date: Date) -> String {
+        guard Date().timeIntervalSince(date) > 50 else { return localized("şimdi", "now") }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.locale = Locale(identifier: settings.language == .turkish ? "tr_TR" : "en_US")
+        formatter.unitsStyle = .short
+        return formatter.localizedString(for: date, relativeTo: .now)
+    }
+
+    /// Opens the notch straight onto the notifications list.
+    private func openNotifications() {
+        hoverTask?.cancel()
+        isPinned = true
+        selectDashboardSection(.notifications)
+        setPresentation(.expanded)
     }
 
     private var dashboardCustomizer: some View {
@@ -604,29 +1447,35 @@ struct DynamicNotchView: View {
         .buttonStyle(.plain)
     }
 
-    private var dashboardGlassCard: some ShapeStyle {
-        LinearGradient(colors: [.white.opacity(0.115), .white.opacity(0.055)], startPoint: .topLeading, endPoint: .bottomTrailing)
-    }
-
+    /// Black with the theme colour washed in at the chosen tone. The band
+    /// beside the camera housing stays pure black so the real notch blends in.
     private var dashboardSceneBackground: some View {
         ZStack {
             Color.black
-            sceneGradient(for: settings.notchSceneStyle).opacity(0.38)
-            LinearGradient(colors: [.clear, .black.opacity(0.48)], startPoint: .top, endPoint: .bottom)
+            LinearGradient(
+                colors: [
+                    accent.opacity(settings.surfaceTone.tintOpacity),
+                    accent.opacity(settings.surfaceTone.tintOpacity * 0.35),
+                    .black
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .mask {
+                LinearGradient(
+                    stops: [
+                        .init(color: .clear, location: 0),
+                        .init(color: .clear, location: 0.12),
+                        .init(color: .black, location: 0.38)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
+            LinearGradient(colors: [.clear, .black.opacity(0.4)], startPoint: .top, endPoint: .bottom)
         }
-    }
-
-    private func sceneGradient(for style: NotchSceneStyle) -> LinearGradient {
-        switch style {
-        case .graphite:
-            LinearGradient(colors: [Color(white: 0.17), .black], startPoint: .topLeading, endPoint: .bottomTrailing)
-        case .ember:
-            LinearGradient(colors: [Color(red: 0.55, green: 0.16, blue: 0.09), .black], startPoint: .topLeading, endPoint: .bottomTrailing)
-        case .aurora:
-            LinearGradient(colors: [Color.indigo, Color.teal.opacity(0.7), .black], startPoint: .topLeading, endPoint: .bottomTrailing)
-        case .album:
-            LinearGradient(colors: [Color.orange.opacity(0.72), Color.purple.opacity(0.55), .black], startPoint: .topLeading, endPoint: .bottomTrailing)
-        }
+        .animation(.easeInOut(duration: 0.25), value: settings.accentTheme)
+        .animation(.easeInOut(duration: 0.25), value: settings.surfaceTone)
     }
 
     private var dashboardNavigationRow: some View {
@@ -667,33 +1516,21 @@ struct DynamicNotchView: View {
     }
 
     private var dashboardNavigationLeading: some View {
-        HStack(spacing: 8) {
-            Button {
-                selectDashboardSection(.home)
-            } label: {
-                Label(localized("Ana", "Home"), systemImage: "house.fill")
-                    .font(.system(size: 11, weight: .semibold))
-                    .padding(.horizontal, 10)
-                    .frame(height: 27)
-                    .background(
-                        Capsule().fill(
-                            dashboardSection == .home
-                                ? primaryColor.opacity(0.16)
-                                : Color.clear
-                        )
-                    )
+        HStack(spacing: 6) {
+            ForEach(visibleDashboardSections, id: \.self) { section in
+                dashboardNavigationItem(section)
             }
-            .buttonStyle(.plain)
-            .help(localized("Ana özeti göster", "Show home summary"))
+        }
+    }
 
-            dashboardNavigationIcon("calendar", section: .calendar)
-            if settings.dashboardFocusTimerEnabled {
-                dashboardNavigationIcon("timer", section: .timer)
+    private var visibleDashboardSections: [DashboardSection] {
+        DashboardSection.allCases.filter { section in
+            switch section {
+            case .timer: settings.dashboardFocusTimerEnabled
+            case .shelf: settings.dashboardFileShelfEnabled
+            case .notifications: settings.dashboardNotificationsEnabled
+            case .home, .calendar, .clipboard: true
             }
-            if settings.dashboardFileShelfEnabled {
-                dashboardNavigationIcon("tray.full", section: .shelf)
-            }
-            dashboardNavigationIcon("list.clipboard.fill", section: .clipboard)
         }
     }
 
@@ -730,35 +1567,63 @@ struct DynamicNotchView: View {
         max((preferredSize.width - layout.cameraHousingWidth) / 2, 0)
     }
 
-    private func dashboardNavigationIcon(
-        _ name: String,
-        section: DashboardSection
-    ) -> some View {
-        Button {
+    /// The selected section opens into a capsule with its name; the others
+    /// stay as icons. One shared capsule slides between them.
+    private func dashboardNavigationItem(_ section: DashboardSection) -> some View {
+        let isSelected = dashboardSection == section
+        let badge = section == .notifications ? notificationMonitor.unreadCount : 0
+
+        return Button {
             selectDashboardSection(section)
         } label: {
-            Image(systemName: name)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(
-                    dashboardSection == section
-                        ? primaryColor
-                        : primaryColor.opacity(0.5)
-                )
-                .frame(width: 27, height: 27)
-                .background(
-                    Circle().fill(
-                        dashboardSection == section
-                            ? primaryColor.opacity(0.14)
-                            : Color.clear
-                    )
-                )
+            HStack(spacing: 5) {
+                Image(systemName: dashboardSectionSymbol(section))
+                    .font(.system(size: 11, weight: .semibold))
+
+                if isSelected {
+                    Text(dashboardSectionLabel(section))
+                        .font(.system(size: 11, weight: .semibold))
+                        .lineLimit(1)
+                        .fixedSize()
+                        .transition(.opacity.combined(with: .scale(scale: 0.8, anchor: .leading)))
+                }
+
+                if badge > 0 {
+                    Text("\(badge)")
+                        .font(.system(size: 9, weight: .bold).monospacedDigit())
+                        .foregroundStyle(accent)
+                }
+            }
+            .foregroundStyle(isSelected ? primaryColor : primaryColor.opacity(0.5))
+            .padding(.horizontal, isSelected ? 10 : (badge > 0 ? 6 : 0))
+            .frame(minWidth: 27, minHeight: 27)
+            .background {
+                if isSelected {
+                    Capsule()
+                        .fill(primaryColor.opacity(0.16))
+                        .matchedGeometryEffect(id: "selectedSection", in: navigationNamespace)
+                }
+            }
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .help(dashboardSectionLabel(section))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private func dashboardSectionSymbol(_ section: DashboardSection) -> String {
+        switch section {
+        case .home: "house.fill"
+        case .calendar: "calendar"
+        case .timer: "timer"
+        case .shelf: "tray.full.fill"
+        case .clipboard: "list.clipboard.fill"
+        case .notifications: "bell.fill"
+        }
     }
 
     private func selectDashboardSection(_ section: DashboardSection) {
-        withAnimation(.easeInOut(duration: 0.18)) {
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
             dashboardSection = section
         }
     }
@@ -803,354 +1668,6 @@ struct DynamicNotchView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var dashboardFocusPane: some View {
-        HStack(spacing: 18) {
-            ZStack {
-                Circle()
-                    .stroke(primaryColor.opacity(0.1), lineWidth: 7)
-                Circle()
-                    .trim(from: 0, to: max(focusTimerManager.progress, 0.002))
-                    .stroke(
-                        Color.accentColor,
-                        style: StrokeStyle(lineWidth: 7, lineCap: .round)
-                    )
-                    .rotationEffect(.degrees(-90))
-
-                VStack(spacing: 2) {
-                    Text(focusTimerManager.formattedTime)
-                        .font(.system(size: 20, weight: .bold).monospacedDigit())
-                    Text(
-                        focusTimerManager.isBreak
-                            ? localized("Mola", "Break")
-                            : localized("Odak", "Focus")
-                    )
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(primaryColor.opacity(0.5))
-                }
-            }
-            .frame(width: 92, height: 92)
-
-            VStack(alignment: .leading, spacing: 10) {
-                Picker("", selection: $focusTimerManager.mode) {
-                    Text(localized("Zamanlayıcı", "Timer"))
-                        .tag(FocusTimerMode.timer)
-                    Text("Pomodoro").tag(FocusTimerMode.pomodoro)
-                }
-                .labelsHidden()
-                .pickerStyle(.segmented)
-
-                if focusTimerManager.mode == .timer {
-                    HStack(spacing: 6) {
-                        ForEach([5, 10, 25], id: \.self) { minutes in
-                            Button("\(minutes) dk") {
-                                focusTimerManager.timerMinutes = minutes
-                                focusTimerManager.reset()
-                            }
-                            .buttonStyle(.borderless)
-                            .font(.system(size: 9, weight: .semibold))
-                        }
-                    }
-                } else {
-                    Text(localized("25 dk odak · 5 dk mola", "25 min focus · 5 min break"))
-                        .font(.system(size: 9))
-                        .foregroundStyle(primaryColor.opacity(0.5))
-                }
-
-                HStack(spacing: 8) {
-                    Button {
-                        focusTimerManager.toggle()
-                    } label: {
-                        Label(
-                            focusTimerManager.isRunning
-                                ? localized("Duraklat", "Pause")
-                                : localized("Başlat", "Start"),
-                            systemImage: focusTimerManager.isRunning
-                                ? "pause.fill"
-                                : "play.fill"
-                        )
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-
-                    Button(localized("Sıfırla", "Reset")) {
-                        focusTimerManager.reset()
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-
-                    if focusTimerManager.mode == .pomodoro {
-                        Button {
-                            focusTimerManager.skipPhase()
-                        } label: {
-                            Image(systemName: "forward.end.fill")
-                        }
-                        .buttonStyle(.borderless)
-                        .help(localized("Sonraki aşama", "Next phase"))
-                    }
-                }
-            }
-        }
-        .foregroundStyle(primaryColor)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var dashboardShelfPane: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Label(
-                    localized("Dosya Rafı", "File Shelf"),
-                    systemImage: "tray.full.fill"
-                )
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(primaryColor)
-
-                Spacer()
-
-                Text(localized("Dosyaları buraya bırak", "Drop files here"))
-                    .font(.system(size: 9))
-                    .foregroundStyle(primaryColor.opacity(0.45))
-            }
-
-            if fileShelfManager.items.isEmpty {
-                HStack(spacing: 10) {
-                    Image(systemName: "arrow.down.doc.fill")
-                        .font(.system(size: 23))
-                        .foregroundStyle(Color.accentColor)
-                    Text(
-                        localized(
-                            "Geçici bir dosya rafı oluşturmak için Finder'dan sürükle.",
-                            "Drag from Finder to create a temporary file shelf."
-                        )
-                    )
-                    .font(.system(size: 10))
-                    .foregroundStyle(primaryColor.opacity(0.55))
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(primaryColor.opacity(0.06))
-                )
-            } else {
-                HStack(spacing: 10) {
-                    ForEach(fileShelfManager.items.prefix(5), id: \.self) { url in
-                        VStack(spacing: 5) {
-                            Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: 40, height: 40)
-                            Text(url.lastPathComponent)
-                                .font(.system(size: 8, weight: .medium))
-                                .foregroundStyle(primaryColor.opacity(0.7))
-                                .lineLimit(1)
-                                .frame(width: 58)
-                        }
-                        .onDrag { NSItemProvider(contentsOf: url) ?? NSItemProvider() }
-                        .onTapGesture { fileShelfManager.reveal(url) }
-                        .contextMenu {
-                            Button(localized("AirDrop ile Gönder", "Send via AirDrop")) {
-                                fileShelfManager.sendViaAirDrop(url)
-                            }
-                            Button(localized("Finder'da Göster", "Show in Finder")) {
-                                fileShelfManager.reveal(url)
-                            }
-                            Divider()
-                            Button(localized("Raftan Kaldır", "Remove from Shelf")) {
-                                fileShelfManager.remove(url)
-                            }
-                        }
-                    }
-                    Spacer(minLength: 0)
-                }
-                .frame(maxHeight: .infinity)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    private var dashboardClipboardPane: some View {
-        HStack(spacing: 10) {
-            if let latest = clipboardHistoryManager.entries.first {
-                Button { clipboardHistoryManager.copy(latest) } label: {
-                    VStack(alignment: .leading, spacing: 7) {
-                        HStack {
-                            Label(localized("Panoda", "In clipboard"), systemImage: "list.clipboard.fill")
-                                .font(.system(size: 9, weight: .semibold))
-                                .foregroundStyle(.white.opacity(0.48))
-                            Spacer()
-                            Image(systemName: "arrow.up.right")
-                                .font(.system(size: 10, weight: .bold))
-                        }
-                        Text(latest.text)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .lineLimit(4)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        Spacer(minLength: 0)
-                        Text(latest.source)
-                            .font(.system(size: 8, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.35))
-                    }
-                    .padding(11)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .background(RoundedRectangle(cornerRadius: 14).fill(.white.opacity(0.07)))
-                }
-                .buttonStyle(.plain)
-
-                VStack(spacing: 7) {
-                    ForEach(clipboardHistoryManager.entries.dropFirst().prefix(2)) { entry in
-                        Button { clipboardHistoryManager.copy(entry) } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: "text.alignleft")
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .frame(width: 24, height: 24)
-                                    .background(Circle().fill(.white.opacity(0.08)))
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(entry.text).font(.system(size: 9, weight: .medium)).lineLimit(2)
-                                    Text(entry.source).font(.system(size: 7)).foregroundStyle(.white.opacity(0.35))
-                                }
-                                Spacer(minLength: 0)
-                            }
-                            .foregroundStyle(.white.opacity(0.82))
-                            .padding(8)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(.white.opacity(0.055)))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .frame(width: 170)
-            } else {
-                VStack(spacing: 8) {
-                    Image(systemName: "list.clipboard")
-                        .font(.system(size: 23, weight: .light))
-                    Text(localized("Kopyaladığınız metinler burada görünür.", "Copied text appears here."))
-                        .font(.system(size: 10, weight: .medium))
-                }
-                .foregroundStyle(.white.opacity(0.45))
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private var dashboardSidePane: some View {
-        TimelineView(.periodic(from: .now, by: 60)) { context in
-            VStack(alignment: .leading, spacing: 7) {
-                Text(dashboardEyebrow(context.date))
-                    .font(.system(size: 9, weight: .bold))
-                    .tracking(1.2)
-                    .foregroundStyle(Color.red.opacity(0.85))
-
-                HStack(alignment: .firstTextBaseline) {
-                    Text(dashboardHeadline(context.date))
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundStyle(primaryColor)
-                        .lineLimit(1)
-
-                    Spacer()
-
-                    Text(dashboardTrailingText(context.date))
-                        .font(.system(size: 13, weight: .semibold).monospacedDigit())
-                        .foregroundStyle(primaryColor.opacity(0.58))
-                }
-
-                dashboardPrimaryCard(date: context.date)
-
-                Text(localized("Sıradaki", "Up next"))
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(primaryColor.opacity(0.4))
-
-                dashboardSecondaryCard(date: context.date)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func dashboardPrimaryCard(date: Date) -> some View {
-        switch dashboardSection {
-        case .home:
-            dashboardSummaryCard(
-                icon: "calendar.badge.checkmark",
-                title: localized("Bugün için hazırsın", "You're clear for today"),
-                subtitle: localized("Takvimi aç", "Open Calendar"),
-                action: openCalendar
-            )
-        case .calendar:
-            dashboardSummaryCard(
-                icon: "calendar",
-                title: localized("Takvimi aç", "Open Calendar"),
-                subtitle: dashboardLongDate(date),
-                action: openCalendar
-            )
-        case .timer:
-            dashboardSummaryCard(
-                icon: focusTimerManager.isRunning ? "pause.fill" : "play.fill",
-                title: focusTimerManager.isRunning
-                    ? localized("Duraklat", "Pause")
-                    : localized("Başlat", "Start"),
-                subtitle: focusTimerManager.formattedTime,
-                action: focusTimerManager.toggle
-            )
-        case .shelf:
-            dashboardSummaryCard(
-                icon: "airplayaudio",
-                title: localized("AirDrop ile gönder", "Send with AirDrop"),
-                subtitle: fileShelfManager.items.first?.lastPathComponent
-                    ?? localized("Önce bir dosya bırak", "Drop a file first"),
-                action: {
-                    guard let item = fileShelfManager.items.first else { return }
-                    fileShelfManager.sendViaAirDrop(item)
-                }
-            )
-        case .clipboard:
-            dashboardSummaryCard(
-                icon: "list.clipboard.fill",
-                title: localized("Pano geçmişi", "Clipboard history"),
-                subtitle: localized("Yalnızca bellekte tutulur", "Kept in memory only"),
-                action: {}
-            )
-        }
-    }
-
-    @ViewBuilder
-    private func dashboardSecondaryCard(date: Date) -> some View {
-        switch dashboardSection {
-        case .home, .calendar:
-            dashboardSummaryCard(
-                icon: "plus",
-                title: localized("Yeni etkinlik", "New event"),
-                subtitle: localized("Takvim'de oluştur", "Create in Calendar"),
-                action: openCalendar
-            )
-        case .timer:
-            dashboardSummaryCard(
-                icon: "arrow.counterclockwise",
-                title: localized("Zamanlayıcıyı sıfırla", "Reset timer"),
-                subtitle: focusTimerManager.mode == .pomodoro
-                    ? "Pomodoro 25/5"
-                    : "\(focusTimerManager.timerMinutes) dk",
-                action: focusTimerManager.reset
-            )
-        case .shelf:
-            dashboardSummaryCard(
-                icon: "folder",
-                title: localized("Finder'da göster", "Show in Finder"),
-                subtitle: localized("İlk dosyanın konumunu aç", "Reveal the first file"),
-                action: {
-                    guard let item = fileShelfManager.items.first else { return }
-                    fileShelfManager.reveal(item)
-                }
-            )
-        case .clipboard:
-            dashboardSummaryCard(
-                icon: "trash",
-                title: localized("Geçmişi temizle", "Clear history"),
-                subtitle: "\(clipboardHistoryManager.entries.count)",
-                action: clipboardHistoryManager.clear
-            )
-        }
-    }
-
     private func dashboardSummaryCard(
         icon: String,
         title: String,
@@ -1161,9 +1678,9 @@ struct DynamicNotchView: View {
             HStack(spacing: 8) {
                 Image(systemName: icon)
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(accent)
                     .frame(width: 26, height: 26)
-                    .background(Circle().fill(Color.accentColor.opacity(0.12)))
+                    .background(Circle().fill(accent.opacity(0.12)))
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title)
@@ -1197,6 +1714,92 @@ struct DynamicNotchView: View {
 
     private var commandEchoHUD: some View {
         Group {
+            if case .notification(let item) = commandEchoManager.event {
+                notificationHUD(item)
+            } else {
+                systemEchoHUD
+            }
+        }
+    }
+
+    /// The notch widens to show a new notification. Clicking it opens the
+    /// notifications list.
+    private func notificationHUD(_ item: CapturedNotification) -> some View {
+        let showsContent = settings.notificationPreviewStyle == .content
+        let unread = max(notificationMonitor.unreadCount, 1)
+
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 0) {
+                HStack(spacing: 7) {
+                    if showsContent {
+                        notificationAppIcon(item)
+                            .frame(width: 16, height: 16)
+                        Text(item.appName)
+                            .font(.system(size: 11, weight: .semibold))
+                            .lineLimit(1)
+                    } else {
+                        Image(systemName: "bell.fill")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(accent)
+                        Text(
+                            localized(
+                                "\(unread) yeni bildirim",
+                                unread == 1 ? "1 new notification" : "\(unread) new notifications"
+                            )
+                        )
+                        .font(.system(size: 11, weight: .semibold))
+                        .lineLimit(1)
+                    }
+                }
+                .frame(
+                    maxWidth: layout.hasCameraHousing ? commandEchoWingWidth : .infinity,
+                    alignment: .leading
+                )
+
+                if layout.hasCameraHousing {
+                    Color.clear
+                        .frame(width: layout.cameraHousingWidth)
+                        .accessibilityHidden(true)
+                }
+
+                Text(showsContent ? localized("şimdi", "now") : "")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .frame(
+                        maxWidth: layout.hasCameraHousing ? commandEchoWingWidth : .infinity,
+                        alignment: .trailing
+                    )
+            }
+            .padding(.horizontal, 18)
+            .frame(height: layout.hasCameraHousing ? layout.notchBandHeight : 34)
+
+            if showsContent {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.headline)
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .lineLimit(1)
+                    if !item.detail.isEmpty {
+                        Text(item.detail)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.white.opacity(0.65))
+                            .lineLimit(1)
+                    }
+                }
+                .padding(.horizontal, bodyPadding(18, gap: 16))
+                .padding(.top, 4)
+            }
+        }
+        .foregroundStyle(.white)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .contentShape(Rectangle())
+        .onTapGesture(perform: openNotifications)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint(Text(localized("Bildirimleri açar", "Opens notifications")))
+    }
+
+    private var systemEchoHUD: some View {
+        Group {
             if layout.hasCameraHousing {
                 HStack(spacing: 0) {
                     commandEchoLeading
@@ -1224,43 +1827,85 @@ struct DynamicNotchView: View {
         .accessibilityLabel(localized("Sistem değişikliği", "System change"))
     }
 
+    /// A dashed drop zone under the camera housing with one target for the
+    /// shelf and one for AirDrop.
     private var fileDropHUD: some View {
-        VStack(spacing: 10) {
-            if layout.hasCameraHousing {
-                Color.clear.frame(height: max(layout.notchBandHeight - 2, 18))
-            }
-
+        VStack(alignment: .leading, spacing: 10) {
             Label(
                 localized("Dosyaları buraya bırak", "Drop your files here"),
-                systemImage: "arrow.down.doc.fill"
+                systemImage: "tray.and.arrow.down.fill"
             )
             .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(.white.opacity(0.62))
+            .padding(.leading, 1)
 
-            HStack(spacing: 10) {
-                fileDropOption("tray.full.fill", localized("Raf", "Shelf"))
-                fileDropOption("airplayaudio", "AirDrop")
+            HStack(spacing: 9) {
+                fileDropTile(
+                    .shelf,
+                    symbol: "tray.and.arrow.down.fill",
+                    title: localized("Raf", "Shelf"),
+                    isTargeted: $isShelfTileTargeted
+                )
+                fileDropTile(
+                    .airDrop,
+                    symbol: "dot.radiowaves.right",
+                    title: "AirDrop",
+                    isTargeted: $isAirDropTileTargeted
+                )
             }
         }
-        .foregroundStyle(.white)
-        .padding(.horizontal, bodyPadding(14, gap: 10))
-        .padding(.bottom, 12)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .padding(.horizontal, 15)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(style: StrokeStyle(lineWidth: 1, dash: [5, 5]))
-                .foregroundStyle(.white.opacity(0.22))
-                .padding(.horizontal, bodyPadding(8, gap: 4))
-                .padding(.vertical, 8)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(
+                    Color.white.opacity(0.22),
+                    style: StrokeStyle(lineWidth: 1, dash: [4, 4])
+                )
         }
+        .padding(.horizontal, bodyPadding(9, gap: 3))
+        .padding(.top, layout.hasCameraHousing ? layout.notchBandHeight : 9)
+        .padding(.bottom, 9)
     }
 
-    private func fileDropOption(_ symbol: String, _ title: String) -> some View {
-        VStack(spacing: 5) {
-            Image(systemName: symbol).font(.system(size: 15, weight: .semibold))
-            Text(title).font(.system(size: 9, weight: .semibold))
+    private func fileDropTile(
+        _ target: FileDropTarget,
+        symbol: String,
+        title: String,
+        isTargeted: Binding<Bool>
+    ) -> some View {
+        // Hovering the zone outside both tiles drops onto the shelf, so the
+        // shelf lights up for it as well.
+        let isHighlighted = isTargeted.wrappedValue ||
+            (target == .shelf && isFileDropTargeted)
+        let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
+
+        return VStack(spacing: 5) {
+            Image(systemName: symbol)
+                .font(.system(size: 15, weight: .semibold))
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
         }
-        .frame(maxWidth: .infinity, minHeight: 48)
-        .background(RoundedRectangle(cornerRadius: 13).fill(.white.opacity(0.09)))
+        .foregroundStyle(.white.opacity(isHighlighted ? 1 : 0.82))
+        .frame(maxWidth: .infinity)
+        .frame(height: 47)
+        .background(shape.fill(Color.white.opacity(isHighlighted ? 0.17 : 0.07)))
+        .overlay {
+            shape.strokeBorder(
+                Color.white.opacity(isHighlighted ? 0.55 : 0.18),
+                style: StrokeStyle(lineWidth: 1, dash: isHighlighted ? [] : [4, 4])
+            )
+        }
+        .scaleEffect(isHighlighted ? 1.03 : 1)
+        .animation(.easeOut(duration: 0.15), value: isHighlighted)
+        .contentShape(shape)
+        .onDrop(
+            of: [UTType.fileURL.identifier],
+            isTargeted: isTargeted
+        ) { providers in
+            handleFileDrop(providers, to: target)
+        }
     }
 
     private var commandEchoLeading: some View {
@@ -1297,7 +1942,7 @@ struct DynamicNotchView: View {
     private var commandEchoValue: Double? {
         switch commandEchoManager.event {
         case .volume(let value), .brightness(let value): value
-        case .copied, .pasted, .screenshot, .capsLock, .mediaSkip, .trackChanged: nil
+        case .copied, .pasted, .screenshot, .capsLock, .mediaSkip, .trackChanged, .notification: nil
         }
     }
 
@@ -1313,6 +1958,7 @@ struct DynamicNotchView: View {
             ? localized("Sonraki parça", "Next track")
             : localized("Önceki parça", "Previous track")
         case .trackChanged(let title, _): title
+        case .notification(let item): item.appName
         }
     }
 
@@ -1324,6 +1970,7 @@ struct DynamicNotchView: View {
         case .capsLock(let enabled): enabled ? localized("Açık", "On") : localized("Kapalı", "Off")
         case .mediaSkip: localized("Parça değiştiriliyor", "Changing track")
         case .trackChanged: artistTitle
+        case .notification(let item): item.headline
         case .volume, .brightness: ""
         }
     }
@@ -1335,7 +1982,15 @@ struct DynamicNotchView: View {
     private func showCommandEchoIfNeeded() {
         // The open dashboard already shows volume and playback; swapping it
         // for a HUD would yank it away mid-interaction.
-        guard settings.dashboardCommandEchoEnabled,
+        let isNotification: Bool
+        if case .notification = commandEchoManager.event {
+            isNotification = true
+        } else {
+            isNotification = false
+        }
+        guard isNotification
+                ? settings.dashboardNotificationsEnabled
+                : settings.dashboardCommandEchoEnabled,
               presentation == .idle else { return }
         commandEchoTask?.cancel()
         let echoAnimation: Animation = reduceMotion
@@ -1347,7 +2002,9 @@ struct DynamicNotchView: View {
         resizeSurface(to: preferredSize, animation: echoAnimation)
         commandEchoTask = Task {
             let duration: Duration
-            if case .screenshot = commandEchoManager.event {
+            if case .notification = commandEchoManager.event {
+                duration = .seconds(4.5)
+            } else if case .screenshot = commandEchoManager.event {
                 duration = .seconds(3.2)
             } else if case .trackChanged = commandEchoManager.event {
                 duration = .seconds(2.2)
@@ -1371,34 +2028,8 @@ struct DynamicNotchView: View {
         case .calendar: localized("Takvim", "Calendar")
         case .timer: localized("Zamanlayıcı", "Timer")
         case .shelf: localized("Dosya Rafı", "File Shelf")
-        case .clipboard: "Clipboard"
-        }
-    }
-
-    private func dashboardEyebrow(_ date: Date) -> String {
-        switch dashboardSection {
-        case .home, .calendar: dashboardWeekday(date).uppercased()
-        case .timer: localized("ZAMANLAYICI", "TIMER")
-        case .shelf: localized("DOSYA RAFI", "FILE SHELF")
-        case .clipboard: "CLIPBOARD"
-        }
-    }
-
-    private func dashboardHeadline(_ date: Date) -> String {
-        switch dashboardSection {
-        case .home, .calendar: dashboardDate(date)
-        case .timer: dashboardTime(date)
-        case .shelf: localized("Paylaş", "Share")
         case .clipboard: localized("Pano", "Clipboard")
-        }
-    }
-
-    private func dashboardTrailingText(_ date: Date) -> String {
-        switch dashboardSection {
-        case .home, .calendar: dashboardTime(date)
-        case .timer: focusTimerManager.formattedTime
-        case .shelf: "\(fileShelfManager.items.count)"
-        case .clipboard: "\(clipboardHistoryManager.entries.count)"
+        case .notifications: localized("Bildirimler", "Notifications")
         }
     }
 
@@ -1693,7 +2324,7 @@ struct DynamicNotchView: View {
             Image(systemName: icon)
                 .font(.system(size: 9, weight: .semibold))
                 .foregroundStyle(
-                    isActive ? Color.green : primaryColor.opacity(0.62)
+                    isActive ? accent : primaryColor.opacity(0.62)
                 )
                 .frame(width: 24, height: 27)
                 .contentShape(Circle())
@@ -1889,6 +2520,11 @@ struct DynamicNotchView: View {
         } else {
             // Opening replaces a system-change HUD instead of stretching it.
             commandEchoTask?.cancel()
+            if isCommandEchoVisible,
+               settings.dashboardNotificationsEnabled,
+               case .notification = commandEchoManager.event {
+                dashboardSection = .notifications
+            }
         }
 
         withAnimation(presentationAnimation) {
@@ -1904,7 +2540,7 @@ struct DynamicNotchView: View {
     /// once the animation is over. Never animating the window keeps the
     /// notch attached to the top edge and avoids AppKit layout loops.
     private func resizeSurface(to target: CGSize, animation: Animation?) {
-        let margin = isCommandEchoVisible ? Self.haloMargin : 0
+        let margin = showsHalo ? Self.haloMargin : 0
         windowMargin = max(windowMargin, margin)
         let envelope = CGSize(
             width: max(surfaceSize.width, target.width),
@@ -1923,7 +2559,7 @@ struct DynamicNotchView: View {
         windowSettleTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: 650_000_000)
             guard !Task.isCancelled else { return }
-            let settledMargin = isCommandEchoVisible ? Self.haloMargin : 0
+            let settledMargin = showsHalo ? Self.haloMargin : 0
             windowMargin = settledMargin
             onPreferredSizeChange(windowSize(for: target, margin: settledMargin), false)
             isIdleSurfaceConcealed = true
@@ -1943,7 +2579,7 @@ struct DynamicNotchView: View {
             return
         }
         idleWingsTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 1_200_000_000)
+            try? await Task.sleep(nanoseconds: 600_000_000)
             guard !Task.isCancelled else { return }
             setIdleWings(false)
         }
@@ -1951,19 +2587,24 @@ struct DynamicNotchView: View {
 
     private func setIdleWings(_ visible: Bool) {
         guard visible != showsIdleWings else { return }
-        withAnimation(presentationAnimation) {
+        // A quicker spring than opening the dashboard: the wings are a small
+        // change and should follow playback immediately.
+        let wingsAnimation: Animation = reduceMotion
+            ? .easeOut(duration: 0.12)
+            : .spring(response: 0.3, dampingFraction: 0.82)
+        withAnimation(wingsAnimation) {
             showsIdleWings = visible
         }
         guard presentation == .idle,
               !isCommandEchoVisible,
-              !isFileDropTargeted else { return }
-        resizeSurface(to: preferredSize, animation: presentationAnimation)
+              !isFileDropHUDVisible else { return }
+        resizeSurface(to: preferredSize, animation: wingsAnimation)
     }
 
     // MARK: - Derived Values
 
     private var preferredSize: CGSize {
-        if isFileDropTargeted { return fileDropPreferredSize }
+        if isFileDropHUDVisible { return fileDropPreferredSize }
         if isCommandEchoVisible { return commandEchoPreferredSize }
         return basePreferredSize
     }
@@ -1981,6 +2622,16 @@ struct DynamicNotchView: View {
     }
 
     private var commandEchoPreferredSize: CGSize {
+        // A notification with its content gets a second row under the
+        // camera housing for the title and message.
+        if case .notification = commandEchoManager.event,
+           settings.notificationPreviewStyle == .content {
+            let width = layout.hasCameraHousing
+                ? min(max(layout.cameraHousingWidth + 340, 520), layout.screenWidth - 24)
+                : min(440, layout.screenWidth - 24)
+            let height = layout.hasCameraHousing ? layout.notchBandHeight + 46 : 76
+            return CGSize(width: width, height: height)
+        }
         let extensionWidth: CGFloat
         switch commandEchoManager.event {
         case .trackChanged: extensionWidth = 380
@@ -1996,13 +2647,15 @@ struct DynamicNotchView: View {
         return CGSize(width: width, height: height)
     }
 
+    /// Compact, like the reference: a zone just wide enough for two tiles,
+    /// hanging under the camera housing.
     private var fileDropPreferredSize: CGSize {
         let width = layout.hasCameraHousing
-            ? min(max(layout.cameraHousingWidth + 260, 390), layout.screenWidth - 24)
-            : min(380, layout.screenWidth - 24)
+            ? min(max(layout.cameraHousingWidth + 122, 300), layout.screenWidth - 24)
+            : min(300, layout.screenWidth - 24)
         let height = layout.hasCameraHousing
-            ? max(layout.notchBandHeight + 94, 124)
-            : 112
+            ? layout.notchBandHeight + 106
+            : 114
         return CGSize(width: width, height: height)
     }
 
@@ -2070,6 +2723,8 @@ struct DynamicNotchView: View {
 
     /// The dashboard is always a dark surface, like the notch it grows from.
     private var primaryColor: Color { .white }
+
+    private var accent: Color { settings.accentTheme.color }
 
     private var panelColor: Color { .black }
 

@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let keepAwakeManager = KeepAwakeManager()
     private let fileShelfManager = FileShelfManager()
     private let clipboardHistoryManager = ClipboardHistoryManager()
+    private let notificationMonitor = NotificationMonitor()
     private lazy var systemHUDInterceptor = SystemHUDInterceptor(
         onVolume: { [weak self] value in
             self?.commandEchoManager.showHandledVolume(value)
@@ -48,7 +49,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             focusTimerManager: focusTimerManager,
             keepAwakeManager: keepAwakeManager,
             fileShelfManager: fileShelfManager,
-            clipboardHistoryManager: clipboardHistoryManager
+            clipboardHistoryManager: clipboardHistoryManager,
+            notificationMonitor: notificationMonitor
         )
 
         self.mediaManager = mediaManager
@@ -58,6 +60,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         mediaManager.startMonitoring()
         commandEchoManager.startMonitoring()
         clipboardHistoryManager.startMonitoring()
+        fileShelfManager.startDragMonitoring()
 
         if !settings.onboardingCompleted {
             DispatchQueue.main.async { [weak self] in
@@ -70,6 +73,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         mediaManager?.stopMonitoring()
         commandEchoManager.stopMonitoring()
         clipboardHistoryManager.stopMonitoring()
+        fileShelfManager.stopDragMonitoring()
+        notificationMonitor.setEnabled(false)
         keepAwakeManager.setActive(false)
         systemHUDInterceptor.setEnabled(false)
         NotificationCenter.default.removeObserver(self)
@@ -291,6 +296,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             .receive(on: RunLoop.main)
             .sink { [weak self] enabled in
                 self?.systemHUDInterceptor.setEnabled(enabled)
+            }
+            .store(in: &cancellables)
+
+        settings.$dashboardNotificationsEnabled
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] enabled in
+                self?.notificationMonitor.setEnabled(enabled)
             }
             .store(in: &cancellables)
     }

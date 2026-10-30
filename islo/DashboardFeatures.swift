@@ -4,6 +4,7 @@ import Combine
 import CoreAudio
 import Darwin
 import IOKit.graphics
+import QuickLookThumbnailing
 import UniformTypeIdentifiers
 
 enum MediaSkipDirection: Equatable {
@@ -22,6 +23,7 @@ enum CommandEchoKind: Equatable {
     case capsLock(Bool)
     case mediaSkip(MediaSkipDirection)
     case trackChanged(String, MediaSkipDirection?)
+    case notification(CapturedNotification)
 
     var symbolName: String {
         switch self {
@@ -34,6 +36,7 @@ enum CommandEchoKind: Equatable {
         case .capsLock: "capslock.fill"
         case .mediaSkip(let direction): direction.symbolName
         case .trackChanged(_, let direction): direction?.symbolName ?? "music.note"
+        case .notification: "bell.fill"
         }
     }
 }
@@ -90,6 +93,10 @@ final class CommandEchoManager: ObservableObject {
 
     func showTrackChanged(_ title: String, direction: MediaSkipDirection?) {
         publish(.trackChanged(title, direction))
+    }
+
+    func showNotification(_ notification: CapturedNotification) {
+        publish(.notification(notification))
     }
 
     /// For key presses islo. handled itself. Also primes the pollers so the
@@ -654,7 +661,240 @@ final class ClipboardHistoryManager: ObservableObject {
               entries.first?.text != text else { return }
         let source = NSWorkspace.shared.frontmostApplication?.localizedName ?? "Mac"
         entries.insert(ClipboardEntry(text: text, source: source, capturedAt: .now), at: 0)
-        entries = Array(entries.prefix(12))
+        entries = Array(entries.prefix(40))
+    }
+}
+
+extension ClipboardEntry {
+    /// A web address worth opening rather than only copying.
+    var linkURL: URL? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.contains(" "), !trimmed.contains("\n") else { return nil }
+        let candidate = trimmed.lowercased().hasPrefix("www.") ? "https://" + trimmed : trimmed
+        guard let url = URL(string: candidate),
+              let scheme = url.scheme?.lowercased(),
+              scheme == "http" || scheme == "https",
+              url.host != nil else { return nil }
+        return url
+    }
+}
+
+/// A notification macOS showed as a banner, read through Accessibility.
+struct CapturedNotification: Identifiable, Equatable {
+    let id: String
+    let appName: String
+    let bundleIdentifier: String?
+    let title: String
+    let subtitle: String
+    let body: String
+    let date: Date
+
+    /// The line to lead with: the title, or the body when there's no title.
+    var headline: String { title.isEmpty ? body : title }
+
+    /// What follows the headline, without repeating it.
+    var detail: String {
+        let parts = title.isEmpty ? [subtitle] : [subtitle, body]
+        return parts.filter { !$0.isEmpty }.joined(separator: " · ")
+    }
+}
+
+/// Watches the banners Notification Center puts on screen. macOS has no API
+/// for other apps' notifications, but each banner is an Accessibility
+/// element with a unique identifier and separate title, subtitle and body,
+/// so islo. can read new ones as they appear. Needs Accessibility access;
+/// notifications that never show a banner (e.g. in a Focus) aren't seen.
+@MainActor
+final class NotificationMonitor: ObservableObject {
+    @Published private(set) var items: [CapturedNotification] = []
+    @Published private(set) var unreadCount = 0
+    /// Bumps once per notification worth announcing in the notch.
+    @Published private(set) var announcementRevision = 0
+    private(set) var latest: CapturedNotification?
+
+    private let scanQueue = DispatchQueue(label: "islo.notifications", qos: .utility)
+    private var timer: Timer?
+    private var isScanning = false
+    private var hasBaseline = false
+    private var seenIdentifiers: [String] = []
+
+    func setEnabled(_ enabled: Bool) {
+        guard enabled != (timer != nil) else { return }
+        if enabled {
+            hasBaseline = false
+            timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) {
+                [weak self] _ in
+                Task { @MainActor in self?.scheduleScan() }
+            }
+        } else {
+            timer?.invalidate()
+            timer = nil
+        }
+    }
+
+    func markAllRead() {
+        if unreadCount != 0 { unreadCount = 0 }
+    }
+
+    func clear() {
+        items.removeAll()
+        unreadCount = 0
+    }
+
+    func remove(_ item: CapturedNotification) {
+        items.removeAll { $0.id == item.id }
+    }
+
+    func openApplication(for item: CapturedNotification) {
+        guard let bundleIdentifier = item.bundleIdentifier,
+              let url = NSWorkspace.shared.urlForApplication(
+                withBundleIdentifier: bundleIdentifier
+              ) else { return }
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        NSWorkspace.shared.openApplication(at: url, configuration: configuration)
+    }
+
+    private func scheduleScan() {
+        guard !isScanning, AXIsProcessTrusted(),
+              let center = NSRunningApplication.runningApplications(
+                withBundleIdentifier: "com.apple.notificationcenterui"
+              ).first else { return }
+        isScanning = true
+        let pid = center.processIdentifier
+        // Accessibility calls are cross-process; keep them off the main thread.
+        scanQueue.async { [weak self] in
+            let banners = Self.readBanners(processIdentifier: pid)
+            Task { @MainActor in
+                self?.isScanning = false
+                self?.ingest(banners)
+            }
+        }
+    }
+
+    private func ingest(_ banners: [RawBanner]) {
+        let fresh = banners.filter { !seenIdentifiers.contains($0.id) }
+        seenIdentifiers.append(contentsOf: fresh.map(\.id))
+        if seenIdentifiers.count > 400 {
+            seenIdentifiers.removeFirst(seenIdentifiers.count - 400)
+        }
+
+        // Banners already on screen when monitoring starts aren't new.
+        guard hasBaseline else {
+            hasBaseline = true
+            return
+        }
+        // Opening Notification Center lists the whole history at once; only
+        // banners arriving a few at a time are real new notifications.
+        guard !fresh.isEmpty, fresh.count <= 3 else { return }
+
+        let captured = fresh.map { banner in
+            CapturedNotification(
+                id: banner.id,
+                appName: banner.appName,
+                bundleIdentifier: Self.bundleIdentifier(forAppNamed: banner.appName),
+                title: banner.title,
+                subtitle: banner.subtitle,
+                body: banner.body,
+                date: .now
+            )
+        }
+        items.insert(contentsOf: captured.reversed(), at: 0)
+        items = Array(items.prefix(60))
+        unreadCount += captured.count
+        latest = items.first
+        announcementRevision &+= 1
+    }
+
+    private static func bundleIdentifier(forAppNamed name: String) -> String? {
+        NSWorkspace.shared.runningApplications
+            .first { $0.localizedName == name }?
+            .bundleIdentifier
+    }
+
+    fileprivate struct RawBanner {
+        let id: String
+        let appName: String
+        let title: String
+        let subtitle: String
+        let body: String
+    }
+
+    nonisolated private static func readBanners(processIdentifier: pid_t) -> [RawBanner] {
+        let application = AXUIElementCreateApplication(processIdentifier)
+        AXUIElementSetMessagingTimeout(application, 0.25)
+        var banners: [RawBanner] = []
+        for window in children(of: application)
+        where string(window, kAXSubroleAttribute) == "AXSystemDialog" {
+            collectBanners(in: window, depth: 0, into: &banners)
+        }
+        return banners
+    }
+
+    nonisolated private static func collectBanners(
+        in element: AXUIElement,
+        depth: Int,
+        into banners: inout [RawBanner]
+    ) {
+        guard depth < 8 else { return }
+        if string(element, kAXSubroleAttribute) == "AXNotificationCenterBanner" {
+            if let banner = banner(from: element) { banners.append(banner) }
+            return
+        }
+        for child in children(of: element) {
+            collectBanners(in: child, depth: depth + 1, into: &banners)
+        }
+    }
+
+    nonisolated private static func banner(from element: AXUIElement) -> RawBanner? {
+        guard let id = string(element, kAXIdentifierAttribute), !id.isEmpty else {
+            return nil
+        }
+        var fields: [String: String] = [:]
+        for child in children(of: element) {
+            if let key = string(child, kAXIdentifierAttribute),
+               let value = string(child, kAXValueAttribute) {
+                fields[key] = value
+            }
+        }
+        let title = fields["title"] ?? ""
+        let subtitle = fields["subtitle"] ?? ""
+        let body = fields["body"] ?? ""
+        guard !(title.isEmpty && body.isEmpty) else { return nil }
+
+        // The description reads "App, title, subtitle, body".
+        let description = string(element, kAXDescriptionAttribute) ?? ""
+        let leading = title.isEmpty ? body : title
+        let appName: String
+        if !leading.isEmpty, let range = description.range(of: ", " + leading) {
+            appName = String(description[..<range.lowerBound])
+        } else {
+            appName = description.components(separatedBy: ", ").first ?? ""
+        }
+        return RawBanner(id: id, appName: appName, title: title, subtitle: subtitle, body: body)
+    }
+
+    nonisolated private static func children(of element: AXUIElement) -> [AXUIElement] {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            element,
+            kAXChildrenAttribute as CFString,
+            &value
+        ) == .success else { return [] }
+        return value as? [AXUIElement] ?? []
+    }
+
+    nonisolated private static func string(
+        _ element: AXUIElement,
+        _ attribute: String
+    ) -> String? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            element,
+            attribute as CFString,
+            &value
+        ) == .success else { return nil }
+        return value as? String
     }
 }
 
@@ -782,13 +1022,77 @@ final class KeepAwakeManager: ObservableObject {
 @MainActor
 final class FileShelfManager: ObservableObject {
     @Published private(set) var items: [URL] = []
+    /// True while the user holds files being dragged anywhere on screen.
+    @Published private(set) var isFileDragActive = false
     private let defaultsKey = "dashboard.fileShelf.items"
+    private var dragMonitors: [Any] = []
+    private var dragPasteboardChangeCount = NSPasteboard(name: .drag).changeCount
+    private var dragEndTimer: Timer?
+
+    /// Mouse monitors only see other apps' events, which is exactly a file
+    /// being dragged out of Finder or elsewhere. A new drag writes to the
+    /// drag pasteboard, so a changed count with file URLs means files are
+    /// in hand. Mouse events need no extra permission.
+    func startDragMonitoring() {
+        guard dragMonitors.isEmpty else { return }
+        let down = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) {
+            [weak self] _ in
+            Task { @MainActor in
+                self?.dragPasteboardChangeCount = NSPasteboard(name: .drag).changeCount
+            }
+        }
+        let dragged = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDragged) {
+            [weak self] _ in
+            Task { @MainActor in self?.checkForFileDrag() }
+        }
+        let up = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseUp) {
+            [weak self] _ in
+            Task { @MainActor in self?.endFileDrag() }
+        }
+        dragMonitors = [down, dragged, up].compactMap { $0 }
+    }
+
+    func stopDragMonitoring() {
+        dragMonitors.forEach(NSEvent.removeMonitor)
+        dragMonitors.removeAll()
+        endFileDrag()
+    }
+
+    private func checkForFileDrag() {
+        guard !isFileDragActive else { return }
+        let pasteboard = NSPasteboard(name: .drag)
+        guard pasteboard.changeCount != dragPasteboardChangeCount,
+              pasteboard.types?.contains(.fileURL) == true else { return }
+        isFileDragActive = true
+
+        // A drop onto islo. itself is delivered to this app, where the global
+        // mouse-up monitor can't see it, so also watch the button directly.
+        dragEndTimer?.invalidate()
+        dragEndTimer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) {
+            [weak self] _ in
+            Task { @MainActor in
+                if NSEvent.pressedMouseButtons & 1 == 0 { self?.endFileDrag() }
+            }
+        }
+    }
+
+    private func endFileDrag() {
+        dragEndTimer?.invalidate()
+        dragEndTimer = nil
+        dragPasteboardChangeCount = NSPasteboard(name: .drag).changeCount
+        if isFileDragActive { isFileDragActive = false }
+    }
+
+    /// Small previews for the shelf grid, made by Quick Look.
+    @Published private(set) var thumbnails: [URL: NSImage] = [:]
+    private var detailsCache: [URL: ShelfItemDetails] = [:]
 
     init() {
         let paths = UserDefaults.standard.stringArray(forKey: defaultsKey) ?? []
         items = paths.map(URL.init(fileURLWithPath:)).filter {
             FileManager.default.fileExists(atPath: $0.path)
         }
+        items.forEach(makeThumbnail)
     }
 
     func receive(_ providers: [NSItemProvider]) -> Bool {
@@ -811,13 +1115,52 @@ final class FileShelfManager: ObservableObject {
         guard FileManager.default.fileExists(atPath: url.path) else { return }
         items.removeAll { $0.standardizedFileURL == url.standardizedFileURL }
         items.insert(url, at: 0)
-        items = Array(items.prefix(8))
+        items = Array(items.prefix(60))
         persist()
+        makeThumbnail(url)
     }
 
     func remove(_ url: URL) {
         items.removeAll { $0.standardizedFileURL == url.standardizedFileURL }
+        thumbnails[url] = nil
         persist()
+    }
+
+    /// Empties the shelf. The files themselves stay where they are.
+    func clear() {
+        items.removeAll()
+        thumbnails.removeAll()
+        persist()
+    }
+
+    func details(for url: URL) -> ShelfItemDetails {
+        if let cached = detailsCache[url] { return cached }
+        let values = try? url.resourceValues(forKeys: [.contentTypeKey, .fileSizeKey, .isDirectoryKey])
+        let type = values?.contentType
+        let made = ShelfItemDetails(
+            isImage: type?.conforms(to: .image) ?? false,
+            kind: ShelfItemDetails.kind(for: type, isDirectory: values?.isDirectory ?? false),
+            size: values?.fileSize.map {
+                ByteCountFormatter.string(fromByteCount: Int64($0), countStyle: .file)
+            }
+        )
+        detailsCache[url] = made
+        return made
+    }
+
+    private func makeThumbnail(_ url: URL) {
+        guard thumbnails[url] == nil else { return }
+        let request = QLThumbnailGenerator.Request(
+            fileAt: url,
+            size: CGSize(width: 160, height: 100),
+            scale: 2,
+            representationTypes: .thumbnail
+        )
+        QLThumbnailGenerator.shared.generateBestRepresentation(for: request) {
+            [weak self] representation, _ in
+            guard let image = representation?.nsImage else { return }
+            Task { @MainActor in self?.thumbnails[url] = image }
+        }
     }
 
     func reveal(_ url: URL) {
@@ -825,11 +1168,63 @@ final class FileShelfManager: ObservableObject {
     }
 
     func sendViaAirDrop(_ url: URL) {
-        NSSharingService(named: .sendViaAirDrop)?.perform(withItems: [url])
+        sendViaAirDrop([url])
+    }
+
+    /// Sends dropped files straight to AirDrop without keeping them on the
+    /// shelf.
+    func sendViaAirDrop(_ providers: [NSItemProvider]) -> Bool {
+        let matching = providers.filter {
+            $0.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier)
+        }
+        guard !matching.isEmpty else { return false }
+
+        let group = DispatchGroup()
+        let collected = CollectedURLs()
+        for provider in matching {
+            group.enter()
+            provider.loadItem(
+                forTypeIdentifier: UTType.fileURL.identifier,
+                options: nil
+            ) { item, _ in
+                if let url = Self.url(from: item) { collected.append(url) }
+                group.leave()
+            }
+        }
+        group.notify(queue: .main) { [weak self] in
+            let urls = collected.all
+            guard !urls.isEmpty else { return }
+            Task { @MainActor in self?.sendViaAirDrop(urls) }
+        }
+        return true
+    }
+
+    private func sendViaAirDrop(_ urls: [URL]) {
+        // The AirDrop picker is a window of its own; bring it forward.
+        NSApp.activate(ignoringOtherApps: true)
+        NSSharingService(named: .sendViaAirDrop)?.perform(withItems: urls)
     }
 
     private func persist() {
         UserDefaults.standard.set(items.map(\.path), forKey: defaultsKey)
+    }
+
+    /// Gathers URLs that item providers deliver on background queues.
+    private final class CollectedURLs: @unchecked Sendable {
+        private let lock = NSLock()
+        private var urls: [URL] = []
+
+        func append(_ url: URL) {
+            lock.lock()
+            urls.append(url)
+            lock.unlock()
+        }
+
+        var all: [URL] {
+            lock.lock()
+            defer { lock.unlock() }
+            return urls
+        }
     }
 
     nonisolated private static func url(from item: NSSecureCoding?) -> URL? {
@@ -839,5 +1234,23 @@ final class FileShelfManager: ObservableObject {
         }
         if let string = item as? String { return URL(string: string) }
         return nil
+    }
+}
+
+struct ShelfItemDetails {
+    let isImage: Bool
+    let kind: String
+    let size: String?
+
+    static func kind(for type: UTType?, isDirectory: Bool) -> String {
+        if isDirectory { return "folder" }
+        guard let type else { return "file" }
+        if type.conforms(to: .image) { return "image" }
+        if type.conforms(to: .pdf) { return "pdf" }
+        if type.conforms(to: .movie) || type.conforms(to: .video) { return "video" }
+        if type.conforms(to: .audio) { return "audio" }
+        if type.conforms(to: .archive) { return "archive" }
+        if type.conforms(to: .text) || type.conforms(to: .sourceCode) { return "text" }
+        return "file"
     }
 }

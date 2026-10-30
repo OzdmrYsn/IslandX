@@ -20,6 +20,7 @@ final class FloatingNotchWindowController: NSWindowController {
     private let keepAwakeManager: KeepAwakeManager
     private let fileShelfManager: FileShelfManager
     private let clipboardHistoryManager: ClipboardHistoryManager
+    private let notificationMonitor: NotificationMonitor
     private var layout: NotchLayout
     private var currentSize: CGSize
     private var visibilityTask: Task<Void, Never>?
@@ -32,7 +33,8 @@ final class FloatingNotchWindowController: NSWindowController {
         focusTimerManager: FocusTimerManager,
         keepAwakeManager: KeepAwakeManager,
         fileShelfManager: FileShelfManager,
-        clipboardHistoryManager: ClipboardHistoryManager
+        clipboardHistoryManager: ClipboardHistoryManager,
+        notificationMonitor: NotificationMonitor
     ) {
         self.mediaManager = mediaManager
         self.settings = settings
@@ -41,6 +43,7 @@ final class FloatingNotchWindowController: NSWindowController {
         self.keepAwakeManager = keepAwakeManager
         self.fileShelfManager = fileShelfManager
         self.clipboardHistoryManager = clipboardHistoryManager
+        self.notificationMonitor = notificationMonitor
 
         let targetScreen = NSScreen.screens.first ?? NSScreen.main
         let layout = NotchLayout(screen: targetScreen)
@@ -154,6 +157,7 @@ final class FloatingNotchWindowController: NSWindowController {
             keepAwakeManager: keepAwakeManager,
             fileShelfManager: fileShelfManager,
             clipboardHistoryManager: clipboardHistoryManager,
+            notificationMonitor: notificationMonitor,
             layout: layout
         ) { [weak self] preferredSize, animated in
             self?.resizeWindow(to: preferredSize, animated: animated)

@@ -23,6 +23,7 @@ struct OnboardingView: View {
         .frame(width: 1040, height: 680)
         .background(background)
         .preferredColorScheme(settings.theme.colorScheme)
+        .tint(accent)
     }
 
     private var header: some View {
@@ -93,9 +94,10 @@ struct OnboardingView: View {
             eyebrow(text("GÖRÜNÜM", "APPEARANCE"))
             Text(text("Çentik, Mac'inizin\nbir parçası gibi.", "A notch that feels\npart of your Mac."))
                 .font(.system(size: 38, weight: .bold, design: .rounded)).tracking(-0.8)
-            Text(text("Renk temasını ve islo.'nun boşta nasıl görüneceğini seçin.", "Choose the color theme and how islo. looks while idle."))
+            Text(text("Tema rengini, pencere görünümünü ve islo.'nun boşta nasıl görüneceğini seçin.", "Choose the theme color, the window look, and how islo. looks while idle."))
                 .font(.system(size: 15)).foregroundStyle(.secondary)
-            ThemeChoicePicker(selection: $settings.theme, language: settings.language)
+            ThemeChoicePicker(selection: $settings.theme, language: settings.language, accent: accent)
+            AccentSwatchPicker(selection: $settings.accentTheme, language: settings.language)
             Picker("", selection: $settings.notchIdleMode) {
                 ForEach(NotchIdleMode.allCases) { mode in Text(mode.title(language: settings.language)).tag(mode) }
             }.labelsHidden().pickerStyle(.segmented)
@@ -169,12 +171,12 @@ struct OnboardingView: View {
     private var background: some View {
         ZStack {
             Color(nsColor: .windowBackgroundColor)
-            LinearGradient(colors: [Color.accentColor.opacity(0.055), .clear, Color.pink.opacity(0.035)], startPoint: .topLeading, endPoint: .bottomTrailing)
+            LinearGradient(colors: [accent.opacity(0.055), .clear, Color.pink.opacity(0.035)], startPoint: .topLeading, endPoint: .bottomTrailing)
         }
     }
 
     private func eyebrow(_ value: String) -> some View {
-        Text(value).font(.system(size: 11, weight: .bold)).tracking(1.8).foregroundStyle(Color.accentColor)
+        Text(value).font(.system(size: 11, weight: .bold)).tracking(1.8).foregroundStyle(accent)
     }
 
     private func featureLine(_ symbol: String, _ title: String) -> some View {
@@ -183,7 +185,7 @@ struct OnboardingView: View {
 
     private func permissionRow(symbol: String, title: String, message: String, isOn: Binding<Bool>) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: symbol).font(.system(size: 16, weight: .semibold)).foregroundStyle(Color.accentColor).frame(width: 32, height: 32).background(Circle().fill(Color.accentColor.opacity(0.1)))
+            Image(systemName: symbol).font(.system(size: 16, weight: .semibold)).foregroundStyle(accent).frame(width: 32, height: 32).background(Circle().fill(accent.opacity(0.1)))
             VStack(alignment: .leading, spacing: 2) { Text(title).font(.system(size: 13, weight: .semibold)); Text(message).font(.caption).foregroundStyle(.secondary) }
             Spacer(); Toggle("", isOn: isOn).labelsHidden().toggleStyle(.switch)
         }.padding(13).background(RoundedRectangle(cornerRadius: 14).fill(Color.primary.opacity(0.045)))
@@ -192,15 +194,15 @@ struct OnboardingView: View {
     private func wideChoice(symbol: String, title: String, subtitle: String, selected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                Image(systemName: symbol).font(.system(size: 17, weight: .semibold)).foregroundStyle(selected ? Color.accentColor : .secondary).frame(width: 30)
+                Image(systemName: symbol).font(.system(size: 17, weight: .semibold)).foregroundStyle(selected ? accent : .secondary).frame(width: 30)
                 VStack(alignment: .leading, spacing: 2) { Text(title).font(.system(size: 13, weight: .semibold)); Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(2) }
-                Spacer(); Image(systemName: selected ? "checkmark.circle.fill" : "circle").foregroundStyle(selected ? Color.accentColor : Color.secondary.opacity(0.45))
+                Spacer(); Image(systemName: selected ? "checkmark.circle.fill" : "circle").foregroundStyle(selected ? accent : Color.secondary.opacity(0.45))
             }.padding(12).background(RoundedRectangle(cornerRadius: 13).fill(Color.primary.opacity(selected ? 0.07 : 0.035)))
         }.buttonStyle(.plain)
     }
 
     private var pageIndicator: some View {
-        HStack(spacing: 6) { ForEach(0..<pageCount, id: \.self) { index in Capsule().fill(index <= step ? Color.accentColor : Color.secondary.opacity(0.18)).frame(width: index == step ? 20 : 8, height: 6) } }
+        HStack(spacing: 6) { ForEach(0..<pageCount, id: \.self) { index in Capsule().fill(index <= step ? accent : Color.secondary.opacity(0.18)).frame(width: index == step ? 20 : 8, height: 6) } }
             .animation(.easeInOut(duration: 0.2), value: step)
     }
 
@@ -208,6 +210,7 @@ struct OnboardingView: View {
     private func move(to value: Int) { withAnimation(.easeInOut(duration: 0.28)) { step = min(max(value, 0), pageCount - 1) } }
     private func activationSymbol(_ mode: NotchActivationMode) -> String { switch mode { case .hover: "cursorarrow.motionlines"; case .click: "cursorarrow.click"; case .activationZone: "viewfinder" } }
     private func text(_ tr: String, _ en: String) -> String { settings.language.value(turkish: tr, english: en) }
+    private var accent: Color { settings.accentTheme.color }
     private var launchAtLoginBinding: Binding<Bool> { Binding(get: { settings.launchAtLogin }, set: settings.setLaunchAtLogin) }
     private var automaticUpdatesBinding: Binding<Bool> { Binding(get: { updateManager.automaticUpdatesEnabled }, set: updateManager.setAutomaticUpdates) }
 }

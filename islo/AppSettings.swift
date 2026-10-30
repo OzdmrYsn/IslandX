@@ -207,20 +207,93 @@ enum HomeWidgetStyle: String, CaseIterable, Identifiable {
     }
 }
 
-enum NotchSceneStyle: String, CaseIterable, Identifiable {
+/// The theme colour used across the notch and islo.'s windows.
+enum AccentTheme: String, CaseIterable, Identifiable {
+    case blue
+    case purple
+    case pink
+    case red
+    case orange
+    case yellow
+    case green
+    case mint
+    case teal
     case graphite
-    case ember
-    case aurora
-    case album
+
+    var id: String { rawValue }
+
+    var color: Color {
+        switch self {
+        case .blue: Color(red: 0.27, green: 0.55, blue: 1.0)
+        case .purple: Color(red: 0.68, green: 0.42, blue: 1.0)
+        case .pink: Color(red: 1.0, green: 0.38, blue: 0.62)
+        case .red: Color(red: 1.0, green: 0.33, blue: 0.31)
+        case .orange: Color(red: 1.0, green: 0.58, blue: 0.2)
+        case .yellow: Color(red: 1.0, green: 0.8, blue: 0.2)
+        case .green: Color(red: 0.25, green: 0.82, blue: 0.42)
+        case .mint: Color(red: 0.3, green: 0.88, blue: 0.75)
+        case .teal: Color(red: 0.2, green: 0.74, blue: 0.86)
+        case .graphite: Color(white: 0.66)
+        }
+    }
+
+    func title(language: AppLanguage) -> String {
+        switch self {
+        case .blue: language.value(turkish: "Mavi", english: "Blue")
+        case .purple: language.value(turkish: "Mor", english: "Purple")
+        case .pink: language.value(turkish: "Pembe", english: "Pink")
+        case .red: language.value(turkish: "Kırmızı", english: "Red")
+        case .orange: language.value(turkish: "Turuncu", english: "Orange")
+        case .yellow: language.value(turkish: "Sarı", english: "Yellow")
+        case .green: language.value(turkish: "Yeşil", english: "Green")
+        case .mint: language.value(turkish: "Nane", english: "Mint")
+        case .teal: language.value(turkish: "Turkuaz", english: "Teal")
+        case .graphite: language.value(turkish: "Grafit", english: "Graphite")
+        }
+    }
+}
+
+/// What the notch shows when a notification arrives.
+enum NotificationPreviewStyle: String, CaseIterable, Identifiable {
+    case content
+    case countOnly
 
     var id: String { rawValue }
 
     func title(language: AppLanguage) -> String {
         switch self {
-        case .graphite: "Graphite"
-        case .ember: "Ember"
-        case .aurora: "Aurora"
-        case .album: language.value(turkish: "Albüm", english: "Album")
+        case .content:
+            language.value(turkish: "İçeriği göster", english: "Show content")
+        case .countOnly:
+            language.value(turkish: "Yalnızca \u{201C}1 yeni bildirim\u{201D}", english: "Only \u{201C}1 new notification\u{201D}")
+        }
+    }
+}
+
+/// How strongly the theme colour tints the dark dashboard surface.
+enum SurfaceTone: String, CaseIterable, Identifiable {
+    case black
+    case subtle
+    case medium
+    case vivid
+
+    var id: String { rawValue }
+
+    var tintOpacity: Double {
+        switch self {
+        case .black: 0
+        case .subtle: 0.22
+        case .medium: 0.4
+        case .vivid: 0.62
+        }
+    }
+
+    func title(language: AppLanguage) -> String {
+        switch self {
+        case .black: language.value(turkish: "Saf siyah", english: "Pure black")
+        case .subtle: language.value(turkish: "Hafif", english: "Subtle")
+        case .medium: language.value(turkish: "Orta", english: "Medium")
+        case .vivid: language.value(turkish: "Canlı", english: "Vivid")
         }
     }
 }
@@ -243,8 +316,12 @@ final class AppSettings: ObservableObject {
         static let dashboardFocusTimerEnabled = "dashboard.focusTimer.enabled"
         static let dashboardKeepAwakeEnabled = "dashboard.keepAwake.enabled"
         static let dashboardFileShelfEnabled = "dashboard.fileShelf.enabled"
+        static let dashboardNotificationsEnabled = "dashboard.notifications.enabled"
+        static let notificationPreviewStyle = "dashboard.notifications.preview"
         static let homeWidgetStyle = "dashboard.homeWidgetStyle"
-        static let notchSceneStyle = "appearance.notchSceneStyle"
+        static let legacySceneStyle = "appearance.notchSceneStyle"
+        static let accentTheme = "appearance.accentTheme"
+        static let surfaceTone = "appearance.surfaceTone"
         static let onboardingCompleted = "onboarding.completed"
     }
 
@@ -320,12 +397,24 @@ final class AppSettings: ObservableObject {
         didSet { defaults.set(dashboardFileShelfEnabled, forKey: Key.dashboardFileShelfEnabled) }
     }
 
+    @Published var dashboardNotificationsEnabled: Bool {
+        didSet { defaults.set(dashboardNotificationsEnabled, forKey: Key.dashboardNotificationsEnabled) }
+    }
+
+    @Published var notificationPreviewStyle: NotificationPreviewStyle {
+        didSet { defaults.set(notificationPreviewStyle.rawValue, forKey: Key.notificationPreviewStyle) }
+    }
+
     @Published var homeWidgetStyle: HomeWidgetStyle {
         didSet { defaults.set(homeWidgetStyle.rawValue, forKey: Key.homeWidgetStyle) }
     }
 
-    @Published var notchSceneStyle: NotchSceneStyle {
-        didSet { defaults.set(notchSceneStyle.rawValue, forKey: Key.notchSceneStyle) }
+    @Published var accentTheme: AccentTheme {
+        didSet { defaults.set(accentTheme.rawValue, forKey: Key.accentTheme) }
+    }
+
+    @Published var surfaceTone: SurfaceTone {
+        didSet { defaults.set(surfaceTone.rawValue, forKey: Key.surfaceTone) }
     }
 
     @Published private(set) var onboardingCompleted: Bool
@@ -412,12 +501,34 @@ final class AppSettings: ObservableObject {
             defaults: defaults,
             fallback: true
         )
+        dashboardNotificationsEnabled = Self.bool(
+            forKey: Key.dashboardNotificationsEnabled,
+            defaults: defaults,
+            fallback: true
+        )
+        notificationPreviewStyle = NotificationPreviewStyle(
+            rawValue: defaults.string(forKey: Key.notificationPreviewStyle) ?? ""
+        ) ?? .content
         homeWidgetStyle = HomeWidgetStyle(
             rawValue: defaults.string(forKey: Key.homeWidgetStyle) ?? ""
         ) ?? .balanced
-        notchSceneStyle = NotchSceneStyle(
-            rawValue: defaults.string(forKey: Key.notchSceneStyle) ?? ""
-        ) ?? .graphite
+        // The colour + tone theme replaces the old fixed scenes; carry an
+        // existing scene over to its closest colour and tone.
+        let legacyScene: (AccentTheme, SurfaceTone)? = switch defaults.string(
+            forKey: Key.legacySceneStyle
+        ) {
+        case "graphite": (.graphite, .subtle)
+        case "ember": (.orange, .medium)
+        case "aurora": (.teal, .medium)
+        case "album": (.pink, .medium)
+        default: nil
+        }
+        accentTheme = AccentTheme(
+            rawValue: defaults.string(forKey: Key.accentTheme) ?? ""
+        ) ?? legacyScene?.0 ?? .blue
+        surfaceTone = SurfaceTone(
+            rawValue: defaults.string(forKey: Key.surfaceTone) ?? ""
+        ) ?? legacyScene?.1 ?? .subtle
 
         onboardingCompleted = defaults.bool(
             forKey: Key.onboardingCompleted
@@ -458,6 +569,8 @@ final class AppSettings: ObservableObject {
         dashboardFocusTimerEnabled = true
         dashboardKeepAwakeEnabled = true
         dashboardFileShelfEnabled = true
+        dashboardNotificationsEnabled = true
+        notificationPreviewStyle = .content
     }
 
     private static func bool(

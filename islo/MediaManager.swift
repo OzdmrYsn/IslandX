@@ -403,6 +403,8 @@ final class MediaManager: ObservableObject {
     private var artworkTask: Task<Void, Never>?
     private var volumeWriteTask: Task<Void, Never>?
     private var isRefreshing = false
+    private var needsAnotherRefresh = false
+    private var playerObservers: [NSObjectProtocol] = []
     private var artworkKey: String?
     private var trackIdentifier = ""
     private var volumeRevision = 0
@@ -414,6 +416,7 @@ final class MediaManager: ObservableObject {
 
     func startMonitoring() {
         guard monitorTask == nil else { return }
+        observePlayerNotifications()
 
         monitorTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -438,12 +441,60 @@ final class MediaManager: ObservableObject {
         monitorTask = nil
         artworkTask = nil
         volumeWriteTask = nil
+        let center = DistributedNotificationCenter.default()
+        playerObservers.forEach(center.removeObserver)
+        playerObservers.removeAll()
+    }
+
+    /// Music and Spotify announce every play/pause and track change. Reacting
+    /// to those makes the notch respond at once instead of on the next poll.
+    private func observePlayerNotifications() {
+        guard playerObservers.isEmpty else { return }
+        let center = DistributedNotificationCenter.default()
+        let players: [(String, MediaSource)] = [
+            ("com.spotify.client.PlaybackStateChanged", .spotify),
+            ("com.apple.Music.playerInfo", .appleMusic)
+        ]
+        playerObservers = players.map { name, player in
+            center.addObserver(
+                forName: Notification.Name(name),
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                let state = (notification.userInfo?["Player State"] as? String)?
+                    .lowercased()
+                Task { @MainActor in
+                    self?.handlePlayerNotification(state: state, from: player)
+                }
+            }
+        }
+    }
+
+    private func handlePlayerNotification(state: String?, from player: MediaSource) {
+        // Trust the announced state right away; the snapshot that follows
+        // fills in the track. A pause from a player islo. isn't showing
+        // doesn't change anything.
+        if state == "playing" {
+            isPlaying = true
+        } else if state != nil, player == source {
+            isPlaying = false
+        }
+        Task { await refresh() }
     }
 
     func refresh() async {
-        guard !isRefreshing else { return }
+        guard !isRefreshing else {
+            needsAnotherRefresh = true
+            return
+        }
         isRefreshing = true
-        defer { isRefreshing = false }
+        defer {
+            isRefreshing = false
+            if needsAnotherRefresh {
+                needsAnotherRefresh = false
+                Task { await refresh() }
+            }
+        }
 
         if volumeWriteTask == nil {
             do {
