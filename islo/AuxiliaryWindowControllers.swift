@@ -10,7 +10,7 @@ final class SettingsWindowController: NSWindowController {
         )
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 580, height: 740),
+            contentRect: NSRect(x: 0, y: 0, width: 940, height: 690),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -23,7 +23,7 @@ final class SettingsWindowController: NSWindowController {
         window.isReleasedWhenClosed = false
         centerOnPrimaryDisplay(
             window,
-            contentSize: NSSize(width: 580, height: 740)
+            contentSize: NSSize(width: 940, height: 690)
         )
 
         super.init(window: window)
@@ -44,7 +44,7 @@ final class SettingsWindowController: NSWindowController {
             guard let window = self?.window else { return }
             centerOnPrimaryDisplay(
                 window,
-                contentSize: NSSize(width: 580, height: 740)
+                contentSize: NSSize(width: 940, height: 690)
             )
             window.makeKeyAndOrderFront(nil)
         }
@@ -60,7 +60,7 @@ final class OnboardingWindowController: NSWindowController {
         )
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 680, height: 600),
+            contentRect: NSRect(x: 0, y: 0, width: 1040, height: 680),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -75,7 +75,7 @@ final class OnboardingWindowController: NSWindowController {
         window.isReleasedWhenClosed = false
         centerOnPrimaryDisplay(
             window,
-            contentSize: NSSize(width: 680, height: 600)
+            contentSize: NSSize(width: 1040, height: 680)
         )
 
         super.init(window: window)
@@ -95,7 +95,7 @@ final class OnboardingWindowController: NSWindowController {
             guard let window = self?.window else { return }
             centerOnPrimaryDisplay(
                 window,
-                contentSize: NSSize(width: 680, height: 600)
+                contentSize: NSSize(width: 1040, height: 680)
             )
             window.makeKeyAndOrderFront(nil)
         }

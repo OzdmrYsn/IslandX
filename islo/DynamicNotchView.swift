@@ -179,7 +179,13 @@ struct DynamicNotchView: View {
 
     private var renderedSurface: some View {
         ZStack(alignment: .top) {
-            if presentation == .idle {
+            if isFileDropTargeted {
+                fileDropHUD
+                    .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
+            } else if isCommandEchoVisible {
+                commandEchoHUD
+                    .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
+            } else if presentation == .idle {
                 compactContent
                     .transition(
                         .opacity.combined(
@@ -201,8 +207,10 @@ struct DynamicNotchView: View {
             alignment: .top
         )
         .background {
-            if isHiddenMiniIdle {
+            if isHiddenMiniIdle && !isCommandEchoVisible && !isFileDropTargeted {
                 Color.clear
+            } else if isCommandEchoVisible || isFileDropTargeted {
+                notchShape.fill(Color.black)
             } else {
                 notchBackground
             }
@@ -214,15 +222,8 @@ struct DynamicNotchView: View {
                     .stroke(primaryColor.opacity(0.13), lineWidth: 0.5)
             }
         }
-        .overlay(alignment: .topTrailing) {
-            if isCommandEchoVisible,
-               settings.contentMode == .dashboard,
-               settings.dashboardCommandEchoEnabled {
-                commandEchoHUD
-                    .padding(.top, layout.hasCameraHousing ? 5 : 7)
-                    .padding(.trailing, 12)
-                    .transition(.scale(scale: 0.88).combined(with: .opacity))
-            }
+        .overlay(alignment: .bottomLeading) {
+            if isCommandEchoVisible { commandEchoGlow }
         }
         .overlay {
             if isFileDropTargeted {
@@ -299,8 +300,7 @@ struct DynamicNotchView: View {
             showTrackChangePreviewIfNeeded()
         }
         .onReceive(mediaManager.$volume.dropFirst().removeDuplicates()) { value in
-            guard settings.contentMode == .dashboard,
-                  settings.dashboardCommandEchoEnabled else { return }
+            guard settings.dashboardCommandEchoEnabled else { return }
             commandEchoManager.showVolume(value)
         }
         .onReceive(commandEchoManager.$revision.dropFirst()) { _ in
@@ -311,6 +311,12 @@ struct DynamicNotchView: View {
         }
         .onChange(of: settings.dashboardFileShelfEnabled) { enabled in
             if !enabled, dashboardSection == .shelf { dashboardSection = .home }
+        }
+        .onChange(of: isFileDropTargeted) { targeted in
+            let nextSize = targeted
+                ? fileDropPreferredSize
+                : (isCommandEchoVisible ? commandEchoPreferredSize : basePreferredSize)
+            onPreferredSizeChange(nextSize, !reduceMotion)
         }
         .onChange(of: settings.dashboardKeepAwakeEnabled) { enabled in
             if !enabled { keepAwakeManager.setActive(false) }
@@ -1026,48 +1032,177 @@ struct DynamicNotchView: View {
     }
 
     private var commandEchoHUD: some View {
-        HStack(spacing: 7) {
-            Image(systemName: commandEchoManager.event.symbolName)
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(Color.accentColor)
-
-            switch commandEchoManager.event {
-            case .volume(let value), .brightness(let value):
-                ProgressView(value: value)
-                    .progressViewStyle(.linear)
-                    .frame(width: 48)
-            case .copied:
-                Text(localized("Kopyalandı", "Copied"))
-                    .font(.system(size: 9, weight: .semibold))
-            case .capsLock(let enabled):
-                Text(enabled ? "Caps Lock" : localized("Caps kapalı", "Caps off"))
-                    .font(.system(size: 9, weight: .semibold))
+        Group {
+            if layout.hasCameraHousing {
+                HStack(spacing: 0) {
+                    commandEchoLeading
+                        .frame(width: commandEchoWingWidth, alignment: .leading)
+                    Color.clear
+                        .frame(width: layout.cameraHousingWidth)
+                        .accessibilityHidden(true)
+                    commandEchoTrailing
+                        .frame(width: commandEchoWingWidth, alignment: .trailing)
+                }
+                .padding(.horizontal, 18)
+                .padding(.top, 2)
+            } else {
+                HStack(spacing: 12) {
+                    commandEchoLeading
+                    Spacer(minLength: 8)
+                    commandEchoTrailing
+                }
+                .padding(.horizontal, 18)
             }
         }
-        .foregroundStyle(primaryColor)
-        .padding(.horizontal, 10)
-        .frame(height: 27)
-        .background(
-            Capsule()
-                .fill(primaryColor.opacity(0.1))
-        )
+        .foregroundStyle(.white)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .combine)
         .accessibilityLabel(localized("Sistem değişikliği", "System change"))
     }
 
+    private var fileDropHUD: some View {
+        VStack(spacing: 10) {
+            if layout.hasCameraHousing {
+                Color.clear.frame(height: max(layout.notchBandHeight - 2, 18))
+            }
+
+            Label(
+                localized("Dosyaları buraya bırak", "Drop your files here"),
+                systemImage: "arrow.down.doc.fill"
+            )
+            .font(.system(size: 12, weight: .semibold))
+
+            HStack(spacing: 10) {
+                fileDropOption("tray.full.fill", localized("Raf", "Shelf"))
+                fileDropOption("airplayaudio", "AirDrop")
+            }
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 14)
+        .padding(.bottom, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(style: StrokeStyle(lineWidth: 1, dash: [5, 5]))
+                .foregroundStyle(.white.opacity(0.22))
+                .padding(8)
+        }
+    }
+
+    private func fileDropOption(_ symbol: String, _ title: String) -> some View {
+        VStack(spacing: 5) {
+            Image(systemName: symbol).font(.system(size: 15, weight: .semibold))
+            Text(title).font(.system(size: 9, weight: .semibold))
+        }
+        .frame(maxWidth: .infinity, minHeight: 48)
+        .background(RoundedRectangle(cornerRadius: 13).fill(.white.opacity(0.09)))
+    }
+
+    private var commandEchoLeading: some View {
+        HStack(spacing: 9) {
+            Image(systemName: commandEchoManager.event.symbolName)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(commandEchoAccent)
+
+            if commandEchoValue == nil {
+                Text(commandEchoTitle)
+                    .font(.system(size: 11, weight: .semibold))
+                    .lineLimit(1)
+            }
+        }
+    }
+
+    private var commandEchoTrailing: some View {
+        Group {
+            if let value = commandEchoValue {
+                Text("\(Int((value * 100).rounded()))%")
+                    .font(.system(size: 13, weight: .bold).monospacedDigit())
+            } else {
+                Text(commandEchoDetail)
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.58))
+                    .lineLimit(1)
+            }
+        }
+    }
+
+    private var commandEchoGlow: some View {
+        GeometryReader { proxy in
+            let progress = commandEchoValue ?? 1
+            LinearGradient(
+                colors: [Color.cyan, Color.blue, Color.purple, Color.pink, Color.orange],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .frame(width: max(proxy.size.width * progress, 3), height: 3)
+            .shadow(color: commandEchoAccent.opacity(0.9), radius: 10, y: -2)
+            .animation(.spring(response: 0.28, dampingFraction: 0.82), value: progress)
+        }
+        .frame(height: 3)
+        .allowsHitTesting(false)
+    }
+
+    private var commandEchoValue: Double? {
+        switch commandEchoManager.event {
+        case .volume(let value), .brightness(let value): value
+        case .copied, .screenshot, .capsLock: nil
+        }
+    }
+
+    private var commandEchoAccent: Color {
+        switch commandEchoManager.event {
+        case .volume: .orange
+        case .brightness: .yellow
+        case .copied: .cyan
+        case .screenshot: .purple
+        case .capsLock(let enabled): enabled ? .green : .gray
+        }
+    }
+
+    private var commandEchoTitle: String {
+        switch commandEchoManager.event {
+        case .volume: localized("Ses", "Volume")
+        case .brightness: localized("Parlaklık", "Brightness")
+        case .copied: localized("Kopyalandı", "Copied")
+        case .screenshot: localized("Ekran görüntüsü alındı", "Screenshot captured")
+        case .capsLock(let enabled): enabled ? "Caps Lock" : localized("Caps Lock kapalı", "Caps Lock off")
+        }
+    }
+
+    private var commandEchoDetail: String {
+        switch commandEchoManager.event {
+        case .screenshot(let filename): filename
+        case .copied: localized("Panoya eklendi", "Added to clipboard")
+        case .capsLock(let enabled): enabled ? localized("Açık", "On") : localized("Kapalı", "Off")
+        case .volume, .brightness: ""
+        }
+    }
+
+    private var commandEchoWingWidth: CGFloat {
+        max((commandEchoPreferredSize.width - layout.cameraHousingWidth) / 2 - 18, 56)
+    }
+
     private func showCommandEchoIfNeeded() {
-        guard settings.contentMode == .dashboard,
-              settings.dashboardCommandEchoEnabled else { return }
+        guard settings.dashboardCommandEchoEnabled else { return }
         commandEchoTask?.cancel()
         withAnimation(.easeOut(duration: 0.16)) {
             isCommandEchoVisible = true
         }
+        onPreferredSizeChange(commandEchoPreferredSize, !reduceMotion)
         commandEchoTask = Task {
-            try? await Task.sleep(for: .seconds(1.35))
+            let duration: Duration
+            if case .screenshot = commandEchoManager.event {
+                duration = .seconds(3.2)
+            } else {
+                duration = .seconds(1.45)
+            }
+            try? await Task.sleep(for: duration)
             guard !Task.isCancelled else { return }
             await MainActor.run {
                 withAnimation(.easeIn(duration: 0.18)) {
                     isCommandEchoVisible = false
                 }
+                onPreferredSizeChange(basePreferredSize, !reduceMotion)
             }
         }
     }
@@ -1907,11 +2042,37 @@ struct DynamicNotchView: View {
     // MARK: - Derived Values
 
     private var preferredSize: CGSize {
+        if isFileDropTargeted { return fileDropPreferredSize }
+        if isCommandEchoVisible { return commandEchoPreferredSize }
+        return basePreferredSize
+    }
+
+    private var basePreferredSize: CGSize {
         layout.size(
             for: presentation,
             idleMode: settings.notchIdleMode,
             contentMode: settings.contentMode
         )
+    }
+
+    private var commandEchoPreferredSize: CGSize {
+        let width = layout.hasCameraHousing
+            ? min(max(layout.cameraHousingWidth + 300, 430), layout.screenWidth - 24)
+            : min(390, layout.screenWidth - 24)
+        let height = layout.hasCameraHousing
+            ? max(layout.notchBandHeight + 13, 46)
+            : 46
+        return CGSize(width: width, height: height)
+    }
+
+    private var fileDropPreferredSize: CGSize {
+        let width = layout.hasCameraHousing
+            ? min(max(layout.cameraHousingWidth + 260, 390), layout.screenWidth - 24)
+            : min(380, layout.screenWidth - 24)
+        let height = layout.hasCameraHousing
+            ? max(layout.notchBandHeight + 94, 124)
+            : 112
+        return CGSize(width: width, height: height)
     }
 
     private var isHiddenMiniIdle: Bool {

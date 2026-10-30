@@ -7,6 +7,7 @@ enum CommandEchoKind: Equatable {
     case volume(Double)
     case brightness(Double)
     case copied
+    case screenshot(String)
     case capsLock(Bool)
 
     var symbolName: String {
@@ -15,6 +16,7 @@ enum CommandEchoKind: Equatable {
             value == 0 ? "speaker.slash.fill" : "speaker.wave.2.fill"
         case .brightness: "sun.max.fill"
         case .copied: "doc.on.doc.fill"
+        case .screenshot: "camera.viewfinder"
         case .capsLock: "capslock.fill"
         }
     }
@@ -29,12 +31,14 @@ final class CommandEchoManager: ObservableObject {
     private var lastBrightness: Double?
     private var lastPasteboardChangeCount = NSPasteboard.general.changeCount
     private var lastCapsLockState = NSEvent.modifierFlags.contains(.capsLock)
+    private var screenshotObservers: [NSObjectProtocol] = []
 
     func startMonitoring() {
         guard timer == nil else { return }
         lastBrightness = Self.readBrightness()
         lastPasteboardChangeCount = NSPasteboard.general.changeCount
         lastCapsLockState = NSEvent.modifierFlags.contains(.capsLock)
+        startScreenshotMonitoring()
 
         timer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) {
             [weak self] _ in
@@ -45,10 +49,14 @@ final class CommandEchoManager: ObservableObject {
     func stopMonitoring() {
         timer?.invalidate()
         timer = nil
+        let center = DistributedNotificationCenter.default()
+        screenshotObservers.forEach(center.removeObserver)
+        screenshotObservers.removeAll()
     }
 
     func showVolume(_ value: Double) {
-        publish(.volume(min(max(value, 0), 100) / 100))
+        let normalized = value > 1 ? value / 100 : value
+        publish(.volume(min(max(normalized, 0), 1)))
     }
 
     private func pollSystemState() {
@@ -70,6 +78,28 @@ final class CommandEchoManager: ObservableObject {
                 publish(.brightness(brightness))
             }
             lastBrightness = brightness
+        }
+
+    }
+
+    private func startScreenshotMonitoring() {
+        guard screenshotObservers.isEmpty else { return }
+        let center = DistributedNotificationCenter.default()
+        let names = [
+            "com.apple.screencaptureui.completed",
+            "com.apple.screencapture.completed"
+        ]
+        screenshotObservers = names.map { rawName in
+            center.addObserver(
+                forName: Notification.Name(rawName),
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                let filename = (notification.userInfo?["filename"] as? String)
+                    .map { URL(fileURLWithPath: $0).lastPathComponent }
+                    ?? "PNG"
+                Task { @MainActor in self?.publish(.screenshot(filename)) }
+            }
         }
     }
 
