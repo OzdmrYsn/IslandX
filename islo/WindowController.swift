@@ -19,6 +19,7 @@ final class FloatingNotchWindowController: NSWindowController {
     private let focusTimerManager: FocusTimerManager
     private let keepAwakeManager: KeepAwakeManager
     private let fileShelfManager: FileShelfManager
+    private let clipboardHistoryManager: ClipboardHistoryManager
     private var layout: NotchLayout
     private var currentSize: CGSize
     private var visibilityTask: Task<Void, Never>?
@@ -30,7 +31,8 @@ final class FloatingNotchWindowController: NSWindowController {
         commandEchoManager: CommandEchoManager,
         focusTimerManager: FocusTimerManager,
         keepAwakeManager: KeepAwakeManager,
-        fileShelfManager: FileShelfManager
+        fileShelfManager: FileShelfManager,
+        clipboardHistoryManager: ClipboardHistoryManager
     ) {
         self.mediaManager = mediaManager
         self.settings = settings
@@ -38,6 +40,7 @@ final class FloatingNotchWindowController: NSWindowController {
         self.focusTimerManager = focusTimerManager
         self.keepAwakeManager = keepAwakeManager
         self.fileShelfManager = fileShelfManager
+        self.clipboardHistoryManager = clipboardHistoryManager
 
         let targetScreen = NSScreen.screens.first ?? NSScreen.main
         let layout = NotchLayout(screen: targetScreen)
@@ -150,6 +153,7 @@ final class FloatingNotchWindowController: NSWindowController {
             focusTimerManager: focusTimerManager,
             keepAwakeManager: keepAwakeManager,
             fileShelfManager: fileShelfManager,
+            clipboardHistoryManager: clipboardHistoryManager,
             layout: layout
         ) { [weak self] preferredSize, animated in
             self?.resizeWindow(to: preferredSize, animated: animated)
@@ -185,7 +189,7 @@ final class FloatingNotchWindowController: NSWindowController {
         }
 
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.4
+            context.duration = 0.24
             context.timingFunction = CAMediaTimingFunction(
                 controlPoints: 0.22,
                 0.8,

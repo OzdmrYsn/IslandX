@@ -13,7 +13,7 @@ private enum DashboardSection: String, CaseIterable {
     case calendar
     case timer
     case shelf
-    case battery
+    case clipboard
 }
 
 /// Derives the camera-housing geometry from AppKit's safe display regions.
@@ -26,7 +26,7 @@ struct NotchLayout: Equatable {
     let expandedWidth: CGFloat
     let screenWidth: CGFloat
 
-    private static let compactWingWidth: CGFloat = 52
+    private static let compactWingWidth: CGFloat = 42
 
     init(screen: NSScreen?) {
         guard let screen else {
@@ -105,7 +105,7 @@ struct NotchLayout: Equatable {
             if contentMode == .dashboard {
                 return CGSize(
                     width: min(780, max(screenWidth - 24, 620)),
-                    height: hasCameraHousing ? 292 : 280
+                    height: hasCameraHousing ? 244 : 232
                 )
             }
             return CGSize(
@@ -127,6 +127,7 @@ struct DynamicNotchView: View {
     @ObservedObject private var focusTimerManager: FocusTimerManager
     @ObservedObject private var keepAwakeManager: KeepAwakeManager
     @ObservedObject private var fileShelfManager: FileShelfManager
+    @ObservedObject private var clipboardHistoryManager: ClipboardHistoryManager
 
     private let layout: NotchLayout
     private let onPreferredSizeChange: (CGSize, Bool) -> Void
@@ -165,6 +166,7 @@ struct DynamicNotchView: View {
         focusTimerManager: FocusTimerManager,
         keepAwakeManager: KeepAwakeManager,
         fileShelfManager: FileShelfManager,
+        clipboardHistoryManager: ClipboardHistoryManager,
         layout: NotchLayout,
         onPreferredSizeChange: @escaping (CGSize, Bool) -> Void = { _, _ in }
     ) {
@@ -174,6 +176,7 @@ struct DynamicNotchView: View {
         _focusTimerManager = ObservedObject(wrappedValue: focusTimerManager)
         _keepAwakeManager = ObservedObject(wrappedValue: keepAwakeManager)
         _fileShelfManager = ObservedObject(wrappedValue: fileShelfManager)
+        _clipboardHistoryManager = ObservedObject(wrappedValue: clipboardHistoryManager)
         self.layout = layout
         self.onPreferredSizeChange = onPreferredSizeChange
     }
@@ -529,6 +532,8 @@ struct DynamicNotchView: View {
             dashboardFocusPane
         case .shelf where settings.dashboardFileShelfEnabled:
             dashboardShelfPane
+        case .clipboard:
+            dashboardClipboardPane
         case .home where settings.homeWidgetStyle == .focus && settings.dashboardFocusTimerEnabled:
             dashboardFocusPane
         default:
@@ -551,7 +556,7 @@ struct DynamicNotchView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(localized("Ana ekranı özelleştir", "Customize Home"))
                         .font(.system(size: 14, weight: .bold))
-                    Text(localized("Bir yerleşim ve sahne seçin.", "Choose a layout and a scene."))
+                    Text(localized("Ana ekran düzenini seçin.", "Choose the Home layout."))
                         .font(.system(size: 9))
                         .foregroundStyle(.white.opacity(0.45))
                 }
@@ -573,16 +578,6 @@ struct DynamicNotchView: View {
                 }
             }
 
-            Text(localized("SAHNE", "SCENE"))
-                .font(.system(size: 8, weight: .bold))
-                .tracking(1.4)
-                .foregroundStyle(.white.opacity(0.38))
-
-            HStack(spacing: 9) {
-                ForEach(NotchSceneStyle.allCases) { style in
-                    dashboardSceneChoice(style)
-                }
-            }
         }
         .foregroundStyle(.white)
         .padding(.horizontal, 18)
@@ -609,22 +604,6 @@ struct DynamicNotchView: View {
             .overlay(RoundedRectangle(cornerRadius: 13).stroke(settings.homeWidgetStyle == style ? Color.white : .white.opacity(0.1), lineWidth: settings.homeWidgetStyle == style ? 1.5 : 0.7))
         }
         .buttonStyle(.plain)
-    }
-
-    private func dashboardSceneChoice(_ style: NotchSceneStyle) -> some View {
-        Button { settings.notchSceneStyle = style } label: {
-            VStack(spacing: 5) {
-                RoundedRectangle(cornerRadius: 9)
-                    .fill(sceneGradient(for: style))
-                    .frame(height: 32)
-                Text(style.title(language: settings.language))
-                    .font(.system(size: 8, weight: .medium))
-            }
-            .padding(5)
-            .background(RoundedRectangle(cornerRadius: 11).stroke(settings.notchSceneStyle == style ? Color.white : .clear, lineWidth: 1.5))
-        }
-        .buttonStyle(.plain)
-        .frame(maxWidth: .infinity)
     }
 
     private var dashboardGlassCard: some ShapeStyle {
@@ -716,7 +695,7 @@ struct DynamicNotchView: View {
             if settings.dashboardFileShelfEnabled {
                 dashboardNavigationIcon("tray.full", section: .shelf)
             }
-            dashboardNavigationIcon("battery.75percent", section: .battery)
+            dashboardNavigationIcon("list.clipboard.fill", section: .clipboard)
         }
     }
 
@@ -990,6 +969,72 @@ struct DynamicNotchView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
+    private var dashboardClipboardPane: some View {
+        HStack(spacing: 10) {
+            if let latest = clipboardHistoryManager.entries.first {
+                Button { clipboardHistoryManager.copy(latest) } label: {
+                    VStack(alignment: .leading, spacing: 7) {
+                        HStack {
+                            Label(localized("Panoda", "In clipboard"), systemImage: "list.clipboard.fill")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(.white.opacity(0.48))
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .font(.system(size: 10, weight: .bold))
+                        }
+                        Text(latest.text)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .lineLimit(4)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Spacer(minLength: 0)
+                        Text(latest.source)
+                            .font(.system(size: 8, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.35))
+                    }
+                    .padding(11)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .background(RoundedRectangle(cornerRadius: 14).fill(.white.opacity(0.07)))
+                }
+                .buttonStyle(.plain)
+
+                VStack(spacing: 7) {
+                    ForEach(clipboardHistoryManager.entries.dropFirst().prefix(2)) { entry in
+                        Button { clipboardHistoryManager.copy(entry) } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "text.alignleft")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .frame(width: 24, height: 24)
+                                    .background(Circle().fill(.white.opacity(0.08)))
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(entry.text).font(.system(size: 9, weight: .medium)).lineLimit(2)
+                                    Text(entry.source).font(.system(size: 7)).foregroundStyle(.white.opacity(0.35))
+                                }
+                                Spacer(minLength: 0)
+                            }
+                            .foregroundStyle(.white.opacity(0.82))
+                            .padding(8)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                            .background(RoundedRectangle(cornerRadius: 12).fill(.white.opacity(0.055)))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .frame(width: 170)
+            } else {
+                VStack(spacing: 8) {
+                    Image(systemName: "list.clipboard")
+                        .font(.system(size: 23, weight: .light))
+                    Text(localized("Kopyaladığınız metinler burada görünür.", "Copied text appears here."))
+                        .font(.system(size: 10, weight: .medium))
+                }
+                .foregroundStyle(.white.opacity(0.45))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
     private var dashboardSidePane: some View {
         TimelineView(.periodic(from: .now, by: 60)) { context in
             VStack(alignment: .leading, spacing: 7) {
@@ -1059,24 +1104,13 @@ struct DynamicNotchView: View {
                     fileShelfManager.sendViaAirDrop(item)
                 }
             )
-        case .battery:
-            if settings.dashboardKeepAwakeEnabled {
-                dashboardSummaryCard(
-                    icon: keepAwakeManager.isActive ? "cup.and.saucer.fill" : "moon.zzz.fill",
-                    title: keepAwakeManager.isActive
-                        ? localized("Mac uyanık kalıyor", "Mac is staying awake")
-                        : localized("Uyanık Tut'u aç", "Enable Keep Awake"),
-                    subtitle: localized("Uyku ve ekran kapanmasını denetler", "Controls sleep and display idle"),
-                    action: keepAwakeManager.toggle
-                )
-            } else {
-                dashboardSummaryCard(
-                    icon: "battery.75percent",
-                    title: localized("Pil ayarlarını aç", "Open Battery settings"),
-                    subtitle: localized("Enerji kullanımını yönet", "Manage energy usage"),
-                    action: openBatterySettings
-                )
-            }
+        case .clipboard:
+            dashboardSummaryCard(
+                icon: "list.clipboard.fill",
+                title: localized("Pano geçmişi", "Clipboard history"),
+                subtitle: localized("Yalnızca bellekte tutulur", "Kept in memory only"),
+                action: {}
+            )
         }
     }
 
@@ -1109,16 +1143,12 @@ struct DynamicNotchView: View {
                     fileShelfManager.reveal(item)
                 }
             )
-        case .battery:
+        case .clipboard:
             dashboardSummaryCard(
-                icon: ProcessInfo.processInfo.isLowPowerModeEnabled
-                    ? "leaf.fill"
-                    : "leaf",
-                title: ProcessInfo.processInfo.isLowPowerModeEnabled
-                    ? localized("Düşük Güç açık", "Low Power is on")
-                    : localized("Düşük Güç kapalı", "Low Power is off"),
-                subtitle: localized("Pil ayarlarında değiştir", "Change in Battery settings"),
-                action: openBatterySettings
+                icon: "trash",
+                title: localized("Geçmişi temizle", "Clear history"),
+                subtitle: "\(clipboardHistoryManager.entries.count)",
+                action: clipboardHistoryManager.clear
             )
         }
     }
@@ -1238,7 +1268,7 @@ struct DynamicNotchView: View {
         HStack(spacing: 9) {
             Image(systemName: commandEchoManager.event.symbolName)
                 .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(commandEchoAccent)
+                .foregroundStyle(.white)
 
             if commandEchoValue == nil {
                 Text(commandEchoTitle)
@@ -1251,8 +1281,9 @@ struct DynamicNotchView: View {
     private var commandEchoTrailing: some View {
         Group {
             if let value = commandEchoValue {
-                Text("\(Int((value * 100).rounded()))%")
+                AnimatedPercentText(value: value)
                     .font(.system(size: 13, weight: .bold).monospacedDigit())
+                    .animation(.spring(response: 0.22, dampingFraction: 0.9), value: value)
             } else {
                 Text(commandEchoDetail)
                     .font(.system(size: 9, weight: .medium))
@@ -1265,16 +1296,27 @@ struct DynamicNotchView: View {
     private var commandEchoGlow: some View {
         GeometryReader { proxy in
             let progress = commandEchoValue ?? 1
-            LinearGradient(
-                colors: [Color.cyan, Color.blue, Color.purple, Color.pink, Color.orange],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-            .frame(width: max(proxy.size.width * progress, 3), height: 3)
-            .shadow(color: commandEchoAccent.opacity(0.9), radius: 10, y: -2)
-            .animation(.spring(response: 0.28, dampingFraction: 0.82), value: progress)
+            TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+                let phase = timeline.date.timeIntervalSinceReferenceDate
+                    .truncatingRemainder(dividingBy: 1.6) / 1.6
+                ZStack(alignment: .leading) {
+                    Capsule().fill(.white.opacity(0.08))
+                    Capsule()
+                        .fill(LinearGradient(colors: [.white.opacity(0.35), .white, .white.opacity(0.42)], startPoint: .leading, endPoint: .trailing))
+                        .frame(width: max(proxy.size.width * progress, 3))
+                        .shadow(color: .white.opacity(0.72), radius: 8, y: -2)
+
+                    Capsule()
+                        .fill(.white.opacity(commandEchoValue == nil ? 0.9 : 0.34))
+                        .frame(width: 46)
+                        .blur(radius: 5)
+                        .offset(x: (proxy.size.width + 46) * phase - 46)
+                        .mask(Capsule())
+                }
+                .animation(.spring(response: 0.24, dampingFraction: 0.88), value: progress)
+            }
         }
-        .frame(height: 3)
+        .frame(height: 2)
         .allowsHitTesting(false)
     }
 
@@ -1282,16 +1324,6 @@ struct DynamicNotchView: View {
         switch commandEchoManager.event {
         case .volume(let value), .brightness(let value): value
         case .copied, .screenshot, .capsLock: nil
-        }
-    }
-
-    private var commandEchoAccent: Color {
-        switch commandEchoManager.event {
-        case .volume: .orange
-        case .brightness: .yellow
-        case .copied: .cyan
-        case .screenshot: .purple
-        case .capsLock(let enabled): enabled ? .green : .gray
         }
     }
 
@@ -1321,7 +1353,7 @@ struct DynamicNotchView: View {
     private func showCommandEchoIfNeeded() {
         guard settings.dashboardCommandEchoEnabled else { return }
         commandEchoTask?.cancel()
-        withAnimation(.easeOut(duration: 0.16)) {
+        withAnimation(.spring(response: 0.2, dampingFraction: 0.9)) {
             isCommandEchoVisible = true
         }
         onPreferredSizeChange(commandEchoPreferredSize, !reduceMotion)
@@ -1349,7 +1381,7 @@ struct DynamicNotchView: View {
         case .calendar: localized("Takvim", "Calendar")
         case .timer: localized("Zamanlayıcı", "Timer")
         case .shelf: localized("Dosya Rafı", "File Shelf")
-        case .battery: localized("Pil", "Battery")
+        case .clipboard: "Clipboard"
         }
     }
 
@@ -1358,7 +1390,7 @@ struct DynamicNotchView: View {
         case .home, .calendar: dashboardWeekday(date).uppercased()
         case .timer: localized("ZAMANLAYICI", "TIMER")
         case .shelf: localized("DOSYA RAFI", "FILE SHELF")
-        case .battery: localized("PİL", "BATTERY")
+        case .clipboard: "CLIPBOARD"
         }
     }
 
@@ -1367,7 +1399,7 @@ struct DynamicNotchView: View {
         case .home, .calendar: dashboardDate(date)
         case .timer: dashboardTime(date)
         case .shelf: localized("Paylaş", "Share")
-        case .battery: localized("Enerji", "Energy")
+        case .clipboard: localized("Pano", "Clipboard")
         }
     }
 
@@ -1376,10 +1408,7 @@ struct DynamicNotchView: View {
         case .home, .calendar: dashboardTime(date)
         case .timer: focusTimerManager.formattedTime
         case .shelf: "\(fileShelfManager.items.count)"
-        case .battery:
-            ProcessInfo.processInfo.isLowPowerModeEnabled
-                ? localized("Açık", "On")
-                : localized("Kapalı", "Off")
+        case .clipboard: "\(clipboardHistoryManager.entries.count)"
         }
     }
 
@@ -1396,11 +1425,6 @@ struct DynamicNotchView: View {
 
     private func openClock() {
         openApplication(bundleIdentifier: "com.apple.clock")
-    }
-
-    private func openBatterySettings() {
-        guard let url = URL(string: "x-apple.systempreferences:com.apple.Battery-Settings.extension") else { return }
-        NSWorkspace.shared.open(url)
     }
 
     private func openApplication(bundleIdentifier: String) {
@@ -2384,9 +2408,9 @@ private struct AdaptiveNotchShape: Shape {
         progress: CGFloat
     ) -> Path {
         let bottomRadius = min(
-            interpolate(from: 13, to: 28, progress: progress),
+            interpolate(from: 18, to: 30, progress: progress),
             rect.width / 4,
-            rect.height / 4
+            rect.height / 2
         )
 
         // A notched Mac already has a physical black camera housing at the
@@ -2423,6 +2447,19 @@ private struct AdaptiveNotchShape: Shape {
         progress: CGFloat
     ) -> CGFloat {
         start + (end - start) * progress
+    }
+}
+
+private struct AnimatedPercentText: View, Animatable {
+    var value: Double
+
+    var animatableData: Double {
+        get { value }
+        set { value = newValue }
+    }
+
+    var body: some View {
+        Text("\(Int((value * 100).rounded()))%")
     }
 }
 

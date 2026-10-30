@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import CoreAudio
 import IOKit.graphics
 import UniformTypeIdentifiers
 
@@ -29,6 +30,7 @@ final class CommandEchoManager: ObservableObject {
 
     private var timer: Timer?
     private var lastBrightness: Double?
+    private var lastVolume: Double?
     private var lastPasteboardChangeCount = NSPasteboard.general.changeCount
     private var lastCapsLockState = NSEvent.modifierFlags.contains(.capsLock)
     private var screenshotObservers: [NSObjectProtocol] = []
@@ -36,11 +38,12 @@ final class CommandEchoManager: ObservableObject {
     func startMonitoring() {
         guard timer == nil else { return }
         lastBrightness = Self.readBrightness()
+        lastVolume = Self.readSystemVolume()
         lastPasteboardChangeCount = NSPasteboard.general.changeCount
         lastCapsLockState = NSEvent.modifierFlags.contains(.capsLock)
         startScreenshotMonitoring()
 
-        timer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) {
+        timer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) {
             [weak self] _ in
             Task { @MainActor in self?.pollSystemState() }
         }
@@ -60,6 +63,13 @@ final class CommandEchoManager: ObservableObject {
     }
 
     private func pollSystemState() {
+        if let volume = Self.readSystemVolume() {
+            if let previous = lastVolume, abs(volume - previous) >= 0.005 {
+                publish(.volume(volume))
+            }
+            lastVolume = volume
+        }
+
         let pasteboardCount = NSPasteboard.general.changeCount
         if pasteboardCount != lastPasteboardChangeCount {
             lastPasteboardChangeCount = pasteboardCount
@@ -151,6 +161,115 @@ final class CommandEchoManager: ObservableObject {
         }
 
         return min(max(value.doubleValue / maximum.doubleValue, 0), 1)
+    }
+
+    private static func readSystemVolume() -> Double? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var device = AudioDeviceID(0)
+        var deviceSize = UInt32(MemoryLayout<AudioDeviceID>.size)
+        guard AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address,
+            0,
+            nil,
+            &deviceSize,
+            &device
+        ) == noErr, device != 0 else { return nil }
+
+        var values: [Double] = []
+        for element in [
+            kAudioObjectPropertyElementMain,
+            AudioObjectPropertyElement(1),
+            AudioObjectPropertyElement(2)
+        ] {
+            address = AudioObjectPropertyAddress(
+                mSelector: kAudioDevicePropertyVolumeScalar,
+                mScope: kAudioDevicePropertyScopeOutput,
+                mElement: element
+            )
+            guard AudioObjectHasProperty(device, &address) else { continue }
+            var value = Float32(0)
+            var valueSize = UInt32(MemoryLayout<Float32>.size)
+            if AudioObjectGetPropertyData(
+                device,
+                &address,
+                0,
+                nil,
+                &valueSize,
+                &value
+            ) == noErr {
+                values.append(Double(value))
+                if element == kAudioObjectPropertyElementMain { break }
+            }
+        }
+        guard !values.isEmpty else { return nil }
+        let average = values.reduce(0, +) / Double(values.count)
+        return min(max(average, 0), 1)
+    }
+}
+
+struct ClipboardEntry: Identifiable, Equatable {
+    let id = UUID()
+    let text: String
+    let source: String
+    let capturedAt: Date
+}
+
+/// A deliberately in-memory clipboard history. Nothing is written to disk and
+/// the list is discarded when islo. quits.
+@MainActor
+final class ClipboardHistoryManager: ObservableObject {
+    @Published private(set) var entries: [ClipboardEntry] = []
+    private var timer: Timer?
+    private var lastChangeCount = NSPasteboard.general.changeCount
+
+    func startMonitoring() {
+        guard timer == nil else { return }
+        lastChangeCount = NSPasteboard.general.changeCount
+        timer = Timer.scheduledTimer(withTimeInterval: 0.18, repeats: true) {
+            [weak self] _ in
+            Task { @MainActor in self?.captureIfNeeded() }
+        }
+    }
+
+    func stopMonitoring() {
+        timer?.invalidate()
+        timer = nil
+    }
+
+    func copy(_ entry: ClipboardEntry) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(entry.text, forType: .string)
+    }
+
+    func remove(_ entry: ClipboardEntry) {
+        entries.removeAll { $0.id == entry.id }
+    }
+
+    func clear() { entries.removeAll() }
+
+    private func captureIfNeeded() {
+        let pasteboard = NSPasteboard.general
+        guard pasteboard.changeCount != lastChangeCount else { return }
+        lastChangeCount = pasteboard.changeCount
+        let concealedTypes = [
+            NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType"),
+            NSPasteboard.PasteboardType("org.nspasteboard.AutoGeneratedType"),
+            NSPasteboard.PasteboardType("com.agilebits.onepassword")
+        ]
+        let availableTypes = pasteboard.types ?? []
+        guard concealedTypes.allSatisfy({ !availableTypes.contains($0) }) else { return }
+        guard let text = pasteboard.string(forType: .string)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              !text.isEmpty,
+              entries.first?.text != text else { return }
+        let source = NSWorkspace.shared.frontmostApplication?.localizedName ?? "Mac"
+        entries.insert(ClipboardEntry(text: text, source: source, capturedAt: .now), at: 0)
+        entries = Array(entries.prefix(12))
     }
 }
 
