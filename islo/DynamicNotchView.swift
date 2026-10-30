@@ -153,7 +153,6 @@ struct DynamicNotchView: View {
     @State private var isScrubbing = false
     @State private var expansionProgress: CGFloat = 0
     @State private var dashboardSection: DashboardSection = .home
-    @State private var isCustomizingDashboard = false
     @State private var isFileDropTargeted = false
     @State private var isShelfTileTargeted = false
     @State private var isAirDropTileTargeted = false
@@ -693,14 +692,7 @@ struct DynamicNotchView: View {
     private var dashboardExpandedContent: some View {
         VStack(spacing: 0) {
             dashboardNavigationRow
-
-            if isCustomizingDashboard {
-                dashboardCustomizer
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
-            } else {
-                dashboardStage
-                    .transition(.opacity)
-            }
+            dashboardStage
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(dashboardSceneBackground)
@@ -1942,62 +1934,6 @@ struct DynamicNotchView: View {
         setPresentation(.expanded)
     }
 
-    private var dashboardCustomizer: some View {
-        VStack(alignment: .leading, spacing: 11) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(localized("Ana ekranı özelleştir", "Customize Home"))
-                        .font(.system(size: 14, weight: .bold))
-                    Text(localized("Ana ekran düzenini seçin.", "Choose the Home layout."))
-                        .font(.system(size: 9))
-                        .foregroundStyle(.white.opacity(0.45))
-                }
-                Spacer()
-                Button(localized("Bitti", "Done")) {
-                    withAnimation(.easeInOut(duration: 0.2)) { isCustomizingDashboard = false }
-                }
-                .buttonStyle(.plain)
-                .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(.black)
-                .padding(.horizontal, 13)
-                .frame(height: 25)
-                .background(Capsule().fill(.white))
-            }
-
-            HStack(spacing: 9) {
-                ForEach(HomeWidgetStyle.allCases) { style in
-                    dashboardLayoutChoice(style)
-                }
-            }
-
-        }
-        .foregroundStyle(.white)
-        .padding(.horizontal, bodyPadding(18, gap: 12))
-        .padding(.bottom, 14)
-    }
-
-    private func dashboardLayoutChoice(_ style: HomeWidgetStyle) -> some View {
-        Button { settings.homeWidgetStyle = style } label: {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 5) {
-                    RoundedRectangle(cornerRadius: 6).fill(.white.opacity(0.18))
-                    VStack(spacing: 4) {
-                        RoundedRectangle(cornerRadius: 3).fill(.white.opacity(0.34)).frame(height: 6)
-                        RoundedRectangle(cornerRadius: 3).fill(.white.opacity(0.12)).frame(height: 6)
-                    }
-                }
-                .frame(height: 42)
-                Text(style.title(language: settings.language))
-                    .font(.system(size: 9, weight: .semibold))
-            }
-            .padding(9)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 13).fill(.white.opacity(0.075)))
-            .overlay(RoundedRectangle(cornerRadius: 13).stroke(settings.homeWidgetStyle == style ? Color.white : .white.opacity(0.1), lineWidth: settings.homeWidgetStyle == style ? 1.5 : 0.7))
-        }
-        .buttonStyle(.plain)
-    }
-
     /// Black with the theme colour washed in at the chosen tone. The band
     /// beside the camera housing stays pure black so the real notch blends in.
     private var dashboardSceneBackground: some View {
@@ -2087,13 +2023,6 @@ struct DynamicNotchView: View {
 
     private var dashboardNavigationTrailing: some View {
         HStack(spacing: 8) {
-            smallUtilityButton(
-                icon: "slider.horizontal.3",
-                label: localized("Özelleştir", "Customize")
-            ) {
-                withAnimation(.easeInOut(duration: 0.2)) { isCustomizingDashboard.toggle() }
-            }
-
             smallUtilityButton(
                 icon: "gearshape.fill",
                 label: localized("Ayarlar", "Settings")
