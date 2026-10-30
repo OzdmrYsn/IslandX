@@ -3,9 +3,12 @@ import SwiftUI
 
 @MainActor
 final class SettingsWindowController: NSWindowController {
+    private let router = SettingsRouter()
+
     init(settings: AppSettings, onShowOnboarding: @escaping () -> Void) {
         let rootView = SettingsView(
             settings: settings,
+            router: router,
             onShowOnboarding: onShowOnboarding
         )
 
@@ -34,7 +37,10 @@ final class SettingsWindowController: NSWindowController {
         fatalError("init(coder:) is not supported")
     }
 
-    func present() {
+    func present(destination: SettingsDestination? = nil) {
+        if let destination {
+            router.requestedDestination = destination
+        }
         showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
 

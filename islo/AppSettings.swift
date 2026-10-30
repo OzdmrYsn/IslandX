@@ -3,6 +3,30 @@ import ApplicationServices
 import ServiceManagement
 import SwiftUI
 
+enum PermissionState: Equatable {
+    case granted
+    case missing
+    case notAsked
+    /// Automation can only be checked while the target app runs.
+    case appClosed
+    case appNotInstalled
+}
+
+/// Apps islo. controls through Apple Events.
+enum AutomationTarget: String, CaseIterable, Identifiable {
+    case music = "com.apple.Music"
+    case spotify = "com.spotify.client"
+
+    var id: String { rawValue }
+
+    var name: String {
+        switch self {
+        case .music: "Music"
+        case .spotify: "Spotify"
+        }
+    }
+}
+
 enum AppTheme: String, CaseIterable, Identifiable {
     case system
     case light
@@ -323,6 +347,7 @@ final class AppSettings: ObservableObject {
         static let accentTheme = "appearance.accentTheme"
         static let surfaceTone = "appearance.surfaceTone"
         static let onboardingCompleted = "onboarding.completed"
+        static let permissionReminderBuild = "permissions.reminderBuild"
     }
 
     private let defaults: UserDefaults
@@ -422,6 +447,8 @@ final class AppSettings: ObservableObject {
     @Published private(set) var launchAtLoginRequiresApproval: Bool
     @Published private(set) var launchAtLoginError: String?
     @Published private(set) var isAccessibilityTrusted = AXIsProcessTrusted()
+    @Published private(set) var automationStates: [AutomationTarget: PermissionState] = [:]
+    private var isCheckingAutomation = false
 
     private init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -616,28 +643,162 @@ final class AppSettings: ObservableObject {
         SMAppService.openSystemSettingsLoginItems()
     }
 
-    /// macOS doesn't notify apps when Accessibility access changes, so the
-    /// Permissions page and app activation re-read it.
+    /// Permissions that are missing and break a feature (not ones macOS
+    /// simply hasn't asked about yet).
+    var missingPermissionCount: Int {
+        (isAccessibilityTrusted ? 0 : 1)
+            + automationStates.values.filter { $0 == .missing }.count
+    }
+
+    /// macOS doesn't notify apps when permissions change, so Settings and
+    /// app activation re-read them.
     func refreshPermissionState() {
         let trusted = AXIsProcessTrusted()
         if trusted != isAccessibilityTrusted {
             isAccessibilityTrusted = trusted
         }
+        refreshAutomationStates()
     }
 
     func requestAccessibilityPermission() {
-        let options = [
-            kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true
-        ] as CFDictionary
-        _ = AXIsProcessTrustedWithOptions(options)
-        refreshPermissionState()
+        let wasTrusted = AXIsProcessTrusted()
+        DispatchQueue.global(qos: .userInitiated).async {
+            // After an update macOS can keep an old islo. entry that still
+            // looks switched on but no longer matches this copy, and then it
+            // never asks again. Clearing islo.'s own entry lets it ask afresh.
+            if !wasTrusted {
+                Self.resetPermission(service: "Accessibility")
+            }
+            DispatchQueue.main.async { [weak self] in
+                let options = [
+                    kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true
+                ] as CFDictionary
+                _ = AXIsProcessTrustedWithOptions(options)
+                self?.refreshPermissionState()
+            }
+            // Open the list too, in case macOS shows no prompt.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+                guard self?.isAccessibilityTrusted == false else { return }
+                self?.openAccessibilitySettings()
+            }
+        }
+    }
+
+    func requestAutomationPermission(for target: AutomationTarget) {
+        let previous = automationStates[target]
+        DispatchQueue.global(qos: .userInitiated).async {
+            // macOS never asks again once access was turned off; resetting
+            // islo.'s Automation entries brings the prompt back.
+            if previous == .missing {
+                Self.resetPermission(service: "AppleEvents")
+            }
+            let state = Self.automationState(for: target, askUser: true)
+            DispatchQueue.main.async { [weak self] in
+                self?.refreshPermissionState()
+                if state == .missing { self?.openAutomationSettings() }
+            }
+        }
     }
 
     func openAccessibilitySettings() {
+        openPrivacySettings("Privacy_Accessibility")
+    }
+
+    func openAutomationSettings() {
+        openPrivacySettings("Privacy_Automation")
+    }
+
+    /// Opens Permissions once per version when an update left islo. without
+    /// Accessibility; nothing else would tell the user why features stopped.
+    func takePermissionReminder() -> Bool {
+        guard onboardingCompleted,
+              !AXIsProcessTrusted(),
+              dashboardCommandEchoEnabled || dashboardNotificationsEnabled else {
+            return false
+        }
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
+        guard defaults.string(forKey: Key.permissionReminderBuild) != build else {
+            return false
+        }
+        defaults.set(build, forKey: Key.permissionReminderBuild)
+        return true
+    }
+
+    private func openPrivacySettings(_ anchor: String) {
         guard let url = URL(
-            string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+            string: "x-apple.systempreferences:com.apple.preference.security?\(anchor)"
         ) else { return }
         NSWorkspace.shared.open(url)
+    }
+
+    private func refreshAutomationStates() {
+        guard !isCheckingAutomation else { return }
+        isCheckingAutomation = true
+        DispatchQueue.global(qos: .utility).async {
+            var states: [AutomationTarget: PermissionState] = [:]
+            for target in AutomationTarget.allCases {
+                states[target] = Self.automationState(for: target, askUser: false)
+            }
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                isCheckingAutomation = false
+                if states != automationStates { automationStates = states }
+            }
+        }
+    }
+
+    /// Blocks while macOS shows its prompt, so never call it on the main thread.
+    nonisolated private static func automationState(
+        for target: AutomationTarget,
+        askUser: Bool
+    ) -> PermissionState {
+        guard NSWorkspace.shared.urlForApplication(
+            withBundleIdentifier: target.rawValue
+        ) != nil else {
+            return .appNotInstalled
+        }
+
+        var address = AEAddressDesc()
+        let status: OSStatus = target.rawValue.withCString { bundleID in
+            guard AECreateDesc(
+                DescType(typeApplicationBundleID),
+                bundleID,
+                strlen(bundleID),
+                &address
+            ) == noErr else {
+                return OSStatus(procNotFound)
+            }
+            defer { AEDisposeDesc(&address) }
+            return AEDeterminePermissionToAutomateTarget(
+                &address,
+                AEEventClass(typeWildCard),
+                AEEventID(typeWildCard),
+                askUser
+            )
+        }
+
+        switch status {
+        case noErr: return .granted
+        case OSStatus(errAEEventNotPermitted): return .missing
+        case OSStatus(errAEEventWouldRequireUserConsent): return .notAsked
+        default: return .appClosed  // procNotFound: macOS only answers while it runs
+        }
+    }
+
+    /// Removes islo.'s own entry for a privacy service.
+    nonisolated private static func resetPermission(service: String) {
+        guard let bundleID = Bundle.main.bundleIdentifier else { return }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
+        process.arguments = ["reset", service, bundleID]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            return
+        }
     }
 
     private static func isLoginItemRequested(

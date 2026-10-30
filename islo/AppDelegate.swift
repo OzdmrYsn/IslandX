@@ -30,6 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var activationModeMenuItems: [NotchActivationMode: NSMenuItem] = [:]
     private var launchAtLoginMenuItem: NSMenuItem?
     private var checkForUpdatesMenuItem: NSMenuItem?
+    private var missingPermissionMenuItems: [NSMenuItem] = []
     private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -65,6 +66,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if !settings.onboardingCompleted {
             DispatchQueue.main.async { [weak self] in
                 self?.showOnboarding()
+            }
+        } else if settings.takePermissionReminder() {
+            // An update can cost islo. its Accessibility access; show the
+            // user where to restore it instead of features silently failing.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+                self?.presentSettings(destination: .permissions)
             }
         }
     }
@@ -116,6 +123,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         launchAtLoginMenuItem?.state = settings.launchAtLogin ? .on : .off
         checkForUpdatesMenuItem?.isEnabled = updateManager.canCheckForUpdates
+        settings.refreshPermissionState()
+        updateMissingPermissionMenuItems()
+    }
+
+    private func updateMissingPermissionMenuItems() {
+        let isHidden = settings.missingPermissionCount == 0
+        missingPermissionMenuItems.forEach { $0.isHidden = isHidden }
     }
 
     private func configureNotifications() {
@@ -172,6 +186,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         let menu = NSMenu(title: "islo.")
         menu.delegate = self
+
+        let permissionItem = menuItem(
+            title: localized("İzin eksik — Düzelt…", "Permission missing — Fix…"),
+            action: #selector(showPermissionSettings)
+        )
+        permissionItem.image = NSImage(
+            systemSymbolName: "exclamationmark.triangle.fill",
+            accessibilityDescription: nil
+        )
+        let permissionSeparator = NSMenuItem.separator()
+        missingPermissionMenuItems = [permissionItem, permissionSeparator]
+        menu.addItem(permissionItem)
+        menu.addItem(permissionSeparator)
+        updateMissingPermissionMenuItems()
 
         menu.addItem(
             menuItem(
@@ -367,7 +395,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc
+    private func showPermissionSettings() {
+        presentSettings(destination: .permissions)
+    }
+
+    @objc
     private func showSettings() {
+        presentSettings(destination: nil)
+    }
+
+    private func presentSettings(destination: SettingsDestination?) {
         if settingsWindowController == nil {
             settingsWindowController = SettingsWindowController(
                 settings: settings,
@@ -377,7 +414,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             )
         }
 
-        settingsWindowController?.present()
+        settingsWindowController?.present(destination: destination)
     }
 
     private func showOnboarding() {

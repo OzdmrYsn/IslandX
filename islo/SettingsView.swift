@@ -1,6 +1,7 @@
+import Combine
 import SwiftUI
 
-private enum SettingsDestination: String, CaseIterable, Identifiable {
+enum SettingsDestination: String, CaseIterable, Identifiable {
     case general, appearance, interaction, modules, permissions, updates, about
     var id: String { rawValue }
 
@@ -29,9 +30,15 @@ private enum SettingsDestination: String, CaseIterable, Identifiable {
     }
 }
 
+/// Lets the menu bar and launch reminders open Settings on a given page.
+final class SettingsRouter: ObservableObject {
+    @Published var requestedDestination: SettingsDestination?
+}
+
 struct SettingsView: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject private var updateManager = UpdateManager.shared
+    var router: SettingsRouter?
     var onShowOnboarding: () -> Void = {}
     @State private var selection: SettingsDestination = .general
 
@@ -54,6 +61,17 @@ struct SettingsView: View {
         .background(Color(nsColor: .windowBackgroundColor))
         .preferredColorScheme(settings.theme.colorScheme)
         .tint(accent)
+        .onReceive(router?.$requestedDestination.eraseToAnyPublisher() ?? Empty().eraseToAnyPublisher()) { destination in
+            guard let destination else { return }
+            selection = destination
+            router?.requestedDestination = nil
+        }
+        // macOS doesn't announce permission changes; re-read them while
+        // Settings is open so badges update as soon as access is granted.
+        .onAppear(perform: settings.refreshPermissionState)
+        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
+            settings.refreshPermissionState()
+        }
     }
 
     private var sidebar: some View {
@@ -74,7 +92,18 @@ struct SettingsView: View {
                     Button {
                         withAnimation(.easeInOut(duration: 0.16)) { selection = destination }
                     } label: {
-                        Label(destination.title(settings.language), systemImage: destination.symbol)
+                        HStack(spacing: 8) {
+                            Label(destination.title(settings.language), systemImage: destination.symbol)
+                            Spacer(minLength: 0)
+                            if destination == .permissions, settings.missingPermissionCount > 0 {
+                                Text("\(settings.missingPermissionCount)")
+                                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                                    .foregroundStyle(.white)
+                                    .frame(minWidth: 18, minHeight: 18)
+                                    .background(Capsule().fill(Color.orange))
+                                    .help(text("Eksik izin var", "A permission is missing"))
+                            }
+                        }
                             .font(.system(size: 13, weight: selection == destination ? .semibold : .medium))
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 12).frame(height: 36)
@@ -124,6 +153,11 @@ struct SettingsView: View {
 
     private var generalPage: some View {
         VStack(spacing: 16) {
+            if settings.missingPermissionCount > 0 {
+                noticeCard(symbol: "exclamationmark.triangle.fill", message: text("Bazı izinler eksik, bu yüzden bazı özellikler çalışmıyor.", "Some permissions are missing, so some features don't work."), buttonTitle: text("İzinlere git", "Go to Permissions")) {
+                    withAnimation(.easeInOut(duration: 0.16)) { selection = .permissions }
+                }
+            }
             settingsCard(title: text("Tercihler", "Preferences")) {
                 settingsRow(symbol: "globe", title: text("Dil", "Language"), subtitle: text("Uygulama arayüzünün dilini seçin.", "Choose the app interface language.")) {
                     Picker("", selection: $settings.language) {
@@ -241,43 +275,132 @@ struct SettingsView: View {
 
     private var permissionsPage: some View {
         VStack(spacing: 16) {
+            permissionSummary
             settingsCard(title: text("Sistem izinleri", "System permissions")) {
                 settingsRow(symbol: "hand.raised.fill", title: text("Erişilebilirlik", "Accessibility"), subtitle: text("Bildirimleri çentikte göstermek, ses ve parlaklıkta macOS'un kendi göstergesini gizlemek, yapıştırma ve medya tuşlarını algılamak için gerekir.", "Needed to show notifications in the notch, hide macOS's own volume and brightness indicator, and detect paste and media keys.")) {
-                    permissionStatus(granted: settings.isAccessibilityTrusted) {
-                        settings.requestAccessibilityPermission()
-                        settings.openAccessibilitySettings()
-                    }
-                }
-                rowDivider
-                settingsRow(symbol: "music.note", title: text("Otomasyon: Music ve Spotify", "Automation: Music and Spotify"), subtitle: text("Çalan parçayı göstermek ve kontrol etmek için. macOS bu izni Music veya Spotify ilk açıldığında kendisi sorar.", "To show and control the current track. macOS asks for this itself the first time Music or Spotify runs.")) {
-                    Button(text("Ayarları aç", "Open Settings")) {
-                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation") {
-                            NSWorkspace.shared.open(url)
+                    HStack(spacing: 10) {
+                        permissionBadge(settings.isAccessibilityTrusted ? .granted : .missing)
+                        if !settings.isAccessibilityTrusted {
+                            Button(text("İzin ver", "Allow"), action: settings.requestAccessibilityPermission)
+                                .buttonStyle(.borderedProminent)
                         }
                     }
                 }
+                if !settings.isAccessibilityTrusted {
+                    accessibilitySteps
+                }
+                ForEach(AutomationTarget.allCases) { target in
+                    rowDivider
+                    automationRow(target)
+                }
             }
-            if !settings.isAccessibilityTrusted {
-                noticeCard(symbol: "info.circle.fill", message: text("İzni verdikten sonra ayar burada kendiliğinden güncellenir; uygulamayı yeniden başlatmanız gerekmez.", "Once you grant access, this page updates by itself; no restart needed."))
-            }
-        }
-        .onAppear(perform: settings.refreshPermissionState)
-        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
-            settings.refreshPermissionState()
         }
     }
 
-    private func permissionStatus(granted: Bool, request: @escaping () -> Void) -> some View {
-        Group {
-            if granted {
-                Label(text("İzin verildi", "Allowed"), systemImage: "checkmark.circle.fill")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.green)
-            } else {
-                Button(text("İzin ver", "Allow"), action: request)
+    private var permissionSummary: some View {
+        let missing = settings.missingPermissionCount
+        return HStack(spacing: 14) {
+            Image(systemName: missing == 0 ? "checkmark.shield.fill" : "exclamationmark.shield.fill")
+                .font(.system(size: 26, weight: .semibold))
+                .foregroundStyle(missing == 0 ? Color.green : Color.orange)
+                .frame(width: 34)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(missing == 0 ? text("Her şey hazır", "All set") : text("\(missing) izin eksik", missing == 1 ? "1 permission missing" : "\(missing) permissions missing"))
+                    .font(.system(size: 15, weight: .semibold))
+                Text(missing == 0 ? text("islo.'nun ihtiyaç duyduğu izinlerin hepsi verilmiş.", "islo. has every permission it needs.") : missingPermissionImpact)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(16)
+        .background(cardBackground)
+    }
+
+    private var missingPermissionImpact: String {
+        var parts: [String] = []
+        if !settings.isAccessibilityTrusted {
+            parts.append(text("Bildirimler çentikte görünmüyor ve ses/parlaklıkta macOS'un kendi göstergesi de çıkıyor.", "Notifications don't reach the notch, and macOS's own volume/brightness indicator still appears."))
+        }
+        let blocked = AutomationTarget.allCases.filter { settings.automationStates[$0] == .missing }.map(\.name)
+        if !blocked.isEmpty {
+            let names = blocked.joined(separator: ", ")
+            parts.append(text("\(names) çalan parçası gösterilemiyor ve kontrol edilemiyor.", "\(names) playback can't be shown or controlled."))
+        }
+        return parts.joined(separator: " ")
+    }
+
+    private var accessibilitySteps: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            permissionStep(1, text("“İzin ver”e basın. macOS bir izin penceresi açar.", "Click “Allow”. macOS shows a permission prompt."))
+            permissionStep(2, text("“Sistem Ayarları'nı Aç”ı seçin ve listede islo.'nun anahtarını açın.", "Choose “Open System Settings” and switch islo. on in the list."))
+            permissionStep(3, text("Bu sayfa birkaç saniye içinde kendiliğinden “Verildi” olur.", "This page changes to “Allowed” by itself within seconds."))
+            Text(text("Güncellemeden sonra islo. listede açık görünse bile burada “Eksik” yazıyorsa yine “İzin ver”e basın; islo. eski kaydı kendisi temizler.", "If islo. looks switched on in the list after an update but this still says “Missing”, click “Allow” anyway; islo. clears the old entry itself."))
+                .font(.caption2).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 2)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.orange.opacity(0.08)))
+        .padding(.leading, 48)
+        .padding(.bottom, 10)
+    }
+
+    private func permissionStep(_ number: Int, _ message: String) -> some View {
+        HStack(spacing: 9) {
+            Text("\(number)")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .frame(width: 18, height: 18)
+                .background(Circle().fill(Color.orange))
+            Text(message).font(.caption).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func automationRow(_ target: AutomationTarget) -> some View {
+        let state = settings.automationStates[target] ?? .appClosed
+        return settingsRow(symbol: target == .music ? "music.note" : "waveform", title: text("Otomasyon: \(target.name)", "Automation: \(target.name)"), subtitle: automationSubtitle(state)) {
+            HStack(spacing: 10) {
+                permissionBadge(state)
+                if state == .missing || state == .notAsked {
+                    Button(state == .missing ? text("Düzelt", "Fix") : text("İzin ver", "Allow")) {
+                        settings.requestAutomationPermission(for: target)
+                    }
                     .buttonStyle(.borderedProminent)
+                }
             }
         }
+    }
+
+    private func automationSubtitle(_ state: PermissionState) -> String {
+        switch state {
+        case .missing:
+            text("Kapalı olduğu için çalan parça gösterilemiyor ve kontrol edilemiyor. “Düzelt” macOS'un yeniden sormasını sağlar.", "It's off, so the current track can't be shown or controlled. “Fix” makes macOS ask again.")
+        case .appClosed:
+            text("Çalan parçayı göstermek ve kontrol etmek için. Durumu, uygulama açıkken görünür.", "To show and control the current track. Its status shows while the app is open.")
+        case .appNotInstalled:
+            text("Bu Mac'te yüklü değil.", "Not installed on this Mac.")
+        case .granted, .notAsked:
+            text("Çalan parçayı göstermek ve kontrol etmek için.", "To show and control the current track.")
+        }
+    }
+
+    private func permissionBadge(_ state: PermissionState) -> some View {
+        let style: (title: String, symbol: String, color: Color) = switch state {
+        case .granted: (text("Verildi", "Allowed"), "checkmark.circle.fill", .green)
+        case .missing: (text("Eksik", "Missing"), "exclamationmark.triangle.fill", .orange)
+        case .notAsked: (text("Sorulmadı", "Not asked"), "questionmark.circle.fill", .secondary)
+        case .appClosed: (text("Uygulama kapalı", "App not running"), "moon.zzz.fill", .secondary)
+        case .appNotInstalled: (text("Yüklü değil", "Not installed"), "minus.circle.fill", .secondary)
+        }
+        return Label(style.title, systemImage: style.symbol)
+            .font(.system(size: 11.5, weight: .semibold))
+            .foregroundStyle(style.color)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 4)
+            .background(Capsule().fill(style.color.opacity(0.13)))
+            .fixedSize()
     }
 
     private var updatesPage: some View {
