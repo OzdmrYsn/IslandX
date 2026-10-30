@@ -12,6 +12,8 @@
 	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundleDisplayName</key>
+	<string>islo.</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -21,7 +23,7 @@
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>LSUIElement</key>
-	<false/>
+	<true/>
 	<key>SUAllowsAutomaticUpdates</key>
 	<true/>
 	<key>SUAutomaticallyUpdate</key>
@@ -35,7 +37,7 @@
 	<key>SUScheduledCheckInterval</key>
 	<integer>86400</integer>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>IslandX, çalan parçayı göstermek ve medya kontrollerini çalıştırmak için Music ve Spotify ile iletişim kurar.</string>
+	<string>islo., çalan parçayı göstermek ve medya kontrollerini çalıştırmak için Music ve Spotify ile iletişim kurar.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSPrefersDisplaySafeAreaCompatibilityMode</key>

@@ -325,7 +325,7 @@ struct DynamicNotchView: View {
             setPresentation(.idle)
         }
         .contextMenu {
-            Menu(localized("IslandX Düzeni", "IslandX Layout")) {
+            Menu(localized("islo. Düzeni", "islo. Layout")) {
                 ForEach(IslandContentMode.allCases) { mode in
                     Button {
                         settings.contentMode = mode
@@ -398,7 +398,7 @@ struct DynamicNotchView: View {
 
             Divider()
 
-            Button(localized("IslandX'ten Çık", "Quit IslandX")) {
+            Button(localized("islo.'dan Çık", "Quit islo.")) {
                 NSApp.terminate(nil)
             }
         }

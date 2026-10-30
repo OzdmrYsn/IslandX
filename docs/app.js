@@ -17,17 +17,17 @@ function setLanguage(language) {
   });
 
   description.content = selected === 'tr'
-    ? 'IslandX, MacBook çentiğiyle bütünleşen zarif Music ve Spotify kontrolleridir.'
-    : 'IslandX brings elegant Music and Spotify controls to your MacBook notch.';
+    ? 'islo., MacBook çentiğiyle bütünleşen medya kontrolleri ve günlük araçlardır.'
+    : 'islo. brings media controls and everyday utilities to your MacBook notch.';
 
-  localStorage.setItem('islandx-language', selected);
+  localStorage.setItem('islo-language', selected);
 }
 
 languageButtons.forEach((button) => {
   button.addEventListener('click', () => setLanguage(button.dataset.language));
 });
 
-const savedLanguage = localStorage.getItem('islandx-language');
+const savedLanguage = localStorage.getItem('islo-language') || localStorage.getItem('islandx-language');
 const browserLanguage = navigator.language.toLowerCase().startsWith('tr') ? 'tr' : 'en';
 setLanguage(savedLanguage || browserLanguage);
 

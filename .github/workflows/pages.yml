@@ -1,4 +1,4 @@
-name: Deploy IslandX website
+name: Deploy islo. website
 
 on:
   push:

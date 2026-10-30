@@ -4,7 +4,7 @@ set -euo pipefail
 project_root="${0:A:h:h}"
 cd "$project_root"
 
-repository="${ISLANDX_GITHUB_REPOSITORY:-OzdmrYsn/IslandX}"
+repository="${ISLO_GITHUB_REPOSITORY:-${ISLANDX_GITHUB_REPOSITORY:-OzdmrYsn/IslandX}}"
 info_plist="$project_root/IslandX/Info.plist"
 version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$info_plist")
 build=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$info_plist")
@@ -12,9 +12,9 @@ package_cache="$project_root/.sparkle-packages"
 derived_data=$(mktemp -d /tmp/IslandXRelease.XXXXXX)
 appcast_input=$(mktemp -d /tmp/IslandXAppcast.XXXXXX)
 trap 'rm -rf "$derived_data" "$appcast_input"' EXIT
-archive_name="IslandX-$version.zip"
+archive_name="islo-$version.zip"
 archive_path="$project_root/dist/$archive_name"
-dmg_path="$project_root/dist/IslandX.dmg"
+dmg_path="$project_root/dist/islo.dmg"
 
 mkdir -p "$project_root/dist"
 
@@ -35,7 +35,7 @@ xcodebuild \
     ONLY_ACTIVE_ARCH=NO \
     build
 
-release_app="$derived_data/Build/Products/Release/IslandX.app"
+release_app="$derived_data/Build/Products/Release/islo.app"
 /usr/bin/codesign --verify --deep --strict "$release_app"
 
 if [[ -e "$archive_path" ]]; then
@@ -74,7 +74,7 @@ else
         "$appcast_input"
 fi
 
-echo "IslandX $version ($build) hazır:"
+echo "islo. $version ($build) hazır:"
 echo "  $archive_path"
 echo "  $dmg_path"
 echo "  $project_root/appcast.xml"

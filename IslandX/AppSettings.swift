@@ -171,8 +171,8 @@ enum NotchActivationMode: String, CaseIterable, Identifiable {
         switch self {
         case .hover:
             language.value(
-                turkish: "İşaretçi IslandX'in herhangi bir yerine geldiğinde açılır.",
-                english: "Opens when the pointer reaches any part of IslandX."
+                turkish: "İşaretçi islo.'nun herhangi bir yerine geldiğinde açılır.",
+                english: "Opens when the pointer reaches any part of islo.."
             )
         case .click:
             language.value(

@@ -1,14 +1,14 @@
-# IslandX
+# islo.
 
 [Türkçe](#türkçe) · [English](#english) · [Website](https://ozdmrysn.github.io/IslandX/) · [Releases](https://github.com/OzdmrYsn/IslandX/releases)
 
-IslandX brings Music and Spotify controls to the top of macOS. It blends into the camera notch on compatible MacBooks and becomes a compact floating island on other displays.
+islo. brings Music, focus tools and quick utilities to the top of macOS. It blends into the camera notch on compatible MacBooks and becomes a compact floating island on other displays.
 
 > Minimum system: macOS 13 · Universal binary: Apple Silicon + Intel
 
 ## Türkçe
 
-IslandX, Music ve Spotify kontrollerini MacBook'un kamera çentiğiyle bütünleştiren SwiftUI + AppKit uygulamasıdır. Çentik olmayan ekranlarda ekranın üst-ortasında zarif bir yüzen ada olarak görünür.
+islo., medya kontrollerini ve günlük araçları MacBook'un kamera çentiğiyle bütünleştiren SwiftUI + AppKit uygulamasıdır. Çentik olmayan ekranlarda ekranın üst-ortasında zarif bir yüzen ada olarak görünür; Dock'ta yer kaplamadan menü çubuğundan yönetilir.
 
 ### Özellikler
 
@@ -24,12 +24,14 @@ IslandX, Music ve Spotify kontrollerini MacBook'un kamera çentiğiyle bütünle
 - Sistem, Beyaz, Siyah ve desteklenen macOS sürümlerinde Liquid Glass görünümü
 - Türkçe/İngilizce ilk kurulum rehberi
 - Açılışta başlatma ve Sparkle tabanlı imzalı güncellemeler
+- İsteğe bağlı Command Echo, Pomodoro, Uyanık Tut ve Dosya Rafı + AirDrop modülleri
+- Dock simgesi olmadan menü çubuğunda çalışma
 - Tüm Spaces ve tam ekran uygulamalarla çalışma
 
 ### Kurulum
 
-1. [IslandX DMG dosyasını](https://github.com/OzdmrYsn/IslandX/releases/latest/download/IslandX.dmg) indirin ve açın.
-2. `IslandX.app` uygulamasını aynı penceredeki **Applications / Uygulamalar** kısayoluna sürükleyin.
+1. [Son sürüm sayfasından](https://github.com/OzdmrYsn/IslandX/releases/latest) islo. DMG dosyasını indirin ve açın.
+2. `islo.app` uygulamasını aynı penceredeki **Applications / Uygulamalar** kısayoluna sürükleyin.
 3. İlk açılışta uygulamaya Control-tıklayıp **Aç** seçeneğini kullanın.
 4. Music veya Spotify kontrolü için macOS'un istediği **Automation** iznine onay verin.
 
@@ -43,7 +45,7 @@ Apple Developer ID ile notarizasyon henüz tamamlanmadığı için ilk açılı�
 
 ## English
 
-IslandX is a SwiftUI + AppKit app that blends Music and Spotify controls into the MacBook camera notch. On displays without a notch, it appears as an elegant floating island at the top center of the screen.
+islo. is a SwiftUI + AppKit app that blends media controls and everyday utilities into the MacBook camera notch. On displays without a notch, it appears as an elegant floating island at the top center and runs from the menu bar without occupying the Dock.
 
 ### Features
 
@@ -59,12 +61,14 @@ IslandX is a SwiftUI + AppKit app that blends Music and Spotify controls into th
 - System, White, Black, and Liquid Glass appearances on supported macOS versions
 - Turkish and English first-run guide
 - Launch at login and signed Sparkle updates
+- Optional Command Echo, Pomodoro, Keep Awake, and File Shelf + AirDrop modules
+- Menu-bar operation without a Dock icon
 - Works across Spaces and over full-screen apps
 
 ### Installation
 
-1. Download and open the latest [IslandX DMG](https://github.com/OzdmrYsn/IslandX/releases/latest/download/IslandX.dmg).
-2. Drag `IslandX.app` onto the **Applications** shortcut in the same window.
+1. Download and open the islo. DMG from the [latest release page](https://github.com/OzdmrYsn/IslandX/releases/latest).
+2. Drag `islo.app` onto the **Applications** shortcut in the same window.
 3. On first launch, Control-click the app and choose **Open**.
 4. Approve the macOS **Automation** request to control Music or Spotify.
 
@@ -87,13 +91,13 @@ The app is not yet notarized with an Apple Developer ID, so macOS may show a sec
 
 ## Updates and releases
 
-IslandX uses Sparkle 2 with an EdDSA-signed appcast. The private key remains in the developer's macOS Keychain and must never be committed.
+islo. uses Sparkle 2 with an EdDSA-signed appcast. The private key remains in the developer's macOS Keychain and must never be committed.
 
 To prepare a new release:
 
 1. Increase `CFBundleShortVersionString` and `CFBundleVersion`.
 2. Run `scripts/create-release.sh`.
-3. Upload `dist/IslandX-VERSION.zip` and `dist/IslandX.dmg` to a GitHub Release tagged `vVERSION`.
+3. Upload `dist/islo-VERSION.zip` and `dist/islo.dmg` to a GitHub Release tagged `vVERSION`.
 4. Commit and publish the regenerated `appcast.xml` after the ZIP is available.
 
 Developer ID signing and notarization are recommended for polished public distribution. The current ad-hoc signature is intended for development and early GitHub releases.

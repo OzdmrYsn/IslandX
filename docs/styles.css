@@ -1,13 +1,13 @@
 :root {
   color-scheme: light;
-  --ink: #0e1222;
-  --muted: #626a7d;
-  --line: rgba(24, 35, 64, .11);
+  --ink: #252438;
+  --muted: #686678;
+  --line: rgba(37, 36, 56, .12);
   --surface: rgba(255, 255, 255, .82);
-  --blue: #1677ff;
-  --cyan: #19d5f7;
-  --purple: #8a3ffc;
-  --shadow: 0 28px 90px rgba(33, 53, 112, .15);
+  --blue: #f39a77;
+  --cyan: #ffc7ba;
+  --purple: #e18c92;
+  --shadow: 0 28px 90px rgba(69, 49, 62, .14);
 }
 
 * { box-sizing: border-box; }
@@ -16,9 +16,9 @@ body {
   margin: 0;
   color: var(--ink);
   background:
-    radial-gradient(circle at 14% 1%, rgba(33, 200, 255, .13), transparent 27rem),
-    radial-gradient(circle at 88% 12%, rgba(137, 63, 252, .11), transparent 28rem),
-    #f8faff;
+    radial-gradient(circle at 14% 1%, rgba(255, 194, 181, .28), transparent 27rem),
+    radial-gradient(circle at 88% 12%, rgba(243, 154, 119, .16), transparent 28rem),
+    #fffaf8;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
 }
@@ -57,22 +57,22 @@ nav a:hover { color: var(--ink); }
 .language-button.active { color: var(--ink); background: white; box-shadow: 0 3px 10px rgba(28, 41, 84, .12); }
 
 .hero { min-height: 760px; padding: 88px 0 72px; display: grid; grid-template-columns: .9fr 1.1fr; align-items: center; gap: 64px; }
-.eyebrow { display: inline-block; color: #315dca; font-size: 12px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+.eyebrow { display: inline-block; color: #c96f57; font-size: 12px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
 h1, h2, h3, p { margin-top: 0; }
 h1 { margin: 17px 0 24px; font-size: clamp(48px, 6vw, 78px); line-height: .98; letter-spacing: -.055em; }
 .hero-copy > p { max-width: 610px; color: var(--muted); font-size: 18px; line-height: 1.65; }
 .hero-actions { margin-top: 30px; display: flex; flex-wrap: wrap; gap: 12px; }
 .button { min-height: 48px; padding: 0 20px; display: inline-flex; align-items: center; justify-content: center; border-radius: 15px; font-size: 14px; font-weight: 750; text-decoration: none; transition: transform .2s ease, box-shadow .2s ease; }
 .button:hover { transform: translateY(-2px); }
-.button-primary { color: white; background: linear-gradient(135deg, #0d79f9, #6551f4); box-shadow: 0 12px 30px rgba(43, 94, 236, .28); }
+.button-primary { color: #252438; background: linear-gradient(135deg, #ffc9bd, #f29b78); box-shadow: 0 12px 30px rgba(217, 126, 94, .24); }
 .button-secondary { border: 1px solid var(--line); background: rgba(255,255,255,.72); }
 .compatibility { margin-top: 18px !important; font-size: 12px !important; }
 
 .hero-stage { position: relative; min-height: 540px; display: grid; place-items: center; }
 .ambient { position: absolute; border-radius: 999px; filter: blur(9px); }
-.ambient-one { width: 430px; height: 430px; background: rgba(29, 211, 255, .2); animation: float 8s ease-in-out infinite; }
-.ambient-two { width: 330px; height: 330px; right: 2%; top: 4%; background: rgba(140, 63, 252, .19); animation: float 9s ease-in-out -3s infinite reverse; }
-.mac-screen { position: relative; width: min(620px, 100%); aspect-ratio: 1.22; overflow: hidden; border: 1px solid rgba(255,255,255,.9); border-radius: 40px; background: linear-gradient(145deg, #eff8ff 0%, #eaf0ff 46%, #f5edff 100%); box-shadow: var(--shadow), inset 0 0 0 1px rgba(83,103,171,.08); }
+.ambient-one { width: 430px; height: 430px; background: rgba(255, 195, 181, .32); animation: float 8s ease-in-out infinite; }
+.ambient-two { width: 330px; height: 330px; right: 2%; top: 4%; background: rgba(243, 154, 119, .22); animation: float 9s ease-in-out -3s infinite reverse; }
+.mac-screen { position: relative; width: min(620px, 100%); aspect-ratio: 1.22; overflow: hidden; border: 1px solid rgba(255,255,255,.9); border-radius: 40px; background: linear-gradient(145deg, #fff4f0 0%, #ffe9e3 46%, #fff8f3 100%); box-shadow: var(--shadow), inset 0 0 0 1px rgba(92,68,80,.08); }
 .menu-line { position: absolute; z-index: 0; inset: 0 0 auto; height: 32px; border-bottom: 1px solid rgba(20,30,60,.07); background: rgba(255,255,255,.42); }
 .notch-demo { position: absolute; z-index: 3; top: 0; left: 50%; width: 48%; min-width: min(280px, calc(100% - 24px)); height: 46px; transform: translateX(-50%); overflow: hidden; color: white; border-radius: 0 0 21px 21px; background: #050506; box-shadow: 0 12px 35px rgba(4, 9, 22, .24); animation: islandMorph 7s cubic-bezier(.65,0,.25,1) infinite; }
 .demo-top { height: 35px; }

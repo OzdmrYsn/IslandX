@@ -23,9 +23,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // A regular activation policy keeps the custom app icon visible in Dock.
-        // The floating panel itself remains borderless and non-activating.
-        NSApp.setActivationPolicy(.regular)
+        // The app lives in the menu bar and notch without occupying the Dock.
+        NSApp.setActivationPolicy(.accessory)
         applyDockIcon()
         settings.applyApplicationAppearance()
         configureMenuBarItem()
@@ -141,20 +140,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = item.button {
             let image = NSImage(
-                systemSymbolName: "waveform.circle.fill",
-                accessibilityDescription: "IslandX"
+                systemSymbolName: "face.smiling",
+                accessibilityDescription: "islo."
             )
             image?.isTemplate = true
             button.image = image
-            button.toolTip = "IslandX Media Controls"
+            button.toolTip = "islo."
         }
 
-        let menu = NSMenu(title: "IslandX")
+        let menu = NSMenu(title: "islo.")
         menu.delegate = self
 
         menu.addItem(
             menuItem(
-                title: localized("IslandX'i Göster", "Show IslandX"),
+                title: localized("islo.'yu Göster", "Show islo."),
                 action: #selector(showIsland)
             )
         )
@@ -249,7 +248,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
         menu.addItem(
             menuItem(
-                title: localized("IslandX'ten Çık", "Quit IslandX"),
+                title: localized("islo.'dan Çık", "Quit islo."),
                 action: #selector(quitApplication),
                 keyEquivalent: "q"
             )

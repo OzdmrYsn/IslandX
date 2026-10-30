@@ -16,8 +16,8 @@ final class SettingsWindowController: NSWindowController {
             defer: false
         )
         window.title = settings.language.value(
-            turkish: "IslandX Ayarları",
-            english: "IslandX Settings"
+            turkish: "islo. Ayarları",
+            english: "islo. Settings"
         )
         window.contentViewController = NSHostingController(rootView: rootView)
         window.isReleasedWhenClosed = false
@@ -66,8 +66,8 @@ final class OnboardingWindowController: NSWindowController {
             defer: false
         )
         window.title = settings.language.value(
-            turkish: "IslandX'e Hoş Geldiniz",
-            english: "Welcome to IslandX"
+            turkish: "islo.'ya Hoş Geldiniz",
+            english: "Welcome to islo."
         )
         window.titlebarAppearsTransparent = true
         window.isMovableByWindowBackground = true

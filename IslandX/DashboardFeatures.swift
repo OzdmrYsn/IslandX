@@ -235,7 +235,7 @@ final class KeepAwakeManager: ObservableObject {
         if active {
             activity = ProcessInfo.processInfo.beginActivity(
                 options: [.idleSystemSleepDisabled, .idleDisplaySleepDisabled, .userInitiated],
-                reason: "IslandX Keep Awake"
+                reason: "islo. Keep Awake"
             )
         } else if let activity {
             ProcessInfo.processInfo.endActivity(activity)

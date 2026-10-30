@@ -20,8 +20,8 @@ struct SettingsView: View {
 
                 Toggle(
                     text(
-                        "Mac açıldığında IslandX'i başlat",
-                        "Launch IslandX when I log in"
+                        "Mac açıldığında islo.'yu başlat",
+                        "Launch islo. when I log in"
                     ),
                     isOn: launchAtLoginBinding
                 )
@@ -52,7 +52,7 @@ struct SettingsView: View {
 
             Section(text("Görünüm", "Appearance")) {
                 Picker(
-                    text("IslandX düzeni", "IslandX layout"),
+                    text("islo. düzeni", "islo. layout"),
                     selection: $settings.contentMode
                 ) {
                     ForEach(IslandContentMode.allCases) { mode in
@@ -143,8 +143,8 @@ struct SettingsView: View {
 
                 Toggle(
                     text(
-                        "Tam ekran uygulamalarda IslandX'i gizle",
-                        "Hide IslandX over full-screen apps"
+                        "Tam ekran uygulamalarda islo.'yu gizle",
+                        "Hide islo. over full-screen apps"
                     ),
                     isOn: $settings.hideInFullScreen
                 )
@@ -253,8 +253,8 @@ struct SettingsView: View {
                 LabeledContent(text("Menü çubuğu", "Menu bar")) {
                     Text(
                         text(
-                            "Ayarlar ve hızlı işlemler için IslandX simgesini kullanın.",
-                            "Use the IslandX icon for settings and quick actions."
+                            "Ayarlar ve hızlı işlemler için islo. menü çubuğu simgesini kullanın.",
+                            "Use the islo. menu bar icon for settings and quick actions."
                         )
                     )
                         .foregroundStyle(.secondary)
@@ -300,7 +300,7 @@ struct SettingsView: View {
         let version = Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
         ) as? String ?? "—"
-        return "IslandX \(version)"
+        return "islo. \(version)"
     }
 }
 

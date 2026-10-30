@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if (( $# < 2 || $# > 3 )); then
-    echo "Usage: $0 /path/to/IslandX.app /path/to/IslandX.dmg [version]" >&2
+    echo "Usage: $0 /path/to/islo.app /path/to/islo.dmg [version]" >&2
     exit 64
 fi
 
@@ -18,7 +18,7 @@ fi
 staging_dir=$(mktemp -d /tmp/IslandXDMG.XXXXXX)
 trap 'rm -rf "$staging_dir"' EXIT
 
-/usr/bin/ditto "$app_path" "$staging_dir/IslandX.app"
+/usr/bin/ditto "$app_path" "$staging_dir/islo.app"
 /bin/ln -s /Applications "$staging_dir/Applications"
 
 /bin/mkdir -p "${dmg_path:h}"
@@ -27,7 +27,7 @@ if [[ -e "$dmg_path" ]]; then
 fi
 
 /usr/sbin/diskutil image create from \
-    --volumeName "IslandX $version" \
+    --volumeName "islo. $version" \
     --format UDZO \
     "$staging_dir" \
     "$dmg_path"

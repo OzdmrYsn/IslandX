@@ -69,7 +69,7 @@ private enum AppleScriptBridgeError: LocalizedError {
             "AppleScript could not be created."
         case let .executionFailed(message, number):
             if number == -1743 {
-                "Automation access was denied. Enable IslandX for Music/Spotify "
+                "Automation access was denied. Enable islo. for Music/Spotify "
                     + "in System Settings > Privacy & Security > Automation."
             } else if number == -1742 {
                 "The App Sandbox blocked media automation. Verify the Music and "

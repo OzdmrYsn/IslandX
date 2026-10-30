@@ -34,7 +34,7 @@ struct OnboardingView: View {
 
                     Button(
                         step == pageCount - 1
-                            ? text("IslandX'i Kullanmaya Başla", "Start Using IslandX")
+                            ? text("islo.'yu Kullanmaya Başla", "Start Using islo.")
                             : text("Devam", "Continue")
                     ) {
                         if step == pageCount - 1 {
@@ -115,7 +115,7 @@ struct OnboardingView: View {
                 .shadow(color: .accentColor.opacity(0.24), radius: 24)
 
             VStack(spacing: 10) {
-                Text(text("IslandX'e Hoş Geldiniz", "Welcome to IslandX"))
+                Text(text("islo.'ya Hoş Geldiniz", "Welcome to islo."))
                     .font(.system(size: 30, weight: .bold, design: .rounded))
 
                 Text(
@@ -142,8 +142,8 @@ struct OnboardingView: View {
                     symbol: "cursorarrow.motionlines",
                     title: text("Üzerine Gelin veya Tıklayın", "Hover or Click"),
                     message: text(
-                        "Oynatma kontrollerini göstermek için işaretçiyi IslandX'in üzerine getirin veya tıklayın.",
-                        "Move the pointer over IslandX or click it to reveal playback controls."
+                        "Oynatma kontrollerini göstermek için işaretçiyi islo.'nun üzerine getirin veya tıklayın.",
+                        "Move the pointer over islo. or click it to reveal playback controls."
                     )
                 )
 
@@ -160,16 +160,16 @@ struct OnboardingView: View {
                     symbol: "menubar.rectangle",
                     title: text("Menü Çubuğu Ayarları", "Menu Bar Settings"),
                     message: text(
-                        "Görünümü ve davranışı istediğiniz zaman IslandX menü çubuğu simgesinden değiştirin.",
-                        "Change appearance and behavior any time from the IslandX menu bar icon."
+                        "Görünümü ve davranışı istediğiniz zaman islo. menü çubuğu simgesinden değiştirin.",
+                        "Change appearance and behavior any time from the islo. menu bar icon."
                     )
                 )
             }
 
             Text(
                 text(
-                    "IslandX, Music veya Spotify ile ilk kez iletişim kurduğunda macOS Otomasyon izni isteyebilir.",
-                    "macOS may ask for Automation permission the first time IslandX communicates with Music or Spotify."
+                    "islo., Music veya Spotify ile ilk kez iletişim kurduğunda macOS Otomasyon izni isteyebilir.",
+                    "macOS may ask for Automation permission the first time islo. communicates with Music or Spotify."
                 )
             )
                 .font(.caption)
@@ -186,8 +186,8 @@ struct OnboardingView: View {
 
                 Text(
                     text(
-                        "IslandX'in renk ve yüzey stilini seçin. Bu seçimi daha sonra Ayarlar'dan değiştirebilirsiniz.",
-                        "Choose IslandX's color and surface style. You can change it later in Settings."
+                        "islo.'nun renk ve yüzey stilini seçin. Bu seçimi daha sonra Ayarlar'dan değiştirebilirsiniz.",
+                        "Choose islo.'s color and surface style. You can change it later in Settings."
                     )
                 )
                     .foregroundStyle(.secondary)
@@ -256,8 +256,8 @@ struct OnboardingView: View {
         choicePage(
             title: text("Nasıl açılsın?", "How should it open?"),
             message: text(
-                "IslandX'in genişletilmiş kontrolleri ne zaman göstereceğini belirleyin.",
-                "Choose when IslandX reveals its expanded controls."
+                "islo.'nun genişletilmiş kontrolleri ne zaman göstereceğini belirleyin.",
+                "Choose when islo. reveals its expanded controls."
             )
         ) {
             HStack(spacing: 12) {
@@ -369,8 +369,8 @@ struct OnboardingView: View {
 
                 Text(
                     text(
-                        "IslandX'in Mac'inizde nasıl çalışacağını belirleyin. Bu seçenekleri daha sonra Ayarlar'dan değiştirebilirsiniz.",
-                        "Choose how IslandX behaves on your Mac. You can change these options later in Settings."
+                        "islo.'nun Mac'inizde nasıl çalışacağını belirleyin. Bu seçenekleri daha sonra Ayarlar'dan değiştirebilirsiniz.",
+                        "Choose how islo. behaves on your Mac. You can change these options later in Settings."
                     )
                 )
                 .foregroundStyle(.secondary)
@@ -382,8 +382,8 @@ struct OnboardingView: View {
                 symbol: "power",
                 title: text("Mac açıldığında başlat", "Launch at login"),
                 message: text(
-                    "Oturum açtığınızda IslandX otomatik olarak hazır olur.",
-                    "IslandX is ready automatically whenever you log in."
+                    "Oturum açtığınızda islo. otomatik olarak hazır olur.",
+                    "islo. is ready automatically whenever you log in."
                 )
             ) {
                 Toggle("", isOn: launchAtLoginBinding)
