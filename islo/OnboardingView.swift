@@ -79,6 +79,10 @@ struct OnboardingView: View {
                 .font(.system(size: 15)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             permissionRow(symbol: "waveform.path", title: "Command Echo", message: text("İstediğiniz zaman Ayarlar'dan kapatabilirsiniz.", "You can turn it off any time in Settings."), isOn: $settings.dashboardCommandEchoEnabled)
             permissionRow(symbol: "tray.and.arrow.down", title: text("Dosya Rafı + AirDrop", "File Shelf + AirDrop"), message: text("Dosyaları çentiğe sürükleyin.", "Drag files onto the notch."), isOn: $settings.dashboardFileShelfEnabled)
+            Button(text("Yapıştırma ve medya tuşlarına izin ver", "Allow paste and media keys")) {
+                settings.requestAccessibilityPermission()
+            }
+            .buttonStyle(.bordered)
         } preview: {
             CommandEchoPreview()
         }

@@ -210,6 +210,13 @@ struct SettingsView: View {
                 toggleRow(symbol: "cup.and.saucer.fill", title: text("Uyanık Tut", "Keep Awake"), subtitle: text("İstediğiniz sürece Mac'in uykuya geçmesini engeller.", "Prevents your Mac from sleeping while you need it."), isOn: $settings.dashboardKeepAwakeEnabled)
                 rowDivider
                 toggleRow(symbol: "tray.full.fill", title: text("Dosya Rafı + AirDrop", "File Shelf + AirDrop"), subtitle: text("Dosyaları çentiğe bırakın, taşıyın veya AirDrop ile gönderin.", "Drop files on the notch, move them, or send them with AirDrop."), isOn: $settings.dashboardFileShelfEnabled)
+                rowDivider
+                settingsRow(symbol: "hand.raised.fill", title: text("Klavye olayları", "Keyboard events"), subtitle: text("Yapıştırma ve medya tuşlarını algılamak için Erişilebilirlik izni gerekir.", "Accessibility permission is required to detect paste and media keys.")) {
+                    Button(settings.isAccessibilityTrusted ? text("İzin verildi", "Allowed") : text("İzin ver", "Allow")) {
+                        settings.requestAccessibilityPermission()
+                    }
+                    .disabled(settings.isAccessibilityTrusted)
+                }
             }
             HStack { Spacer(); Button(text("Araç varsayılanlarını geri yükle", "Restore utility defaults")) { settings.resetDashboardFeatureDefaults() } }
         }

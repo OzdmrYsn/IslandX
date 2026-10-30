@@ -26,7 +26,7 @@ struct NotchLayout: Equatable {
     let expandedWidth: CGFloat
     let screenWidth: CGFloat
 
-    private static let compactWingWidth: CGFloat = 42
+    private static let compactWingWidth: CGFloat = 50
 
     init(screen: NSScreen?) {
         guard let screen else {
@@ -76,7 +76,7 @@ struct NotchLayout: Equatable {
     }
 
     var idleHeight: CGFloat {
-        hasCameraHousing ? notchBandHeight + 12 : 38
+        hasCameraHousing ? notchBandHeight : 38
     }
 
     var expandedShoulderHeight: CGFloat {
@@ -158,6 +158,7 @@ struct DynamicNotchView: View {
     @State private var isFileDropTargeted = false
     @State private var isCommandEchoVisible = false
     @State private var commandEchoTask: Task<Void, Never>?
+    @State private var pendingSkipDirection: MediaSkipDirection?
 
     init(
         mediaManager: MediaManager,
@@ -185,31 +186,19 @@ struct DynamicNotchView: View {
         ZStack(alignment: .top) {
             if isFileDropTargeted {
                 fileDropHUD
-                    .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
+                    .transition(.opacity)
             } else if isCommandEchoVisible {
                 commandEchoHUD
-                    .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
+                    .transition(.opacity)
             } else if presentation == .idle {
                 compactContent
-                    .transition(
-                        .opacity.combined(
-                            with: .scale(scale: 0.96, anchor: .top)
-                        )
-                    )
+                    .transition(.opacity)
             } else {
                 expandedContent
-                    .transition(
-                        .opacity.combined(
-                            with: .scale(scale: 0.96, anchor: .top)
-                        )
-                    )
+                    .transition(.opacity)
             }
         }
-        .frame(
-            width: preferredSize.width,
-            height: preferredSize.height,
-            alignment: .top
-        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background {
             if isHiddenMiniIdle && !isCommandEchoVisible && !isFileDropTargeted {
                 Color.clear
@@ -1269,6 +1258,8 @@ struct DynamicNotchView: View {
             Image(systemName: commandEchoManager.event.symbolName)
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(.white)
+                .id(commandEchoManager.revision)
+                .transition(.opacity.combined(with: .scale(scale: 0.72)))
 
             if commandEchoValue == nil {
                 Text(commandEchoTitle)
@@ -1323,7 +1314,7 @@ struct DynamicNotchView: View {
     private var commandEchoValue: Double? {
         switch commandEchoManager.event {
         case .volume(let value), .brightness(let value): value
-        case .copied, .screenshot, .capsLock: nil
+        case .copied, .pasted, .screenshot, .capsLock, .mediaSkip, .trackChanged: nil
         }
     }
 
@@ -1332,8 +1323,13 @@ struct DynamicNotchView: View {
         case .volume: localized("Ses", "Volume")
         case .brightness: localized("Parlaklık", "Brightness")
         case .copied: localized("Kopyalandı", "Copied")
+        case .pasted: localized("Yapıştırıldı", "Pasted")
         case .screenshot: localized("Ekran görüntüsü alındı", "Screenshot captured")
         case .capsLock(let enabled): enabled ? "Caps Lock" : localized("Caps Lock kapalı", "Caps Lock off")
+        case .mediaSkip(let direction): direction == .next
+            ? localized("Sonraki parça", "Next track")
+            : localized("Önceki parça", "Previous track")
+        case .trackChanged(let title, _): title
         }
     }
 
@@ -1341,7 +1337,10 @@ struct DynamicNotchView: View {
         switch commandEchoManager.event {
         case .screenshot(let filename): filename
         case .copied: localized("Panoya eklendi", "Added to clipboard")
+        case .pasted: localized("Panodan yapıştırıldı", "Pasted from clipboard")
         case .capsLock(let enabled): enabled ? localized("Açık", "On") : localized("Kapalı", "Off")
+        case .mediaSkip: localized("Parça değiştiriliyor", "Changing track")
+        case .trackChanged: artistTitle
         case .volume, .brightness: ""
         }
     }
@@ -1361,6 +1360,8 @@ struct DynamicNotchView: View {
             let duration: Duration
             if case .screenshot = commandEchoManager.event {
                 duration = .seconds(3.2)
+            } else if case .trackChanged = commandEchoManager.event {
+                duration = .seconds(2.2)
             } else {
                 duration = .seconds(1.45)
             }
@@ -1640,7 +1641,7 @@ struct DynamicNotchView: View {
             compactMediaControlButton(
                 icon: "backward.fill",
                 label: localized("Önceki parça", "Previous track"),
-                action: mediaManager.previousTrack
+                action: { skipTrack(.previous) }
             )
 
             Button(action: mediaManager.togglePlayPause) {
@@ -1657,7 +1658,7 @@ struct DynamicNotchView: View {
             compactMediaControlButton(
                 icon: "forward.fill",
                 label: localized("Sonraki parça", "Next track"),
-                action: mediaManager.nextTrack
+                action: { skipTrack(.next) }
             )
 
             compactPlaybackModeButton(
@@ -1743,7 +1744,7 @@ struct DynamicNotchView: View {
             mediaControlButton(
                 icon: "backward.fill",
                 label: localized("Önceki parça", "Previous track"),
-                action: mediaManager.previousTrack
+                action: { skipTrack(.previous) }
             )
 
             Button(action: mediaManager.togglePlayPause) {
@@ -1769,7 +1770,7 @@ struct DynamicNotchView: View {
             mediaControlButton(
                 icon: "forward.fill",
                 label: localized("Sonraki parça", "Next track"),
-                action: mediaManager.nextTrack
+                action: { skipTrack(.next) }
             )
 
             playbackModeButton(
@@ -2083,34 +2084,24 @@ struct DynamicNotchView: View {
             return
         }
 
-        hoverTask?.cancel()
-        trackChangeTask?.cancel()
-        isTemporaryTrackPreview = true
-        setPresentation(.expanded)
+        let direction: MediaSkipDirection?
+        if let pendingSkipDirection {
+            direction = pendingSkipDirection
+        } else if case .mediaSkip(let recentDirection) = commandEchoManager.event {
+            direction = recentDirection
+        } else {
+            direction = nil
+        }
+        pendingSkipDirection = nil
+        commandEchoManager.showTrackChanged(trackTitle, direction: direction)
+    }
 
-        let delay = UInt64(
-            settings.trackChangeDisplayDuration * 1_000_000_000
-        )
-        trackChangeTask = Task { @MainActor in
-            do {
-                try await Task<Never, Never>.sleep(nanoseconds: delay)
-            } catch {
-                return
-            }
-
-            guard !Task.isCancelled,
-                  !isPinned,
-                  !isInteracting else {
-                return
-            }
-
-            guard !isPointerInsideFloatingWindow else {
-                isPointerInside = true
-                return
-            }
-
-            isTemporaryTrackPreview = false
-            setPresentation(.idle)
+    private func skipTrack(_ direction: MediaSkipDirection) {
+        pendingSkipDirection = direction
+        commandEchoManager.showMediaSkip(direction)
+        switch direction {
+        case .previous: mediaManager.previousTrack()
+        case .next: mediaManager.nextTrack()
         }
     }
 
@@ -2216,12 +2207,18 @@ struct DynamicNotchView: View {
     }
 
     private var commandEchoPreferredSize: CGSize {
+        let extensionWidth: CGFloat
+        switch commandEchoManager.event {
+        case .trackChanged: extensionWidth = 380
+        case .mediaSkip: extensionWidth = 260
+        default: extensionWidth = 300
+        }
         let width = layout.hasCameraHousing
-            ? min(max(layout.cameraHousingWidth + 300, 430), layout.screenWidth - 24)
+            ? min(max(layout.cameraHousingWidth + extensionWidth, 410), layout.screenWidth - 24)
             : min(390, layout.screenWidth - 24)
         let height = layout.hasCameraHousing
-            ? max(layout.notchBandHeight + 13, 46)
-            : 46
+            ? layout.notchBandHeight
+            : 40
         return CGSize(width: width, height: height)
     }
 
@@ -2418,9 +2415,14 @@ private struct AdaptiveNotchShape: Shape {
         // edge removes the artificial sloped shoulders around it. Only the
         // lower corners are rounded, matching a Dynamic Island attached to the
         // top bezel.
+        let topRadius = min(interpolate(from: 9, to: 14, progress: progress), rect.height / 2)
         var path = Path()
-        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.move(to: CGPoint(x: rect.minX + topRadius, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX - topRadius, y: rect.minY))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.maxX, y: rect.minY + topRadius),
+            control: CGPoint(x: rect.maxX, y: rect.minY)
+        )
         path.addLine(
             to: CGPoint(x: rect.maxX, y: rect.maxY - bottomRadius)
         )
@@ -2435,7 +2437,11 @@ private struct AdaptiveNotchShape: Shape {
             to: CGPoint(x: rect.minX, y: rect.maxY - bottomRadius),
             control: CGPoint(x: rect.minX, y: rect.maxY)
         )
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + topRadius))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.minX + topRadius, y: rect.minY),
+            control: CGPoint(x: rect.minX, y: rect.minY)
+        )
         path.closeSubpath()
 
         return path

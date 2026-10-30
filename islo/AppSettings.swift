@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 import ServiceManagement
 import SwiftUI
 
@@ -541,6 +542,15 @@ final class AppSettings: ObservableObject {
 
     func openLoginItemsSettings() {
         SMAppService.openSystemSettingsLoginItems()
+    }
+
+    var isAccessibilityTrusted: Bool { AXIsProcessTrusted() }
+
+    func requestAccessibilityPermission() {
+        let options = [
+            kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true
+        ] as CFDictionary
+        _ = AXIsProcessTrustedWithOptions(options)
     }
 
     private static func isLoginItemRequested(

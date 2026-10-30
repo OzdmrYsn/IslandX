@@ -4,12 +4,22 @@ import CoreAudio
 import IOKit.graphics
 import UniformTypeIdentifiers
 
+enum MediaSkipDirection: Equatable {
+    case previous
+    case next
+
+    var symbolName: String { self == .previous ? "backward.fill" : "forward.fill" }
+}
+
 enum CommandEchoKind: Equatable {
     case volume(Double)
     case brightness(Double)
     case copied
+    case pasted
     case screenshot(String)
     case capsLock(Bool)
+    case mediaSkip(MediaSkipDirection)
+    case trackChanged(String, MediaSkipDirection?)
 
     var symbolName: String {
         switch self {
@@ -17,8 +27,11 @@ enum CommandEchoKind: Equatable {
             value == 0 ? "speaker.slash.fill" : "speaker.wave.2.fill"
         case .brightness: "sun.max.fill"
         case .copied: "doc.on.doc.fill"
+        case .pasted: "doc.on.clipboard.fill"
         case .screenshot: "camera.viewfinder"
         case .capsLock: "capslock.fill"
+        case .mediaSkip(let direction): direction.symbolName
+        case .trackChanged(_, let direction): direction?.symbolName ?? "music.note"
         }
     }
 }
@@ -34,6 +47,8 @@ final class CommandEchoManager: ObservableObject {
     private var lastPasteboardChangeCount = NSPasteboard.general.changeCount
     private var lastCapsLockState = NSEvent.modifierFlags.contains(.capsLock)
     private var screenshotObservers: [NSObjectProtocol] = []
+    private var keyboardMonitor: Any?
+    private var mediaKeyMonitor: Any?
 
     func startMonitoring() {
         guard timer == nil else { return }
@@ -42,6 +57,7 @@ final class CommandEchoManager: ObservableObject {
         lastPasteboardChangeCount = NSPasteboard.general.changeCount
         lastCapsLockState = NSEvent.modifierFlags.contains(.capsLock)
         startScreenshotMonitoring()
+        startInputMonitoring()
 
         timer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) {
             [weak self] _ in
@@ -55,11 +71,49 @@ final class CommandEchoManager: ObservableObject {
         let center = DistributedNotificationCenter.default()
         screenshotObservers.forEach(center.removeObserver)
         screenshotObservers.removeAll()
+        if let keyboardMonitor { NSEvent.removeMonitor(keyboardMonitor) }
+        if let mediaKeyMonitor { NSEvent.removeMonitor(mediaKeyMonitor) }
+        keyboardMonitor = nil
+        mediaKeyMonitor = nil
     }
 
     func showVolume(_ value: Double) {
         let normalized = value > 1 ? value / 100 : value
         publish(.volume(min(max(normalized, 0), 1)))
+    }
+
+    func showMediaSkip(_ direction: MediaSkipDirection) {
+        publish(.mediaSkip(direction))
+    }
+
+    func showTrackChanged(_ title: String, direction: MediaSkipDirection?) {
+        publish(.trackChanged(title, direction))
+    }
+
+    private func startInputMonitoring() {
+        guard keyboardMonitor == nil, mediaKeyMonitor == nil else { return }
+        keyboardMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) {
+            [weak self] event in
+            guard event.modifierFlags.contains(.command),
+                  event.charactersIgnoringModifiers?.lowercased() == "v" else { return }
+            Task { @MainActor in self?.publish(.pasted) }
+        }
+        mediaKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .systemDefined) {
+            [weak self] event in
+            guard event.subtype.rawValue == 8 else { return }
+            let data = UInt32(bitPattern: Int32(truncatingIfNeeded: event.data1))
+            let keyCode = Int((data & 0xFFFF0000) >> 16)
+            let keyFlags = Int(data & 0x0000FFFF)
+            guard keyFlags & 0xFF00 == 0x0A00 else { return }
+            let direction: MediaSkipDirection?
+            switch keyCode {
+            case 17: direction = .next
+            case 18: direction = .previous
+            default: direction = nil
+            }
+            guard let direction else { return }
+            Task { @MainActor in self?.publish(.mediaSkip(direction)) }
+        }
     }
 
     private func pollSystemState() {
