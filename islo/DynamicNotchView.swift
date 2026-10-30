@@ -126,6 +126,7 @@ struct DynamicNotchView: View {
     @ObservedObject private var audioDevices = AudioDeviceManager.shared
     @ObservedObject private var privacyMonitor = PrivacyMonitor.shared
     @ObservedObject private var lyricsManager = LyricsManager.shared
+    @ObservedObject private var weatherManager = WeatherManager.shared
     @AppStorage("dashboard.lyrics.visible") private var showsLyrics = false
     @State private var showsOutputPicker = false
 
@@ -825,10 +826,14 @@ struct DynamicNotchView: View {
     private var dashboardSidePane: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
             VStack(alignment: .leading, spacing: 7) {
-                Text(dashboardWeekday(context.date).uppercased())
-                    .font(.system(size: 9, weight: .bold))
-                    .tracking(1.2)
-                    .foregroundStyle(Color.red.opacity(0.85))
+                HStack(alignment: .center) {
+                    Text(dashboardWeekday(context.date).uppercased())
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(1.2)
+                        .foregroundStyle(Color.red.opacity(0.85))
+                    Spacer(minLength: 6)
+                    weatherChip
+                }
 
                 HStack(alignment: .firstTextBaseline) {
                     Text(dashboardDate(context.date))
@@ -843,6 +848,31 @@ struct DynamicNotchView: View {
 
                 calendarSummaryCards(now: context.date, separatorTitle: localized("Sıradaki", "Up next"))
             }
+        }
+    }
+
+    /// Icon, temperature and city; the tooltip has the day's range.
+    @ViewBuilder
+    private var weatherChip: some View {
+        if settings.weatherEnabled, let weather = weatherManager.snapshot {
+            HStack(spacing: 4) {
+                Image(systemName: WeatherManager.symbolName(code: weather.code, isDay: weather.isDay))
+                    .symbolRenderingMode(.multicolor)
+                    .font(.system(size: 11))
+                Text("\(Int(weather.temperature.rounded()))°")
+                    .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(primaryColor)
+                Text(weather.locationName)
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(primaryColor.opacity(0.5))
+                    .lineLimit(1)
+            }
+            .help(
+                WeatherManager.summary(code: weather.code, turkish: settings.language == .turkish)
+                    + localized(" · En yüksek \(Int(weather.high.rounded()))° · En düşük \(Int(weather.low.rounded()))°",
+                                " · High \(Int(weather.high.rounded()))° · Low \(Int(weather.low.rounded()))°")
+            )
+            .transition(.opacity)
         }
     }
 

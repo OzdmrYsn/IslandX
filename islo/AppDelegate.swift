@@ -335,6 +335,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             .sink { enabled in PrivacyMonitor.shared.setEnabled(enabled) }
             .store(in: &cancellables)
 
+        settings.$weatherEnabled
+            .combineLatest(settings.$weatherLocation)
+            .receive(on: RunLoop.main)
+            .sink { enabled, location in
+                WeatherManager.shared.configure(enabled: enabled, location: location)
+            }
+            .store(in: &cancellables)
+
         settings.$calendarAlertsEnabled
             .removeDuplicates()
             .receive(on: RunLoop.main)

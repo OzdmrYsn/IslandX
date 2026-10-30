@@ -42,6 +42,9 @@ struct SettingsView: View {
     var router: SettingsRouter?
     var onShowOnboarding: () -> Void = {}
     @State private var selection: SettingsDestination = .general
+    @State private var weatherQuery = ""
+    @State private var weatherResults: [WeatherLocation] = []
+    @State private var isSearchingWeather = false
 
     var body: some View {
         HStack(spacing: 0) {
@@ -263,6 +266,50 @@ struct SettingsView: View {
             }
             settingsCard(title: text("Müzik", "Music")) {
                 toggleRow(symbol: "quote.bubble.fill", title: text("Şarkı sözleri", "Lyrics"), subtitle: text("Şarkı kartındaki söz düğmesiyle sözler satır satır akar. Sözler ücretsiz LRCLIB'den gelir; bunun için şarkının adı ve sanatçısı oraya gönderilir.", "The lyrics button in the song card shows synced lyrics line by line. They come from the free LRCLIB service, which receives the song's title and artist."), isOn: $settings.lyricsEnabled)
+            }
+            settingsCard(title: text("Hava durumu", "Weather")) {
+                toggleRow(symbol: "cloud.sun.fill", title: text("Hava durumu", "Weather"), subtitle: text("Ana sayfada sıcaklık ve hava durumu. Veriler ücretsiz Open-Meteo'dan gelir; konum izni gerekmez.", "Temperature and conditions on Home, from the free Open-Meteo service; no location permission needed."), isOn: $settings.weatherEnabled)
+                if settings.weatherEnabled {
+                    rowDivider
+                    settingsRow(symbol: "mappin.and.ellipse", title: text("Şehir", "City"), subtitle: weatherLocationText) {
+                        HStack(spacing: 8) {
+                            TextField(text("Şehir ara", "Search city"), text: $weatherQuery)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 150)
+                                .onSubmit(searchWeatherCity)
+                            Button(text("Ara", "Search"), action: searchWeatherCity)
+                                .disabled(weatherQuery.trimmingCharacters(in: .whitespaces).isEmpty || isSearchingWeather)
+                            if settings.weatherLocation != nil {
+                                Button(text("Otomatik", "Automatic")) { settings.weatherLocation = nil }
+                            }
+                        }
+                    }
+                    if !weatherResults.isEmpty {
+                        VStack(alignment: .leading, spacing: 2) {
+                            ForEach(weatherResults) { location in
+                                Button {
+                                    settings.weatherLocation = location
+                                    weatherResults = []
+                                    weatherQuery = ""
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Text(location.name).font(.system(size: 12, weight: .semibold))
+                                        Text(location.detail).font(.caption).foregroundStyle(.secondary)
+                                        Spacer()
+                                    }
+                                    .padding(.horizontal, 10)
+                                    .frame(height: 26)
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(6)
+                        .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.04)))
+                        .padding(.leading, 48)
+                        .padding(.bottom, 8)
+                    }
+                }
             }
             settingsCard(title: text("Cihazlar", "Devices")) {
                 toggleRow(symbol: "battery.100percent.bolt", title: text("Şarj ve kulaklık pili", "Charging and headphone battery"), subtitle: text("Şarj takılınca ya da pil azalınca çentik haber verir; Bluetooth kulaklık (AirPods vb.) bağlanınca pil seviyelerini gösterir.", "The notch tells you when the charger is plugged in or the battery runs low, and shows Bluetooth headphones' (AirPods etc.) battery when they connect."), isOn: $settings.devicesHUDEnabled)
@@ -542,6 +589,23 @@ struct SettingsView: View {
             Spacer()
             if let buttonTitle { Button(buttonTitle, action: action) }
         }.padding(14).background(cardBackground)
+    }
+
+    private var weatherLocationText: String {
+        if let location = settings.weatherLocation {
+            return [location.name, location.detail].filter { !$0.isEmpty }.joined(separator: ", ")
+        }
+        return text("Otomatik: Mac'in saat dilimindeki şehir", "Automatic: the city in your Mac's time zone")
+    }
+
+    private func searchWeatherCity() {
+        let query = weatherQuery
+        isSearchingWeather = true
+        Task {
+            let results = await WeatherManager.search(query)
+            weatherResults = results
+            isSearchingWeather = false
+        }
     }
 
     private func text(_ turkish: String, _ english: String) -> String { settings.language.value(turkish: turkish, english: english) }

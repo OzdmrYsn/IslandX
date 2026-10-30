@@ -907,3 +907,189 @@ final class LyricsManager: ObservableObject {
         return lines.sorted { $0.time < $1.time }
     }
 }
+
+// MARK: - Weather
+
+struct WeatherLocation: Codable, Equatable, Identifiable {
+    let name: String
+    let detail: String
+    let latitude: Double
+    let longitude: Double
+
+    var id: String { "\(latitude),\(longitude)" }
+}
+
+struct WeatherSnapshot: Equatable {
+    let temperature: Double
+    let code: Int
+    let isDay: Bool
+    let high: Double
+    let low: Double
+    let locationName: String
+}
+
+/// Current weather from Open-Meteo (free, no account). The place is the
+/// city the user picked, or the one in the Mac's time zone, so no location
+/// permission is needed.
+@MainActor
+final class WeatherManager: ObservableObject {
+    static let shared = WeatherManager()
+
+    @Published private(set) var snapshot: WeatherSnapshot?
+
+    private var isEnabled = false
+    private var chosenLocation: WeatherLocation?
+    private var automaticLocation: WeatherLocation?
+    private var timer: Timer?
+    private var wakeObserver: NSObjectProtocol?
+    private var task: Task<Void, Never>?
+
+    private init() {}
+
+    var usesFahrenheit: Bool {
+        Locale.current.measurementSystem == .us
+    }
+
+    func configure(enabled: Bool, location: WeatherLocation?) {
+        let locationChanged = location != chosenLocation
+        chosenLocation = location
+        if enabled != isEnabled {
+            isEnabled = enabled
+            if enabled {
+                timer = Timer.scheduledTimer(withTimeInterval: 30 * 60, repeats: true) { _ in
+                    Task { @MainActor in WeatherManager.shared.refresh() }
+                }
+                wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+                    forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
+                ) { _ in
+                    Task { @MainActor in WeatherManager.shared.refresh() }
+                }
+            } else {
+                timer?.invalidate()
+                timer = nil
+                if let wakeObserver { NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver) }
+                wakeObserver = nil
+                task?.cancel()
+                snapshot = nil
+                return
+            }
+            refresh()
+        } else if enabled, locationChanged {
+            refresh()
+        }
+    }
+
+    func refresh() {
+        guard isEnabled else { return }
+        task?.cancel()
+        let chosen = chosenLocation
+        let fahrenheit = usesFahrenheit
+        task = Task { [weak self] in
+            guard let self else { return }
+            var location = chosen ?? self.automaticLocation
+            if location == nil {
+                location = await Self.timeZoneLocation()
+                self.automaticLocation = location
+            }
+            guard let location, !Task.isCancelled,
+                  let snapshot = await Self.forecast(for: location, fahrenheit: fahrenheit),
+                  !Task.isCancelled else { return }
+            self.snapshot = snapshot
+        }
+    }
+
+    /// "Europe/Istanbul" → Istanbul, looked up by name.
+    nonisolated static func timeZoneLocation() async -> WeatherLocation? {
+        let identifier = TimeZone.current.identifier
+        guard let city = identifier.split(separator: "/").last.map({ $0.replacingOccurrences(of: "_", with: " ") }),
+              !city.isEmpty else { return nil }
+        return await search(city).first
+    }
+
+    nonisolated static func search(_ name: String) async -> [WeatherLocation] {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+        var components = URLComponents(string: "https://geocoding-api.open-meteo.com/v1/search")
+        components?.queryItems = [
+            URLQueryItem(name: "name", value: trimmed),
+            URLQueryItem(name: "count", value: "6"),
+            URLQueryItem(name: "language", value: Locale.preferredLanguages.first?.prefix(2).description ?? "en")
+        ]
+        guard let url = components?.url,
+              let (data, _) = try? await URLSession.shared.data(from: url),
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let results = root["results"] as? [[String: Any]] else { return [] }
+        return results.compactMap { result in
+            guard let name = result["name"] as? String,
+                  let latitude = result["latitude"] as? Double,
+                  let longitude = result["longitude"] as? Double else { return nil }
+            let detail = [result["admin1"] as? String, result["country"] as? String]
+                .compactMap { $0 }
+                .joined(separator: ", ")
+            return WeatherLocation(name: name, detail: detail, latitude: latitude, longitude: longitude)
+        }
+    }
+
+    nonisolated private static func forecast(for location: WeatherLocation, fahrenheit: Bool) async -> WeatherSnapshot? {
+        var components = URLComponents(string: "https://api.open-meteo.com/v1/forecast")
+        var items = [
+            URLQueryItem(name: "latitude", value: String(location.latitude)),
+            URLQueryItem(name: "longitude", value: String(location.longitude)),
+            URLQueryItem(name: "current", value: "temperature_2m,weather_code,is_day"),
+            URLQueryItem(name: "daily", value: "temperature_2m_max,temperature_2m_min"),
+            URLQueryItem(name: "timezone", value: "auto"),
+            URLQueryItem(name: "forecast_days", value: "1")
+        ]
+        if fahrenheit { items.append(URLQueryItem(name: "temperature_unit", value: "fahrenheit")) }
+        components?.queryItems = items
+        guard let url = components?.url,
+              let (data, _) = try? await URLSession.shared.data(from: url),
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let current = root["current"] as? [String: Any],
+              let daily = root["daily"] as? [String: Any],
+              let temperature = (current["temperature_2m"] as? NSNumber)?.doubleValue,
+              let code = (current["weather_code"] as? NSNumber)?.intValue else { return nil }
+        let high = ((daily["temperature_2m_max"] as? [NSNumber])?.first?.doubleValue) ?? temperature
+        let low = ((daily["temperature_2m_min"] as? [NSNumber])?.first?.doubleValue) ?? temperature
+        return WeatherSnapshot(
+            temperature: temperature,
+            code: code,
+            isDay: (current["is_day"] as? NSNumber)?.intValue != 0,
+            high: high,
+            low: low,
+            locationName: location.name
+        )
+    }
+
+    /// SF Symbol for a WMO weather code.
+    static func symbolName(code: Int, isDay: Bool) -> String {
+        switch code {
+        case 0: isDay ? "sun.max.fill" : "moon.stars.fill"
+        case 1, 2: isDay ? "cloud.sun.fill" : "cloud.moon.fill"
+        case 3: "cloud.fill"
+        case 45, 48: "cloud.fog.fill"
+        case 51, 53, 55, 56, 57: "cloud.drizzle.fill"
+        case 65, 67, 82: "cloud.heavyrain.fill"
+        case 61, 63, 66, 80, 81: "cloud.rain.fill"
+        case 71, 73, 75, 77, 85, 86: "cloud.snow.fill"
+        case 95, 96, 99: "cloud.bolt.rain.fill"
+        default: "cloud.fill"
+        }
+    }
+
+    static func summary(code: Int, turkish: Bool) -> String {
+        switch code {
+        case 0: turkish ? "Açık" : "Clear"
+        case 1: turkish ? "Az bulutlu" : "Mostly clear"
+        case 2: turkish ? "Parçalı bulutlu" : "Partly cloudy"
+        case 3: turkish ? "Kapalı" : "Overcast"
+        case 45, 48: turkish ? "Sisli" : "Foggy"
+        case 51, 53, 55, 56, 57: turkish ? "Çiseliyor" : "Drizzle"
+        case 61, 63, 66, 80, 81: turkish ? "Yağmurlu" : "Rain"
+        case 65, 67, 82: turkish ? "Sağanak" : "Heavy rain"
+        case 71, 73, 75, 77, 85, 86: turkish ? "Karlı" : "Snow"
+        case 95, 96, 99: turkish ? "Gök gürültülü" : "Thunderstorm"
+        default: turkish ? "Bulutlu" : "Cloudy"
+        }
+    }
+}

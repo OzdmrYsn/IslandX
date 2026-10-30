@@ -344,6 +344,8 @@ final class AppSettings: ObservableObject {
         static let devicesHUDEnabled = "dashboard.devices.enabled"
         static let privacyIndicatorEnabled = "dashboard.privacy.enabled"
         static let lyricsEnabled = "dashboard.lyrics.enabled"
+        static let weatherEnabled = "dashboard.weather.enabled"
+        static let weatherLocation = "dashboard.weather.location"
         static let dashboardKeepAwakeEnabled = "dashboard.keepAwake.enabled"
         static let dashboardFileShelfEnabled = "dashboard.fileShelf.enabled"
         static let dashboardNotificationsEnabled = "dashboard.notifications.enabled"
@@ -433,6 +435,22 @@ final class AppSettings: ObservableObject {
     /// Charger plugged in or out, low battery, and headphone batteries.
     @Published var devicesHUDEnabled: Bool {
         didSet { defaults.set(devicesHUDEnabled, forKey: Key.devicesHUDEnabled) }
+    }
+
+    /// Current weather on Home, from Open-Meteo.
+    @Published var weatherEnabled: Bool {
+        didSet { defaults.set(weatherEnabled, forKey: Key.weatherEnabled) }
+    }
+
+    /// The city for the weather; nil follows the Mac's time zone.
+    @Published var weatherLocation: WeatherLocation? {
+        didSet {
+            if let weatherLocation, let data = try? JSONEncoder().encode(weatherLocation) {
+                defaults.set(data, forKey: Key.weatherLocation)
+            } else {
+                defaults.removeObject(forKey: Key.weatherLocation)
+            }
+        }
     }
 
     /// Synced lyrics in the song card, fetched from LRCLIB.
@@ -564,6 +582,9 @@ final class AppSettings: ObservableObject {
         devicesHUDEnabled = Self.bool(forKey: Key.devicesHUDEnabled, defaults: defaults, fallback: true)
         privacyIndicatorEnabled = Self.bool(forKey: Key.privacyIndicatorEnabled, defaults: defaults, fallback: true)
         lyricsEnabled = Self.bool(forKey: Key.lyricsEnabled, defaults: defaults, fallback: true)
+        weatherEnabled = Self.bool(forKey: Key.weatherEnabled, defaults: defaults, fallback: true)
+        weatherLocation = defaults.data(forKey: Key.weatherLocation)
+            .flatMap { try? JSONDecoder().decode(WeatherLocation.self, from: $0) }
         dashboardKeepAwakeEnabled = Self.bool(
             forKey: Key.dashboardKeepAwakeEnabled,
             defaults: defaults,
@@ -646,6 +667,7 @@ final class AppSettings: ObservableObject {
         devicesHUDEnabled = true
         privacyIndicatorEnabled = true
         lyricsEnabled = true
+        weatherEnabled = true
         dashboardKeepAwakeEnabled = true
         dashboardFileShelfEnabled = true
         dashboardNotificationsEnabled = true
