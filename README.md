@@ -24,7 +24,15 @@ islo., medya kontrollerini ve günlük araçları MacBook'un kamera çentiğiyle
 - Sistem, Beyaz, Siyah ve desteklenen macOS sürümlerinde Liquid Glass görünümü
 - Türkçe/İngilizce ilk kurulum rehberi
 - Açılışta başlatma ve Sparkle tabanlı imzalı güncellemeler
-- İsteğe bağlı Command Echo (macOS'un kendi ses/parlaklık göstergesinin yerine), Pomodoro, Uyanık Tut ve Dosya Rafı + AirDrop modülleri
+- İsteğe bağlı Command Echo (macOS'un kendi ses/parlaklık göstergesinin yerine), Uyanık Tut ve Dosya Rafı + AirDrop modülleri
+- Zamanlayıcı ve Pomodoro: kadranı çevirerek ya da −/+ ile özel süre, kapalı çentikte geri sayım ve "Süre doldu" uyarısı
+- Takvim: sıradaki etkinlikler, toplantıdan 5 dakika önce uyarı ve Zoom/Meet/Teams için Katıl düğmesi
+- Senkron şarkı sözleri (LRCLIB) ve şarkı kartından ses çıkışı seçimi
+- Şarj animasyonu, düşük pil uyarısı ve AirPods/kulaklık pil seviyeleri
+- Kamera/mikrofon kullanan uygulamayı gösteren gizlilik noktası
+- Ana sayfada hava durumu (Open-Meteo, konum izni gerekmez)
+- Çentiği açıp kapatan, ayarlanabilir kısayol (varsayılan ⌥Space)
+- Eksik izinleri gösteren ve tek tıkla onaran İzinler sayfası
 - Dock simgesi olmadan menü çubuğunda çalışma
 - Tüm Spaces ve tam ekran uygulamalarla çalışma
 
@@ -61,7 +69,15 @@ islo. is a SwiftUI + AppKit app that blends media controls and everyday utilitie
 - System, White, Black, and Liquid Glass appearances on supported macOS versions
 - Turkish and English first-run guide
 - Launch at login and signed Sparkle updates
-- Optional Command Echo (replaces the macOS volume and brightness indicator), Pomodoro, Keep Awake, and File Shelf + AirDrop modules
+- Optional Command Echo (replaces the macOS volume and brightness indicator), Keep Awake, and File Shelf + AirDrop modules
+- Timer and Pomodoro: any length by turning the dial or with −/+, a countdown in the closed notch, and a "Time's up" alert
+- Calendar: next events, an alert 5 minutes before meetings, and Join for Zoom/Meet/Teams
+- Synced lyrics (LRCLIB) and audio-output switching from the song card
+- Charging animation, low-battery warning, and AirPods/headphone battery levels
+- A privacy dot naming the app that uses the camera or microphone
+- Weather on Home (Open-Meteo, no location permission)
+- A customizable shortcut to open and close the notch (⌥Space by default)
+- A Permissions page that shows missing permissions and repairs them in one click
 - Menu-bar operation without a Dock icon
 - Works across Spaces and over full-screen apps
 
@@ -86,6 +102,8 @@ The app is not yet notarized with an Apple Developer ID, so macOS may show a sec
 - `AppSettings.swift`: persistent language, theme, hover behavior, launch-at-login, and onboarding state
 - `MediaManager.swift`: AppleScript integration, reactive media state, artwork, playback, and system volume
 - `DynamicNotchView.swift`: adaptive notch geometry, morph animation, themes, and media controls
+- `DashboardFeatures.swift`: Command Echo, volume/brightness key handling, clipboard, notifications, file shelf, and the focus timer
+- `LiveFeatures.swift`: calendar, power and headphone battery, audio outputs, camera/microphone use, lyrics, weather, and the global shortcut
 - `UpdateManager.swift`: Sparkle update checks and automatic-update preferences
 - `OnboardingView.swift`: bilingual first-run experience
 
