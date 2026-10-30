@@ -3,6 +3,72 @@
     <channel>
         <title>islo.</title>
         <item>
+            <title>2.1.0</title>
+            <description><![CDATA[
+<style>body{font:13px -apple-system,sans-serif;line-height:1.45}h3{margin:14px 0 4px}h4{margin:10px 0 2px}ul{padding-left:18px;margin:4px 0}</style>
+<h3>Türkçe</h3>
+<p>islo. 2.1 çentiği canlandırıyor: zamanlayıcın, toplantıların, pilin, kulaklığın ve hava durumu artık çentikte; şarkı kartı ve zamanlayıcı da baştan tasarlandı.</p>
+<h4>Yeni</h4>
+<ul>
+<li><b>Kapalı çentikte geri sayım:</b> Zamanlayıcı çalışırken kalan süre çentiğin yanlarında görünür; bitince çentik zille "Süre doldu" der. Pomodoro'da "Mola zamanı" / "Odak zamanı".</li>
+<li><b>Gerçek takvim:</b> Ana sayfa ve Takvim sekmesi sıradaki etkinlikleri gösterir. Toplantıdan 5 dakika önce çentik uyarır; Zoom, Meet, Teams ve Webex bağlantıları için yeşil <b>Katıl</b> düğmesi çıkar.</li>
+<li><b>Şarj ve kulaklık:</b> Şarj takılınca yeşil dolan pil animasyonu, %20 ve %10'da "Pil zayıf" uyarısı. AirPods ve diğer Bluetooth kulaklıklar bağlanınca sol, sağ ve kutu pil seviyeleri.</li>
+<li><b>Kamera ve mikrofon göstergesi:</b> Bir uygulama kamerayı ya da mikrofonu kullanırken çentikte yeşil/turuncu nokta ve uygulamanın adı.</li>
+<li><b>Senkron şarkı sözleri:</b> Şarkı kartındaki söz düğmesiyle sözler satır satır akar (LRCLIB).</li>
+<li><b>Ses çıkışı seçici:</b> Şarkı kartından tek tıkla hoparlör, AirPods ya da monitör arasında geçiş.</li>
+<li><b>Hava durumu:</b> Ana sayfada sıcaklık ve durum (Open-Meteo). Şehir otomatik bulunur ya da Ayarlar'dan seçilir; konum izni gerekmez.</li>
+<li><b>Kısayol tuşu:</b> ⌥Space ile çentiği her yerden aç/kapat. Kısayolu Ayarlar › Çentik ve Etkileşim'den kendin belirleyebilirsin.</li>
+<li><b>Kendi süren:</b> Zamanlayıcıda kadranı çevirerek ya da −/+ ile 3 saate kadar süre; Pomodoro'da odak ve mola süreleri ayarlanabilir. Yeni "Bugün" kartı odak süreni ve seanslarını gösterir.</li>
+</ul>
+<h4>Yeniden tasarlandı</h4>
+<ul>
+<li><b>Şarkı kartı:</b> Büyük kapak, "Şimdi çalıyor" satırı, ince ilerleme ve ses çubukları, albüm renginde hafif parıltı; altta boşluk kalmıyor.</li>
+<li><b>Zamanlayıcı:</b> Çentikli saat kadranı, ışıldayan halka ve sağda "Bugün" kartı.</li>
+<li><b>İzinler sayfası:</b> Eksik izinler turuncu "Eksik" ile işaretlenir; <b>İzin ver</b> eski kaydı temizleyip macOS'un yeniden sormasını sağlar. Kenar çubuğu, Genel sayfası ve menü çubuğu da eksik izni haber verir.</li>
+</ul>
+<h4>Düzeltmeler</h4>
+<ul>
+<li>İzinler artık güncellemelerden sonra korunuyor: islo. her sürümde aynı sertifikayla imzalanıyor.</li>
+<li>Erişilebilirlik izni olmasa da parlaklık çentikte gösteriliyor.</li>
+<li>Çentikteki "Ana ekranı özelleştir" düğmesi kaldırıldı; düzen Ayarlar › Görünüm'den seçiliyor.</li>
+</ul>
+<p><i><b>Bu güncellemeden sonra bir kereliğine:</b> islo. yeni sertifikasına geçtiği için macOS Erişilebilirlik iznini sıfırlar. islo. açılışta seni <b>Ayarlar › İzinler</b>'e götürür; <b>İzin ver</b>'e basman yeterli. Sonraki güncellemelerde izin korunur.</i></p>
+<h3>English</h3>
+<p>islo. 2.1 brings the notch to life: your timer, meetings, battery, headphones and the weather now live in the notch, and the song card and timer are redesigned.</p>
+<h4>New</h4>
+<ul>
+<li><b>Countdown in the closed notch:</b> While a timer runs, the time left shows beside the notch; when it ends, the notch rings "Time's up". Pomodoro says "Time for a break" / "Back to focus".</li>
+<li><b>Real calendar:</b> Home and the Calendar tab show your next events. Five minutes before a meeting the notch alerts you, with a green <b>Join</b> button for Zoom, Meet, Teams and Webex links.</li>
+<li><b>Charging and headphones:</b> A battery that fills green when you plug in, and "Battery low" at 20% and 10%. AirPods and other Bluetooth headphones show left, right and case battery when they connect.</li>
+<li><b>Camera and microphone indicator:</b> While an app uses the camera or microphone, the notch shows a green/orange dot and the app's name.</li>
+<li><b>Synced lyrics:</b> The lyrics button in the song card shows lyrics line by line (LRCLIB).</li>
+<li><b>Audio output switcher:</b> Move the sound between speakers, AirPods or a display in one click from the song card.</li>
+<li><b>Weather:</b> Temperature and conditions on Home (Open-Meteo). The city is found automatically or picked in Settings; no location permission needed.</li>
+<li><b>Keyboard shortcut:</b> ⌥Space opens and closes the notch from anywhere; set your own in Settings › Notch &amp; Interaction.</li>
+<li><b>Your own durations:</b> Turn the timer's dial or use −/+ for up to 3 hours; Pomodoro focus and break lengths are adjustable. A new "Today" card shows your focus time and sessions.</li>
+</ul>
+<h4>Redesigned</h4>
+<ul>
+<li><b>Song card:</b> Larger artwork, a "Now playing" line, thin progress and volume bars, a soft glow in the album's colours, and no empty space at the bottom.</li>
+<li><b>Timer:</b> A watch-style dial with ticks, a glowing ring and a "Today" card.</li>
+<li><b>Permissions page:</b> Missing permissions are marked "Missing"; <b>Allow</b> clears the stale entry and makes macOS ask again. The sidebar, the General page and the menu bar also tell you when one is missing.</li>
+</ul>
+<h4>Fixes</h4>
+<ul>
+<li>Permissions now survive updates: every release of islo. is signed with the same certificate.</li>
+<li>Brightness shows in the notch even without Accessibility access.</li>
+<li>The "Customize Home" button is gone from the notch; pick the layout in Settings › Appearance.</li>
+</ul>
+<p><i><b>Once, after this update:</b> islo. moves to its new certificate, so macOS resets the Accessibility permission. islo. opens <b>Settings › Permissions</b> at launch; just click <b>Allow</b>. Later updates keep the permission.</i></p>
+]]></description>
+            <pubDate>Sat, 31 Oct 2026 01:17:20 +0300</pubDate>
+            <link>https://github.com/OzdmrYsn/islo</link>
+            <sparkle:version>16</sparkle:version>
+            <sparkle:shortVersionString>2.1.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/OzdmrYsn/islo/releases/download/v2.1.0/islo-2.1.0.zip" length="4504022" type="application/octet-stream" sparkle:edSignature="temzsnYKF532YcEac1Quzo4i9zhj6akwS3JioWR/UmiduXTKGv17bskG37M+BI7og0oAuqf3gX+c/9lF222dBA=="/>
+        </item>
+        <item>
             <title>2.0.0</title>
             <description><![CDATA[
 <style>body{font:13px -apple-system,sans-serif;line-height:1.45}h3{margin:14px 0 4px}h4{margin:10px 0 2px}ul{padding-left:18px;margin:4px 0}</style>
@@ -85,15 +151,6 @@
             <sparkle:shortVersionString>1.8.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
             <enclosure url="https://github.com/OzdmrYsn/islo/releases/download/v1.8.0/islo-1.8.0.zip" length="2413664" type="application/octet-stream" sparkle:edSignature="qZUggrBb9gXxaFUoMCj6q5w0ifj04ECOJ+W5iAh2NtRnxoa5hTFyIX046Q9d4mMpZurORUy9CEkKu0iWToWuAw=="/>
-        </item>
-        <item>
-            <title>1.7.1</title>
-            <pubDate>Thu, 29 Oct 2026 03:11:28 +0300</pubDate>
-            <link>https://github.com/OzdmrYsn/islo</link>
-            <sparkle:version>13</sparkle:version>
-            <sparkle:shortVersionString>1.7.1</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/OzdmrYsn/islo/releases/download/v1.7.1/islo-1.7.1.zip" length="4097507" type="application/octet-stream" sparkle:edSignature="eC9JlrcWJ5ZgK8yxXCg7rYAA6QMX8BsisNbq2VLS2U01o2LG+Mgh9u+n1LZw6vagRVwrUhpoYMjmBT/TISQGCg=="/>
         </item>
     </channel>
 </rss>
