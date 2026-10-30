@@ -30,7 +30,7 @@ islo., medya kontrollerini ve günlük araçları MacBook'un kamera çentiğiyle
 
 ### Kurulum
 
-1. [Son sürüm sayfasından](https://github.com/OzdmrYsn/IslandX/releases/latest) islo. DMG dosyasını indirin ve açın.
+1. [islo. DMG dosyasını](https://github.com/OzdmrYsn/IslandX/releases/latest/download/islo.dmg) indirin ve açın.
 2. `islo.app` uygulamasını aynı penceredeki **Applications / Uygulamalar** kısayoluna sürükleyin.
 3. İlk açılışta uygulamaya Control-tıklayıp **Aç** seçeneğini kullanın.
 4. Music veya Spotify kontrolü için macOS'un istediği **Automation** iznine onay verin.
@@ -67,7 +67,7 @@ islo. is a SwiftUI + AppKit app that blends media controls and everyday utilitie
 
 ### Installation
 
-1. Download and open the islo. DMG from the [latest release page](https://github.com/OzdmrYsn/IslandX/releases/latest).
+1. Download and open the latest [islo. DMG](https://github.com/OzdmrYsn/IslandX/releases/latest/download/islo.dmg).
 2. Drag `islo.app` onto the **Applications** shortcut in the same window.
 3. On first launch, Control-click the app and choose **Open**.
 4. Approve the macOS **Automation** request to control Music or Spotify.
