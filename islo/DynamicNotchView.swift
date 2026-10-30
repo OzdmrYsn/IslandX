@@ -2415,13 +2415,24 @@ private struct AdaptiveNotchShape: Shape {
         // edge removes the artificial sloped shoulders around it. Only the
         // lower corners are rounded, matching a Dynamic Island attached to the
         // top bezel.
-        let topRadius = min(interpolate(from: 9, to: 14, progress: progress), rect.height / 2)
+        let topRadius = min(
+            interpolate(from: 10, to: 16, progress: progress),
+            rect.height / 2
+        )
         var path = Path()
         path.move(to: CGPoint(x: rect.minX + topRadius, y: rect.minY))
         path.addLine(to: CGPoint(x: rect.maxX - topRadius, y: rect.minY))
+
+        // These are deliberately concave shoulders, not ordinary rounded
+        // rectangle corners. The edge first comes down from the top bezel and
+        // then opens outward into the software wings, so the notch feels
+        // attached to the display instead of looking like a floating pill.
         path.addQuadCurve(
             to: CGPoint(x: rect.maxX, y: rect.minY + topRadius),
-            control: CGPoint(x: rect.maxX, y: rect.minY)
+            control: CGPoint(
+                x: rect.maxX - topRadius,
+                y: rect.minY + topRadius
+            )
         )
         path.addLine(
             to: CGPoint(x: rect.maxX, y: rect.maxY - bottomRadius)
@@ -2440,7 +2451,10 @@ private struct AdaptiveNotchShape: Shape {
         path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + topRadius))
         path.addQuadCurve(
             to: CGPoint(x: rect.minX + topRadius, y: rect.minY),
-            control: CGPoint(x: rect.minX, y: rect.minY)
+            control: CGPoint(
+                x: rect.minX + topRadius,
+                y: rect.minY + topRadius
+            )
         )
         path.closeSubpath()
 
