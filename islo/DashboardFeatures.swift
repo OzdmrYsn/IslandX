@@ -895,26 +895,75 @@ enum FocusTimerMode: String, CaseIterable, Identifiable {
 
 @MainActor
 final class FocusTimerManager: ObservableObject {
+    static let timerRange = 1...180
+    static let focusRange = 5...90
+    static let breakRange = 1...30
+    /// Focus sessions in one Pomodoro round.
+    static let sessionsPerRound = 4
+
     @Published var mode: FocusTimerMode = .pomodoro {
         didSet { reset() }
     }
     @Published private(set) var isRunning = false
     @Published private(set) var isBreak = false
     @Published private(set) var remainingSeconds = 25 * 60
-    @Published var timerMinutes = 10 {
+
+    @Published var timerMinutes: Int {
         didSet {
-            guard mode == .timer, !isRunning else { return }
-            remainingSeconds = timerMinutes * 60
+            durationChanged(timerMinutes, range: Self.timerRange, key: Key.timer, isCurrent: mode == .timer) {
+                $0.timerMinutes = $1
+            }
+        }
+    }
+    @Published var focusMinutes: Int {
+        didSet {
+            durationChanged(focusMinutes, range: Self.focusRange, key: Key.focus, isCurrent: mode == .pomodoro && !isBreak) {
+                $0.focusMinutes = $1
+            }
+        }
+    }
+    @Published var breakMinutes: Int {
+        didSet {
+            durationChanged(breakMinutes, range: Self.breakRange, key: Key.breakLength, isCurrent: mode == .pomodoro && isBreak) {
+                $0.breakMinutes = $1
+            }
         }
     }
 
+    /// Finished focus time and sessions, counted per calendar day.
+    @Published private(set) var todayFocusSeconds = 0
+    @Published private(set) var todaySessions = 0
+
+    private enum Key {
+        static let timer = "focus.timerMinutes"
+        static let focus = "focus.pomodoroFocusMinutes"
+        static let breakLength = "focus.pomodoroBreakMinutes"
+        static let statsDay = "focus.statsDay"
+        static let statsSeconds = "focus.statsSeconds"
+        static let statsSessions = "focus.statsSessions"
+    }
+
+    private let defaults: UserDefaults
     private var timer: Timer?
     private var targetDate: Date?
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        func stored(_ key: String, _ fallback: Int, _ range: ClosedRange<Int>) -> Int {
+            let value = defaults.object(forKey: key) as? Int ?? fallback
+            return min(max(value, range.lowerBound), range.upperBound)
+        }
+        timerMinutes = stored(Key.timer, 10, Self.timerRange)
+        focusMinutes = stored(Key.focus, 25, Self.focusRange)
+        breakMinutes = stored(Key.breakLength, 5, Self.breakRange)
+        remainingSeconds = focusMinutes * 60
+        loadTodayStats()
+    }
 
     var totalSeconds: Int {
         switch mode {
         case .timer: timerMinutes * 60
-        case .pomodoro: (isBreak ? 5 : 25) * 60
+        case .pomodoro: (isBreak ? breakMinutes : focusMinutes) * 60
         }
     }
 
@@ -923,8 +972,40 @@ final class FocusTimerManager: ObservableObject {
         return 1 - Double(remainingSeconds) / Double(totalSeconds)
     }
 
+    /// How much of the dial is lit: the timer works like a kitchen timer
+    /// (one turn is an hour), Pomodoro shows what's left of the phase.
+    var dialFraction: Double {
+        switch mode {
+        case .timer:
+            min(Double(remainingSeconds) / 3600, 1)
+        case .pomodoro:
+            totalSeconds > 0 ? Double(remainingSeconds) / Double(totalSeconds) : 0
+        }
+    }
+
+    /// Focus sessions finished in the current round of four.
+    var sessionsInRound: Int {
+        todaySessions % Self.sessionsPerRound
+    }
+
     var formattedTime: String {
-        String(format: "%02d:%02d", remainingSeconds / 60, remainingSeconds % 60)
+        let hours = remainingSeconds / 3600
+        let minutes = remainingSeconds / 60 % 60
+        let seconds = remainingSeconds % 60
+        return hours > 0
+            ? String(format: "%d:%02d:%02d", hours, minutes, seconds)
+            : String(format: "%02d:%02d", minutes, seconds)
+    }
+
+    /// Up in single minutes to 10, then in fives; down the same way.
+    static func steppedMinutes(_ value: Int, up: Bool, range: ClosedRange<Int>) -> Int {
+        let next: Int
+        if up {
+            next = value < 10 ? value + 1 : (value / 5 + 1) * 5
+        } else {
+            next = value <= 10 ? value - 1 : (value - 1) / 5 * 5
+        }
+        return min(max(next, range.lowerBound), range.upperBound)
     }
 
     func toggle() {
@@ -935,7 +1016,7 @@ final class FocusTimerManager: ObservableObject {
         stopTimer()
         isRunning = false
         isBreak = false
-        remainingSeconds = mode == .pomodoro ? 25 * 60 : timerMinutes * 60
+        remainingSeconds = (mode == .pomodoro ? focusMinutes : timerMinutes) * 60
     }
 
     func skipPhase() {
@@ -943,7 +1024,27 @@ final class FocusTimerManager: ObservableObject {
         stopTimer()
         isRunning = false
         isBreak.toggle()
-        remainingSeconds = (isBreak ? 5 : 25) * 60
+        remainingSeconds = totalSeconds
+    }
+
+    private func durationChanged(
+        _ value: Int,
+        range: ClosedRange<Int>,
+        key: String,
+        isCurrent: Bool,
+        assign: (FocusTimerManager, Int) -> Void
+    ) {
+        let clamped = min(max(value, range.lowerBound), range.upperBound)
+        guard clamped == value else {
+            assign(self, clamped)
+            return
+        }
+        defaults.set(value, forKey: key)
+        // A new length for the phase on the dial applies right away, unless
+        // it is counting down.
+        guard isCurrent, !isRunning else { return }
+        stopTimer()
+        remainingSeconds = totalSeconds
     }
 
     private func start() {
@@ -969,11 +1070,41 @@ final class FocusTimerManager: ObservableObject {
         guard remainingSeconds == 0 else { return }
         stopTimer()
         isRunning = false
-        NSSound.beep()
+        if NSSound(named: "Glass")?.play() != true { NSSound.beep() }
+        if mode == .timer || !isBreak {
+            recordFinishedFocus(seconds: totalSeconds, countsAsSession: mode == .pomodoro)
+        }
         if mode == .pomodoro {
             isBreak.toggle()
-            remainingSeconds = (isBreak ? 5 : 25) * 60
+            remainingSeconds = totalSeconds
         }
+    }
+
+    private func recordFinishedFocus(seconds: Int, countsAsSession: Bool) {
+        loadTodayStats()
+        todayFocusSeconds += seconds
+        if countsAsSession { todaySessions += 1 }
+        defaults.set(todayFocusSeconds, forKey: Key.statsSeconds)
+        defaults.set(todaySessions, forKey: Key.statsSessions)
+    }
+
+    /// Starts the counts from zero on a new day.
+    func loadTodayStats() {
+        let today = Self.dayKey(Date())
+        if defaults.string(forKey: Key.statsDay) != today {
+            defaults.set(today, forKey: Key.statsDay)
+            defaults.set(0, forKey: Key.statsSeconds)
+            defaults.set(0, forKey: Key.statsSessions)
+        }
+        let seconds = defaults.integer(forKey: Key.statsSeconds)
+        let sessions = defaults.integer(forKey: Key.statsSessions)
+        if seconds != todayFocusSeconds { todayFocusSeconds = seconds }
+        if sessions != todaySessions { todaySessions = sessions }
+    }
+
+    private static func dayKey(_ date: Date) -> String {
+        let parts = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
     }
 
     private func stopTimer() {

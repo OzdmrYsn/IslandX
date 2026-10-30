@@ -598,7 +598,7 @@ struct DynamicNotchView: View {
             case .home: dashboardHomeSection
             case .notifications: dashboardNotificationsSection
             case .calendar: dashboardCalendarSection
-            case .timer: dashboardCard { dashboardFocusPane }
+            case .timer: dashboardTimerSection
             case .shelf: dashboardShelfSection
             case .clipboard: dashboardClipboardSection
             }
@@ -818,53 +818,156 @@ struct DynamicNotchView: View {
 
     // MARK: Timer
 
-    private var dashboardFocusPane: some View {
-        HStack(spacing: 22) {
-            focusRing
-                .frame(width: 126, height: 126)
+    private var dashboardTimerSection: some View {
+        HStack(spacing: 14) {
+            dashboardCard { dashboardFocusPane }
+            dashboardCard { focusStatsPane }
+                .frame(width: 200)
+        }
+    }
 
-            VStack(alignment: .leading, spacing: 12) {
+    /// Shared by the Timer tab and the Home focus widget, so every row
+    /// falls back to a slimmer version when the card is narrow.
+    private var dashboardFocusPane: some View {
+        HStack(spacing: 20) {
+            // A fixed size, so the stack hands the rest of the width to the
+            // controls instead of splitting it with the dial.
+            focusDial
+                .frame(width: 138, height: 138)
+
+            VStack(alignment: .leading, spacing: 0) {
                 focusModeSwitch
-                if focusTimerManager.mode == .timer {
-                    timerPresets
-                } else {
-                    pomodoroPhases
-                }
-                Spacer(minLength: 0)
+                Spacer(minLength: 6)
+                focusDurationEditor
+                Spacer(minLength: 6)
                 focusControls
             }
             .frame(maxHeight: .infinity, alignment: .top)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .onAppear(perform: focusTimerManager.loadTodayStats)
     }
 
-    private var focusRing: some View {
-        ZStack {
-            Circle()
-                .stroke(primaryColor.opacity(0.08), lineWidth: 10)
-            Circle()
-                .trim(from: 0, to: max(focusTimerManager.progress, 0.004))
-                .stroke(
-                    LinearGradient(colors: [accent, accent.opacity(0.6)], startPoint: .top, endPoint: .bottom),
-                    style: StrokeStyle(lineWidth: 10, lineCap: .round)
-                )
-                .rotationEffect(.degrees(-90))
-                .shadow(color: accent.opacity(0.5), radius: 6)
-                .animation(.linear(duration: 0.25), value: focusTimerManager.progress)
+    /// A watch-style dial. In Timer mode it doubles as a kitchen timer:
+    /// drag around it to set up to an hour.
+    private var focusDial: some View {
+        GeometryReader { geometry in
+            let side = min(geometry.size.width, geometry.size.height)
+            let fraction = focusTimerManager.dialFraction
+            let canSet = focusTimerManager.mode == .timer && !focusTimerManager.isRunning
 
-            VStack(spacing: 4) {
-                Text(focusTimerManager.formattedTime)
-                    .font(.system(size: 28, weight: .semibold, design: .rounded).monospacedDigit())
-                    .foregroundStyle(primaryColor)
-                HStack(spacing: 5) {
+            ZStack {
+                dialTicks
+
+                ZStack {
                     Circle()
-                        .fill(focusTimerManager.isRunning ? accent : primaryColor.opacity(0.35))
-                        .frame(width: 5, height: 5)
-                    Text(focusPhaseLabel)
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(primaryColor.opacity(0.55))
+                        .stroke(primaryColor.opacity(0.08), lineWidth: 9)
+                    Circle()
+                        .trim(from: 0, to: max(fraction, 0.002))
+                        .stroke(
+                            AngularGradient(
+                                colors: [accent.opacity(0.45), accent],
+                                center: .center,
+                                startAngle: .degrees(0),
+                                endAngle: .degrees(360 * max(fraction, 0.02))
+                            ),
+                            style: StrokeStyle(lineWidth: 9, lineCap: .round)
+                        )
+                        .rotationEffect(.degrees(-90))
+                        .shadow(color: accent.opacity(0.45), radius: 6)
+                    if fraction > 0.004 {
+                        Circle()
+                            .fill(Color.white)
+                            .frame(width: 5, height: 5)
+                            .offset(y: -(side - 20) / 2)
+                            .rotationEffect(.degrees(360 * fraction))
+                    }
                 }
+                .padding(10)
+                .animation(.linear(duration: 0.25), value: fraction)
+
+                VStack(spacing: 3) {
+                    Text(focusTimerManager.formattedTime)
+                        .font(.system(size: side * 0.19, weight: .semibold, design: .rounded).monospacedDigit())
+                        .foregroundStyle(primaryColor)
+                        .minimumScaleFactor(0.6)
+                        .lineLimit(1)
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(focusTimerManager.isRunning ? accent : primaryColor.opacity(0.35))
+                            .frame(width: 5, height: 5)
+                        Text(focusPhaseLabel)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(primaryColor.opacity(0.55))
+                    }
+                    if canSet {
+                        Text(localized("Halkayı çevir", "Turn the dial"))
+                            .font(.system(size: 8.5, weight: .medium))
+                            .foregroundStyle(primaryColor.opacity(0.35))
+                    }
+                }
+                .padding(.horizontal, 22)
             }
+            .frame(width: side, height: side)
+            .contentShape(Circle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { gesture in
+                        guard canSet else { return }
+                        setTimerFromDial(gesture.location, side: side)
+                    }
+                    .onEnded { _ in
+                        guard canSet else { return }
+                        updateInteraction(false)
+                    }
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .aspectRatio(1, contentMode: .fit)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var dialTicks: some View {
+        Canvas { context, size in
+            let center = CGPoint(x: size.width / 2, y: size.height / 2)
+            let radius = min(size.width, size.height) / 2 - 1
+            for index in 0..<60 {
+                let isMajor = index % 5 == 0
+                let length: CGFloat = isMajor ? 5 : 2.5
+                let angle = Double(index) / 60 * 2 * .pi
+                var tick = Path()
+                tick.move(to: CGPoint(
+                    x: center.x + CGFloat(sin(angle)) * radius,
+                    y: center.y - CGFloat(cos(angle)) * radius
+                ))
+                tick.addLine(to: CGPoint(
+                    x: center.x + CGFloat(sin(angle)) * (radius - length),
+                    y: center.y - CGFloat(cos(angle)) * (radius - length)
+                ))
+                context.stroke(
+                    tick,
+                    with: .color(primaryColor.opacity(isMajor ? 0.32 : 0.13)),
+                    style: StrokeStyle(lineWidth: isMajor ? 1.5 : 1, lineCap: .round)
+                )
+            }
+        }
+        .accessibilityHidden(true)
+    }
+
+    private func setTimerFromDial(_ location: CGPoint, side: CGFloat) {
+        let dx = location.x - side / 2
+        let dy = location.y - side / 2
+        // The very middle has no clear direction.
+        guard hypot(dx, dy) > side * 0.22 else { return }
+        var angle = atan2(Double(dx), Double(-dy))
+        if angle < 0 { angle += 2 * .pi }
+        var minutes = Int((angle / (2 * .pi) * 60).rounded())
+        if minutes == 0 { minutes = 60 }
+        updateInteraction(true)
+        guard minutes != focusTimerManager.timerMinutes else { return }
+        focusTimerManager.timerMinutes = minutes
+        if minutes % 5 == 0 {
+            NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
         }
     }
 
@@ -907,33 +1010,147 @@ struct DynamicNotchView: View {
         .background(Capsule().fill(primaryColor.opacity(0.08)))
     }
 
-    private var timerPresets: some View {
-        HStack(spacing: 6) {
-            ForEach([5, 10, 15, 25, 45], id: \.self) { minutes in
+    @ViewBuilder
+    private var focusDurationEditor: some View {
+        if focusTimerManager.mode == .timer {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    timerStepper
+                    timerPresets([5, 10, 15, 25, 45, 60])
+                }
+                HStack(spacing: 10) {
+                    timerStepper
+                    timerPresets([5, 15, 25, 45])
+                }
+                HStack(spacing: 10) {
+                    timerStepper
+                    timerPresets([15, 25])
+                }
+                timerStepper
+            }
+        } else {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    labeledStepper(localized("Odak", "Focus"), value: focusTimerManager.focusMinutes, range: FocusTimerManager.focusRange) {
+                        focusTimerManager.focusMinutes = $0
+                    }
+                    labeledStepper(localized("Mola", "Break"), value: focusTimerManager.breakMinutes, range: FocusTimerManager.breakRange) {
+                        focusTimerManager.breakMinutes = $0
+                    }
+                }
+                pomodoroPhases
+            }
+        }
+    }
+
+    private var timerStepper: some View {
+        minuteStepper(value: focusTimerManager.timerMinutes, range: FocusTimerManager.timerRange) {
+            focusTimerManager.timerMinutes = $0
+        }
+    }
+
+    private func labeledStepper(
+        _ title: String,
+        value: Int,
+        range: ClosedRange<Int>,
+        set: @escaping (Int) -> Void
+    ) -> some View {
+        HStack(spacing: 7) {
+            Text(title)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(primaryColor.opacity(0.55))
+            minuteStepper(value: value, range: range, set: set)
+        }
+    }
+
+    /// −/+ around the length: single minutes up to 10, then fives.
+    private func minuteStepper(
+        value: Int,
+        range: ClosedRange<Int>,
+        set: @escaping (Int) -> Void
+    ) -> some View {
+        let isLocked = focusTimerManager.isRunning
+
+        return HStack(spacing: 2) {
+            stepperButton("minus", label: localized("Azalt", "Decrease"), isEnabled: !isLocked && value > range.lowerBound) {
+                set(FocusTimerManager.steppedMinutes(value, up: false, range: range))
+            }
+            Text(minutesText(value))
+                .font(.system(size: 12.5, weight: .semibold, design: .rounded).monospacedDigit())
+                .foregroundStyle(primaryColor.opacity(isLocked ? 0.5 : 1))
+                .lineLimit(1)
+                .frame(minWidth: 50)
+            stepperButton("plus", label: localized("Artır", "Increase"), isEnabled: !isLocked && value < range.upperBound) {
+                set(FocusTimerManager.steppedMinutes(value, up: true, range: range))
+            }
+        }
+        .padding(3)
+        .background(Capsule().fill(primaryColor.opacity(0.07)))
+        .fixedSize()
+    }
+
+    private func stepperButton(
+        _ symbol: String,
+        label: String,
+        isEnabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 9.5, weight: .bold))
+                .foregroundStyle(primaryColor.opacity(isEnabled ? 0.85 : 0.25))
+                .frame(width: 26, height: 26)
+                .background(Circle().fill(primaryColor.opacity(isEnabled ? 0.1 : 0.04)))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .help(label)
+        .accessibilityLabel(Text(label))
+    }
+
+    private func minutesText(_ minutes: Int) -> String {
+        let hours = minutes / 60
+        let rest = minutes % 60
+        if hours == 0 { return localized("\(minutes) dk", "\(minutes) min") }
+        if rest == 0 { return localized("\(hours) sa", "\(hours) h") }
+        return localized("\(hours) sa \(rest) dk", "\(hours) h \(rest) min")
+    }
+
+    private func timerPresets(_ presets: [Int]) -> some View {
+        HStack(spacing: 5) {
+            ForEach(presets, id: \.self) { minutes in
                 let isSelected = focusTimerManager.timerMinutes == minutes
                 Button {
-                    focusTimerManager.timerMinutes = minutes
-                    focusTimerManager.reset()
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        focusTimerManager.timerMinutes = minutes
+                    }
                 } label: {
-                    Text(localized("\(minutes) dk", "\(minutes) min"))
-                        .font(.system(size: 10, weight: .semibold))
+                    Text(minutes == 60 ? localized("1 sa", "1 h") : "\(minutes)")
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
                         .foregroundStyle(isSelected ? accent : primaryColor.opacity(0.7))
-                        .padding(.horizontal, 10)
+                        .frame(minWidth: 30)
+                        .padding(.horizontal, 4)
                         .frame(height: 24)
                         .background(Capsule().fill(isSelected ? accent.opacity(0.16) : primaryColor.opacity(0.06)))
                         .overlay(Capsule().strokeBorder(isSelected ? accent.opacity(0.6) : Color.clear, lineWidth: 1))
                         .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
+                .disabled(focusTimerManager.isRunning)
+                .opacity(focusTimerManager.isRunning ? 0.45 : 1)
+                .help(minutesText(minutes))
             }
         }
+        .fixedSize()
     }
 
     private var pomodoroPhases: some View {
         HStack(spacing: 6) {
-            phaseChip(localized("Odak · 25 dk", "Focus · 25 min"), isActive: !focusTimerManager.isBreak)
-            phaseChip(localized("Mola · 5 dk", "Break · 5 min"), isActive: focusTimerManager.isBreak)
+            phaseChip(localized("Odak · \(focusTimerManager.focusMinutes) dk", "Focus · \(focusTimerManager.focusMinutes) min"), isActive: !focusTimerManager.isBreak)
+            phaseChip(localized("Mola · \(focusTimerManager.breakMinutes) dk", "Break · \(focusTimerManager.breakMinutes) min"), isActive: focusTimerManager.isBreak)
         }
+        .fixedSize()
     }
 
     private func phaseChip(_ title: String, isActive: Bool) -> some View {
@@ -951,33 +1168,106 @@ struct DynamicNotchView: View {
                 focusTimerManager.isRunning ? "pause.fill" : "play.fill",
                 label: focusTimerManager.isRunning ? localized("Duraklat", "Pause") : localized("Başlat", "Start"),
                 filled: true,
-                size: 44,
+                size: 42,
                 action: focusTimerManager.toggle
             )
             roundIconButton(
                 "arrow.counterclockwise",
                 label: localized("Sıfırla", "Reset"),
-                size: 34,
+                size: 32,
                 action: focusTimerManager.reset
             )
             if focusTimerManager.mode == .pomodoro {
                 roundIconButton(
                     "forward.end.fill",
                     label: localized("Sonraki aşama", "Next phase"),
-                    size: 34,
+                    size: 32,
                     action: focusTimerManager.skipPhase
                 )
             }
-            if focusTimerManager.isRunning {
-                Text(
-                    localized("Bitiş ", "Ends ")
-                        + dashboardTime(Date().addingTimeInterval(TimeInterval(focusTimerManager.remainingSeconds)))
-                )
-                .font(.system(size: 10, weight: .medium).monospacedDigit())
-                .foregroundStyle(primaryColor.opacity(0.5))
-                .padding(.leading, 4)
-            }
         }
+    }
+
+    /// The right-hand card in the Timer tab: today's focus and what's next.
+    private var focusStatsPane: some View {
+        TimelineView(.periodic(from: .now, by: 15)) { context in
+            VStack(alignment: .leading, spacing: 0) {
+                Text(localized("BUGÜN", "TODAY"))
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(1.2)
+                    .foregroundStyle(accent)
+
+                Text(focusTotalText(focusTimerManager.todayFocusSeconds))
+                    .font(.system(size: 26, weight: .bold, design: .rounded))
+                    .foregroundStyle(primaryColor)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .padding(.top, 2)
+
+                Text(localized("odaklandın", "of focus"))
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(primaryColor.opacity(0.5))
+
+                HStack(spacing: 4) {
+                    ForEach(0..<FocusTimerManager.sessionsPerRound, id: \.self) { index in
+                        Capsule()
+                            .fill(index < focusTimerManager.sessionsInRound ? accent : primaryColor.opacity(0.12))
+                            .frame(height: 5)
+                    }
+                }
+                .padding(.top, 10)
+
+                Text(localized("\(focusTimerManager.todaySessions) seans tamamlandı", focusTimerManager.todaySessions == 1 ? "1 session done" : "\(focusTimerManager.todaySessions) sessions done"))
+                    .font(.system(size: 9.5, weight: .medium))
+                    .foregroundStyle(primaryColor.opacity(0.5))
+                    .padding(.top, 5)
+
+                Spacer(minLength: 8)
+
+                focusInfoRow(
+                    icon: "flag.checkered",
+                    title: focusTimerManager.isRunning ? localized("Bitiş", "Ends") : localized("Şimdi başlarsan", "If you start now"),
+                    value: dashboardTime(context.date.addingTimeInterval(TimeInterval(focusTimerManager.remainingSeconds)))
+                )
+                if focusTimerManager.mode == .pomodoro {
+                    focusInfoRow(
+                        icon: focusTimerManager.isBreak ? "brain.head.profile" : "cup.and.saucer.fill",
+                        title: localized("Sıradaki", "Up next"),
+                        value: focusTimerManager.isBreak
+                            ? localized("\(focusTimerManager.focusMinutes) dk odak", "\(focusTimerManager.focusMinutes) min focus")
+                            : localized("\(focusTimerManager.breakMinutes) dk mola", "\(focusTimerManager.breakMinutes) min break")
+                    )
+                    .padding(.top, 6)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+    }
+
+    private func focusInfoRow(icon: String, title: String, value: String) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: icon)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(accent)
+                .frame(width: 20, height: 20)
+                .background(Circle().fill(accent.opacity(0.13)))
+            Text(title)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(primaryColor.opacity(0.55))
+                .lineLimit(1)
+            Spacer(minLength: 4)
+            Text(value)
+                .font(.system(size: 10.5, weight: .semibold).monospacedDigit())
+                .foregroundStyle(primaryColor)
+                .lineLimit(1)
+        }
+    }
+
+    private func focusTotalText(_ seconds: Int) -> String {
+        let minutes = seconds / 60
+        return minutes < 60
+            ? localized("\(minutes) dk", "\(minutes) min")
+            : minutesText(minutes)
     }
 
     // MARK: Shelf
