@@ -127,6 +127,7 @@ struct DynamicNotchView: View {
     @ObservedObject private var privacyMonitor = PrivacyMonitor.shared
     @ObservedObject private var lyricsManager = LyricsManager.shared
     @AppStorage("dashboard.lyrics.visible") private var showsLyrics = false
+    @State private var showsOutputPicker = false
 
     private let layout: NotchLayout
     private let onPreferredSizeChange: (CGSize, Bool) -> Void
@@ -2177,14 +2178,81 @@ struct DynamicNotchView: View {
 
             Spacer(minLength: 6)
 
-            HStack(spacing: 12) {
-                compactPlaybackControls
-                Spacer(minLength: 8)
-                volumeSection
-                    .frame(width: 122)
+            if showsOutputPicker {
+                outputPicker
+                    .transition(.opacity.combined(with: .move(edge: .trailing)))
+            } else {
+                HStack(spacing: 8) {
+                    compactPlaybackControls
+                    Spacer(minLength: 4)
+                    outputButton
+                    volumeSection
+                        .frame(width: 122)
+                }
+                .transition(.opacity)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    /// Shows the current output's icon; opens the device chips.
+    private var outputButton: some View {
+        Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.86)) { showsOutputPicker = true }
+        } label: {
+            Image(systemName: audioDevices.currentOutput?.symbolName ?? "speaker.wave.2.fill")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(primaryColor.opacity(0.78))
+                .frame(width: 28, height: 28)
+                .background(Circle().fill(primaryColor.opacity(0.08)))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .help(localized("Ses çıkışı: ", "Output: ") + (audioDevices.currentOutput?.name ?? "—"))
+        .accessibilityLabel(Text(localized("Ses çıkışını değiştir", "Change audio output")))
+    }
+
+    /// Every output as a chip; one click switches and closes the row.
+    private var outputPicker: some View {
+        HStack(spacing: 8) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(audioDevices.outputs) { device in
+                        let isCurrent = device.id == audioDevices.currentOutputID
+                        Button {
+                            audioDevices.select(device)
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.86)) { showsOutputPicker = false }
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: device.symbolName)
+                                    .font(.system(size: 10, weight: .semibold))
+                                Text(device.name)
+                                    .font(.system(size: 10.5, weight: .semibold))
+                                    .lineLimit(1)
+                                    .frame(maxWidth: 130)
+                                if isCurrent {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 8.5, weight: .bold))
+                                }
+                            }
+                            .foregroundStyle(isCurrent ? accent : primaryColor.opacity(0.82))
+                            .padding(.horizontal, 11)
+                            .frame(height: 30)
+                            .background(Capsule().fill(isCurrent ? accent.opacity(0.16) : primaryColor.opacity(0.07)))
+                            .overlay(Capsule().strokeBorder(isCurrent ? accent.opacity(0.55) : Color.clear, lineWidth: 1))
+                            .contentShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            roundIconButton("xmark", label: localized("Kapat", "Close"), size: 28) {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.86)) { showsOutputPicker = false }
+            }
+        }
+        .frame(height: 34)
     }
 
     private var lyricsToggle: some View {
