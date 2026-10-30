@@ -121,6 +121,7 @@ struct DynamicNotchView: View {
     @ObservedObject private var fileShelfManager: FileShelfManager
     @ObservedObject private var clipboardHistoryManager: ClipboardHistoryManager
     @ObservedObject private var notificationMonitor: NotificationMonitor
+    @ObservedObject private var calendarManager = CalendarManager.shared
 
     private let layout: NotchLayout
     private let onPreferredSizeChange: (CGSize, Bool) -> Void
@@ -381,6 +382,10 @@ struct DynamicNotchView: View {
         }
         .onReceive(focusTimerManager.$finishRevision.dropFirst()) { _ in
             commandEchoManager.showTimerFinished(focusTimerManager.lastFinish)
+        }
+        .onReceive(calendarManager.$alertRevision.dropFirst()) { _ in
+            guard let event = calendarManager.alertEvent else { return }
+            commandEchoManager.showUpcomingEvent(event)
         }
         .onChange(of: settings.dashboardFocusTimerEnabled) { enabled in
             if !enabled, dashboardSection == .timer { dashboardSection = .home }
@@ -766,7 +771,7 @@ struct DynamicNotchView: View {
     }
 
     private var dashboardSidePane: some View {
-        TimelineView(.periodic(from: .now, by: 60)) { context in
+        TimelineView(.periodic(from: .now, by: 30)) { context in
             VStack(alignment: .leading, spacing: 7) {
                 Text(dashboardWeekday(context.date).uppercased())
                     .font(.system(size: 9, weight: .bold))
@@ -784,25 +789,125 @@ struct DynamicNotchView: View {
                         .foregroundStyle(primaryColor.opacity(0.58))
                 }
 
-                dashboardSummaryCard(
-                    icon: "calendar.badge.checkmark",
-                    title: localized("Bugün için hazırsın", "You're clear for today"),
-                    subtitle: localized("Takvimi aç", "Open Calendar"),
-                    action: openCalendar
-                )
-
-                Text(localized("Sıradaki", "Up next"))
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(primaryColor.opacity(0.4))
-
-                dashboardSummaryCard(
-                    icon: "plus",
-                    title: localized("Yeni etkinlik", "New event"),
-                    subtitle: localized("Takvim'de oluştur", "Create in Calendar"),
-                    action: openCalendar
-                )
+                calendarSummaryCards(now: context.date, separatorTitle: localized("Sıradaki", "Up next"))
             }
         }
+    }
+
+    /// Two stacked cards: the next event and the one after it, or a way to
+    /// connect the calendar when islo. can't read it yet.
+    @ViewBuilder
+    private func calendarSummaryCards(now: Date, separatorTitle: String?) -> some View {
+        let events = settings.calendarEnabled && calendarManager.authorization == .granted
+            ? Array(calendarManager.upcoming.prefix(2))
+            : []
+
+        if settings.calendarEnabled, calendarManager.authorization == .notAsked {
+            dashboardSummaryCard(
+                icon: "calendar.badge.plus",
+                title: localized("Takvimini bağla", "Connect your calendar"),
+                subtitle: localized("Sıradaki etkinliğin burada görünsün", "See your next event here"),
+                action: calendarManager.requestAccess
+            )
+        } else if settings.calendarEnabled, calendarManager.authorization == .missing {
+            dashboardSummaryCard(
+                icon: "calendar.badge.exclamationmark",
+                title: localized("Takvim izni kapalı", "Calendar access is off"),
+                subtitle: localized("Sistem Ayarları'ndan izin ver", "Allow it in System Settings"),
+                action: calendarManager.openPrivacySettings
+            )
+        } else if let first = events.first {
+            eventCard(first, now: now)
+        } else {
+            dashboardSummaryCard(
+                icon: "calendar.badge.checkmark",
+                title: localized("Bugün için hazırsın", "You're clear for today"),
+                subtitle: localized("Takvimi aç", "Open Calendar"),
+                action: openCalendar
+            )
+        }
+
+        if let separatorTitle {
+            Text(separatorTitle)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(primaryColor.opacity(0.4))
+        }
+
+        if events.count > 1 {
+            eventCard(events[1], now: now)
+        } else {
+            dashboardSummaryCard(
+                icon: "plus",
+                title: localized("Yeni etkinlik", "New event"),
+                subtitle: localized("Takvim'de oluştur", "Create in Calendar"),
+                action: openCalendar
+            )
+        }
+    }
+
+    /// An event row: calendar colour, title, when, and Join for video calls.
+    private func eventCard(_ event: CalendarEventInfo, now: Date) -> some View {
+        Button {
+            calendarManager.join(event)
+        } label: {
+            HStack(spacing: 8) {
+                Capsule()
+                    .fill(Color(nsColor: event.color))
+                    .frame(width: 3.5, height: 25)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(event.title)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(primaryColor)
+                        .lineLimit(1)
+                    Text(eventTimeText(event, now: now))
+                        .font(.system(size: 8))
+                        .foregroundStyle(event.isOngoing(at: now) ? accent : primaryColor.opacity(0.48))
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 0)
+
+                if event.joinURL != nil {
+                    Text(localized("Katıl", "Join"))
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 9)
+                        .frame(height: 20)
+                        .background(Capsule().fill(Color.green.opacity(0.85)))
+                } else {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(primaryColor.opacity(0.3))
+                }
+            }
+            .padding(.horizontal, 9)
+            .frame(height: 39)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(primaryColor.opacity(0.075))
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .help(event.joinURL != nil ? localized("Toplantıya katıl", "Join the meeting") : event.title)
+    }
+
+    private func eventTimeText(_ event: CalendarEventInfo, now: Date) -> String {
+        if event.isOngoing(at: now) {
+            return localized("Şimdi · bitiş \(dashboardTime(event.end))", "Now · until \(dashboardTime(event.end))")
+        }
+        let minutes = Int(ceil(event.start.timeIntervalSince(now) / 60))
+        if minutes <= 60 {
+            return localized("\(minutes) dk sonra · \(dashboardTime(event.start))", "In \(minutes) min · \(dashboardTime(event.start))")
+        }
+        if Calendar.current.isDateInToday(event.start) {
+            return "\(dashboardTime(event.start)) – \(dashboardTime(event.end))"
+        }
+        if Calendar.current.isDateInTomorrow(event.start) {
+            return localized("Yarın \(dashboardTime(event.start))", "Tomorrow \(dashboardTime(event.start))")
+        }
+        return formatted(event.start, template: "EEEHHmm")
     }
 
     // MARK: Calendar
@@ -836,18 +941,7 @@ struct DynamicNotchView: View {
                         weekStrip(for: context.date)
                         Spacer(minLength: 0)
                         HStack(spacing: 10) {
-                            dashboardSummaryCard(
-                                icon: "calendar",
-                                title: localized("Takvimi aç", "Open Calendar"),
-                                subtitle: dashboardLongDate(context.date),
-                                action: openCalendar
-                            )
-                            dashboardSummaryCard(
-                                icon: "plus",
-                                title: localized("Yeni etkinlik", "New event"),
-                                subtitle: localized("Takvim'de oluştur", "Create in Calendar"),
-                                action: openCalendar
-                            )
+                            calendarSummaryCards(now: context.date, separatorTitle: nil)
                         }
                     }
                 }
@@ -2134,10 +2228,69 @@ struct DynamicNotchView: View {
                 systemEchoHUD
                     .contentShape(Rectangle())
                     .onTapGesture { openDashboard(at: .timer) }
+            } else if case .upcomingEvent(let event) = commandEchoManager.event {
+                eventHUD(event)
             } else {
                 systemEchoHUD
             }
         }
+    }
+
+    /// A meeting is about to start: its title and time on the left, Join
+    /// (for video calls) on the right. Clicking anywhere joins or opens it.
+    private func eventHUD(_ event: CalendarEventInfo) -> some View {
+        HStack(spacing: 0) {
+            HStack(spacing: 8) {
+                RingingSymbol(symbol: "calendar", tint: Color(nsColor: event.color))
+                    .id(commandEchoManager.revision)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(event.title)
+                        .font(.system(size: 11, weight: .semibold))
+                        .lineLimit(1)
+                    Text(eventTimeText(event, now: Date()))
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .lineLimit(1)
+                }
+            }
+            .frame(maxWidth: layout.hasCameraHousing ? commandEchoWingWidth : .infinity, alignment: .leading)
+
+            if layout.hasCameraHousing {
+                Color.clear
+                    .frame(width: layout.cameraHousingWidth)
+                    .accessibilityHidden(true)
+            }
+
+            HStack {
+                Spacer(minLength: 0)
+                if event.joinURL != nil {
+                    Text(localized("Katıl", "Join"))
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14)
+                        .frame(height: 22)
+                        .background(Capsule().fill(Color.green))
+                } else {
+                    Text(dashboardTime(event.start))
+                        .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(.white.opacity(0.7))
+                }
+            }
+            .frame(maxWidth: layout.hasCameraHousing ? commandEchoWingWidth : .infinity, alignment: .trailing)
+        }
+        .padding(.horizontal, 18)
+        .frame(height: layout.hasCameraHousing ? layout.notchBandHeight : 40)
+        .foregroundStyle(.white)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            commandEchoTask?.cancel()
+            isCommandEchoVisible = false
+            resizeSurface(to: preferredSize, animation: presentationAnimation)
+            calendarManager.join(event)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
     }
 
     private func openDashboard(at section: DashboardSection) {
@@ -2373,7 +2526,7 @@ struct DynamicNotchView: View {
     private var commandEchoValue: Double? {
         switch commandEchoManager.event {
         case .volume(let value), .brightness(let value): value
-        case .copied, .pasted, .screenshot, .capsLock, .mediaSkip, .trackChanged, .notification, .timerFinished: nil
+        case .copied, .pasted, .screenshot, .capsLock, .mediaSkip, .trackChanged, .notification, .timerFinished, .upcomingEvent: nil
         }
     }
 
@@ -2390,6 +2543,7 @@ struct DynamicNotchView: View {
             : localized("Önceki parça", "Previous track")
         case .trackChanged(let title, _): title
         case .notification(let item): item.appName
+        case .upcomingEvent(let event): event.title
         case .timerFinished(let finish):
             switch finish {
             case .timer: localized("Süre doldu", "Time's up")
@@ -2408,6 +2562,7 @@ struct DynamicNotchView: View {
         case .mediaSkip: localized("Parça değiştiriliyor", "Changing track")
         case .trackChanged: artistTitle
         case .notification(let item): item.headline
+        case .upcomingEvent(let event): eventTimeText(event, now: Date())
         case .timerFinished(let finish):
             switch finish {
             case .timer: localized("Zamanlayıcı bitti", "Timer finished")
@@ -2430,6 +2585,7 @@ struct DynamicNotchView: View {
         case .notification: isAllowed = settings.dashboardNotificationsEnabled
         // The user set this countdown; always say when it ends.
         case .timerFinished: isAllowed = true
+        case .upcomingEvent: isAllowed = settings.calendarEnabled && settings.calendarAlertsEnabled
         default: isAllowed = settings.dashboardCommandEchoEnabled
         }
         guard isAllowed, presentation == .idle else { return }
@@ -2447,6 +2603,8 @@ struct DynamicNotchView: View {
                 duration = .seconds(4.5)
             } else if case .timerFinished = commandEchoManager.event {
                 duration = .seconds(5)
+            } else if case .upcomingEvent = commandEchoManager.event {
+                duration = .seconds(10)
             } else if case .screenshot = commandEchoManager.event {
                 duration = .seconds(3.2)
             } else if case .trackChanged = commandEchoManager.event {
@@ -3089,6 +3247,7 @@ struct DynamicNotchView: View {
         switch commandEchoManager.event {
         case .trackChanged: extensionWidth = 380
         case .timerFinished: extensionWidth = 330
+        case .upcomingEvent: extensionWidth = 400
         case .mediaSkip: extensionWidth = 260
         default: extensionWidth = 300
         }

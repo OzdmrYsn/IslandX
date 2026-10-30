@@ -339,6 +339,8 @@ final class AppSettings: ObservableObject {
         static let dashboardCommandEchoEnabled = "dashboard.commandEcho.enabled"
         static let dashboardFocusTimerEnabled = "dashboard.focusTimer.enabled"
         static let liveTimerInNotch = "dashboard.liveTimer.enabled"
+        static let calendarEnabled = "dashboard.calendar.enabled"
+        static let calendarAlertsEnabled = "dashboard.calendar.alerts"
         static let dashboardKeepAwakeEnabled = "dashboard.keepAwake.enabled"
         static let dashboardFileShelfEnabled = "dashboard.fileShelf.enabled"
         static let dashboardNotificationsEnabled = "dashboard.notifications.enabled"
@@ -413,6 +415,16 @@ final class AppSettings: ObservableObject {
 
     @Published var dashboardFocusTimerEnabled: Bool {
         didSet { defaults.set(dashboardFocusTimerEnabled, forKey: Key.dashboardFocusTimerEnabled) }
+    }
+
+    /// Reads the user's calendars for the next event.
+    @Published var calendarEnabled: Bool {
+        didSet { defaults.set(calendarEnabled, forKey: Key.calendarEnabled) }
+    }
+
+    /// Widens the notch shortly before a meeting starts.
+    @Published var calendarAlertsEnabled: Bool {
+        didSet { defaults.set(calendarAlertsEnabled, forKey: Key.calendarAlertsEnabled) }
     }
 
     /// Shows a running countdown in the closed notch's wings.
@@ -529,6 +541,8 @@ final class AppSettings: ObservableObject {
             defaults: defaults,
             fallback: true
         )
+        calendarEnabled = Self.bool(forKey: Key.calendarEnabled, defaults: defaults, fallback: true)
+        calendarAlertsEnabled = Self.bool(forKey: Key.calendarAlertsEnabled, defaults: defaults, fallback: true)
         dashboardKeepAwakeEnabled = Self.bool(
             forKey: Key.dashboardKeepAwakeEnabled,
             defaults: defaults,
@@ -606,6 +620,8 @@ final class AppSettings: ObservableObject {
         dashboardCommandEchoEnabled = true
         dashboardFocusTimerEnabled = true
         liveTimerInNotch = true
+        calendarEnabled = true
+        calendarAlertsEnabled = true
         dashboardKeepAwakeEnabled = true
         dashboardFileShelfEnabled = true
         dashboardNotificationsEnabled = true
@@ -660,6 +676,7 @@ final class AppSettings: ObservableObject {
     var missingPermissionCount: Int {
         (isAccessibilityTrusted ? 0 : 1)
             + automationStates.values.filter { $0 == .missing }.count
+            + (calendarEnabled && CalendarManager.shared.authorization == .missing ? 1 : 0)
     }
 
     /// macOS doesn't notify apps when permissions change, so Settings and
@@ -669,6 +686,7 @@ final class AppSettings: ObservableObject {
         if trusted != isAccessibilityTrusted {
             isAccessibilityTrusted = trusted
         }
+        CalendarManager.shared.refreshAuthorization()
         refreshAutomationStates()
     }
 

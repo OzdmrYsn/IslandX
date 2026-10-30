@@ -26,6 +26,10 @@
 	<true/>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>islo., çalan parçayı göstermek ve medya kontrollerini çalıştırmak için Music ve Spotify ile iletişim kurar.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>islo., sıradaki etkinliğini çentikte göstermek ve toplantıdan önce seni uyarmak için takvimini okur.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>islo., sıradaki etkinliğini çentikte göstermek ve toplantıdan önce seni uyarmak için takvimini okur.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSPrefersDisplaySafeAreaCompatibilityMode</key>

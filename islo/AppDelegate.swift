@@ -88,6 +88,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
+        CalendarManager.shared.refresh()
         settings.refreshLaunchAtLoginState()
         settings.refreshPermissionState()
     }
@@ -315,6 +316,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             .sink { [weak self] _ in
                 self?.configureMenuBarItem()
             }
+            .store(in: &cancellables)
+
+        settings.$calendarEnabled
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { enabled in CalendarManager.shared.setEnabled(enabled) }
+            .store(in: &cancellables)
+
+        settings.$calendarAlertsEnabled
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { enabled in CalendarManager.shared.alertsEnabled = enabled }
             .store(in: &cancellables)
 
         // islo. only takes the volume and brightness keys over while it has

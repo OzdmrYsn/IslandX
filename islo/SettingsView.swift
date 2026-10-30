@@ -38,6 +38,7 @@ final class SettingsRouter: ObservableObject {
 struct SettingsView: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject private var updateManager = UpdateManager.shared
+    @ObservedObject private var calendarManager = CalendarManager.shared
     var router: SettingsRouter?
     var onShowOnboarding: () -> Void = {}
     @State private var selection: SettingsDestination = .general
@@ -260,6 +261,13 @@ struct SettingsView: View {
                 rowDivider
                 toggleRow(symbol: "tray.full.fill", title: text("Dosya Rafı + AirDrop", "File Shelf + AirDrop"), subtitle: text("Dosyaları çentiğe bırakın, taşıyın veya AirDrop ile gönderin.", "Drop files on the notch, move them, or send them with AirDrop."), isOn: $settings.dashboardFileShelfEnabled)
             }
+            settingsCard(title: text("Takvim", "Calendar")) {
+                toggleRow(symbol: "calendar", title: text("Takvim etkinlikleri", "Calendar events"), subtitle: text("Ana sayfada sıradaki etkinlikleri, video görüşmelerinde Katıl düğmesini gösterir. Takvim izni gerekir.", "Shows your next events on Home, with a Join button for video calls. Needs Calendar access."), isOn: $settings.calendarEnabled)
+                if settings.calendarEnabled {
+                    rowDivider
+                    toggleRow(symbol: "bell.and.waves.left.and.right.fill", title: text("Toplantı uyarısı", "Meeting alert"), subtitle: text("Bir etkinlik başlamadan 5 dakika önce çentik genişleyip haber verir.", "The notch widens 5 minutes before an event starts."), isOn: $settings.calendarAlertsEnabled)
+                }
+            }
             settingsCard(title: text("Bildirimler", "Notifications")) {
                 toggleRow(symbol: "bell.badge.fill", title: text("Bildirimleri çentikte göster", "Show notifications in the notch"), subtitle: text("Gelen bildirim çentiği genişletir; tıklayınca Bildirimler sekmesi açılır. Erişilebilirlik izni gerekir.", "A new notification widens the notch; click it to open the Notifications tab. Needs Accessibility access."), isOn: $settings.dashboardNotificationsEnabled)
                 if settings.dashboardNotificationsEnabled {
@@ -292,6 +300,19 @@ struct SettingsView: View {
                 }
                 if !settings.isAccessibilityTrusted {
                     accessibilitySteps
+                }
+                rowDivider
+                settingsRow(symbol: "calendar", title: text("Takvim", "Calendars"), subtitle: text("Sıradaki etkinliği göstermek ve toplantıdan önce uyarmak için.", "To show your next event and alert you before meetings.")) {
+                    HStack(spacing: 10) {
+                        permissionBadge(calendarManager.authorization)
+                        if calendarManager.authorization == .notAsked {
+                            Button(text("İzin ver", "Allow"), action: calendarManager.requestAccess)
+                                .buttonStyle(.borderedProminent)
+                        } else if calendarManager.authorization == .missing {
+                            Button(text("Ayarları aç", "Open Settings"), action: calendarManager.openPrivacySettings)
+                                .buttonStyle(.borderedProminent)
+                        }
+                    }
                 }
                 ForEach(AutomationTarget.allCases) { target in
                     rowDivider

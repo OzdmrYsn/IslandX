@@ -20,6 +20,7 @@
 		B10000000000000000000001 /* UpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000001 /* UpdateManager.swift */; };
 		B10000000000000000000002 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = B40000000000000000000001 /* Sparkle */; };
 		D10000000000000000000001 /* DashboardFeatures.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000001 /* DashboardFeatures.swift */; };
+		D10000000000000000000002 /* LiveFeatures.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000002 /* LiveFeatures.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -38,6 +39,7 @@
 		A20000000000000000000013 /* AuxiliaryWindowControllers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuxiliaryWindowControllers.swift; sourceTree = "<group>"; };
 		B20000000000000000000001 /* UpdateManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateManager.swift; sourceTree = "<group>"; };
 		D20000000000000000000001 /* DashboardFeatures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardFeatures.swift; sourceTree = "<group>"; };
+		D20000000000000000000002 /* LiveFeatures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveFeatures.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -72,6 +74,7 @@
 				A20000000000000000000013 /* AuxiliaryWindowControllers.swift */,
 				B20000000000000000000001 /* UpdateManager.swift */,
 				D20000000000000000000001 /* DashboardFeatures.swift */,
+				D20000000000000000000002 /* LiveFeatures.swift */,
 				A20000000000000000000003 /* WindowController.swift */,
 				A20000000000000000000004 /* MediaManager.swift */,
 				A20000000000000000000005 /* DynamicNotchView.swift */,
@@ -175,6 +178,7 @@
 				A10000000000000000000010 /* AuxiliaryWindowControllers.swift in Sources */,
 				B10000000000000000000001 /* UpdateManager.swift in Sources */,
 				D10000000000000000000001 /* DashboardFeatures.swift in Sources */,
+				D10000000000000000000002 /* LiveFeatures.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
