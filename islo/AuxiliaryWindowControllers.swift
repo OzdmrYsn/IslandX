@@ -30,6 +30,7 @@ final class SettingsWindowController: NSWindowController {
         )
 
         super.init(window: window)
+        window.delegate = self
     }
 
     @available(*, unavailable)
@@ -41,6 +42,7 @@ final class SettingsWindowController: NSWindowController {
         if let destination {
             router.requestedDestination = destination
         }
+        router.isWindowVisible = true
         showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
 
@@ -127,4 +129,12 @@ private func centerOnPrimaryDisplay(
             y: visibleFrame.midY - windowSize.height / 2
         )
     )
+}
+
+extension SettingsWindowController: NSWindowDelegate {
+    /// The window is only hidden on close, so its views keep running;
+    /// this stops their once-a-second permission checks.
+    func windowWillClose(_ notification: Notification) {
+        router.isWindowVisible = false
+    }
 }

@@ -34,6 +34,7 @@ enum SettingsDestination: String, CaseIterable, Identifiable {
 /// Lets the menu bar and launch reminders open Settings on a given page.
 final class SettingsRouter: ObservableObject {
     @Published var requestedDestination: SettingsDestination?
+    @Published var isWindowVisible = false
 }
 
 struct SettingsView: View {
@@ -75,6 +76,9 @@ struct SettingsView: View {
         // Settings is open so badges update as soon as access is granted.
         .onAppear(perform: settings.refreshPermissionState)
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
+            // Only while the window is on screen (no router: the standard
+            // Settings scene, which closes for real).
+            guard router?.isWindowVisible ?? true else { return }
             settings.refreshPermissionState()
         }
     }
@@ -252,7 +256,7 @@ struct SettingsView: View {
                     rowDivider
                     settingsRow(symbol: "keyboard", title: text("Kısayol", "Shortcut"), subtitle: settings.isHotKeyTaken
                         ? text("Bu kısayolu başka bir uygulama kullanıyor; başka bir tane seçin.", "Another app uses this shortcut; pick a different one.")
-                        : text("Değiştirmek için tıklayıp yeni tuşlara basın (en az bir ⌘ ⌥ ⌃ ⇧ ile). Esc vazgeçer.", "Click, then press the new keys (with at least one of ⌘ ⌥ ⌃ ⇧). Esc cancels.")) {
+                        : text("Tıklayıp yeni tuşlara basın: ⌘ ya da ⌃ ile, veya ⌥ ile Boşluk, ok ya da F tuşu. Esc vazgeçer.", "Click, then press the new keys: with ⌘ or ⌃, or ⌥ with Space, an arrow or an F-key. Esc cancels.")) {
                         HStack(spacing: 8) {
                             if settings.isHotKeyTaken {
                                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
@@ -703,6 +707,10 @@ private struct ShortcutRecorder: View {
         }
         .buttonStyle(.plain)
         .onDisappear(perform: stop)
+        // Closing Settings only hides it, so onDisappear may not run.
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)) { _ in
+            if isRecording { stop() }
+        }
         .accessibilityLabel(Text(language.value(turkish: "Kısayol: ", english: "Shortcut: ") + hotKey.displayString))
     }
 
@@ -714,13 +722,14 @@ private struct ShortcutRecorder: View {
                 stop()
                 return nil
             }
-            let modifiers = HotKey.carbonModifiers(from: event.modifierFlags)
-            let isFunctionKey = HotKey.functionKeys.contains(Int(event.keyCode))
-            guard modifiers != 0 || isFunctionKey else {
+            guard HotKey.isAllowed(keyCode: Int(event.keyCode), flags: event.modifierFlags) else {
                 NSSound.beep()
                 return nil
             }
-            hotKey = HotKey(keyCode: UInt32(event.keyCode), modifiers: modifiers)
+            hotKey = HotKey(
+                keyCode: UInt32(event.keyCode),
+                modifiers: HotKey.carbonModifiers(from: event.modifierFlags)
+            )
             stop()
             return nil
         }

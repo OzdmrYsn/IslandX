@@ -66,6 +66,15 @@ enum CommandEchoKind: Equatable {
             }
         }
     }
+
+    /// Alerts that everyday echoes (volume, copy, Caps Lock, track changes)
+    /// must not replace while they're on screen.
+    var isImportant: Bool {
+        switch self {
+        case .notification, .upcomingEvent, .timerFinished, .headphones, .privacy, .power: true
+        case .volume, .brightness, .copied, .pasted, .screenshot, .capsLock, .mediaSkip, .trackChanged: false
+        }
+    }
 }
 
 @MainActor
@@ -949,7 +958,8 @@ final class FocusTimerManager: ObservableObject {
     static let sessionsPerRound = 4
 
     @Published var mode: FocusTimerMode = .pomodoro {
-        didSet { reset() }
+        // Re-picking the current mode must not wipe a running countdown.
+        didSet { if mode != oldValue { reset() } }
     }
     @Published private(set) var isRunning = false
     @Published private(set) var isBreak = false
@@ -1034,9 +1044,11 @@ final class FocusTimerManager: ObservableObject {
         }
     }
 
-    /// Focus sessions finished in the current round of four.
+    /// Focus sessions finished in the current round of four; a completed
+    /// round shows all four until the next session starts a new one.
     var sessionsInRound: Int {
-        todaySessions % Self.sessionsPerRound
+        guard todaySessions > 0 else { return 0 }
+        return (todaySessions - 1) % Self.sessionsPerRound + 1
     }
 
     var formattedTime: String {

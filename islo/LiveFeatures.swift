@@ -57,9 +57,10 @@ final class CalendarManager: ObservableObject {
         guard enabled != isEnabled else { return }
         isEnabled = enabled
         if enabled {
+            // Any store: the store is recreated when access is granted.
             storeObserver = NotificationCenter.default.addObserver(
                 forName: .EKEventStoreChanged,
-                object: store,
+                object: nil,
                 queue: .main
             ) { [weak self] _ in
                 Task { @MainActor in self?.refresh() }
@@ -118,6 +119,9 @@ final class CalendarManager: ObservableObject {
     func refreshAuthorization() {
         let state = Self.currentAuthorization()
         guard state != authorization else { return }
+        // Access granted in System Settings: a store made before that
+        // keeps returning no events.
+        if state == .granted { store = EKEventStore() }
         authorization = state
         refresh()
     }
@@ -366,6 +370,9 @@ final class AudioDeviceManager: ObservableObject {
 
     private var isListening = false
     private var batteryTask: Task<Void, Never>?
+    /// The default output this manager last reacted to. The device-list
+    /// listener also refreshes `currentOutputID`, so it can't be the guard.
+    private var handledOutputID: AudioDeviceID = 0
 
     private init() {}
 
@@ -377,6 +384,7 @@ final class AudioDeviceManager: ObservableObject {
         guard !isListening else { return }
         isListening = true
         reload()
+        handledOutputID = currentOutputID
         var devicesAddress = Self.address(kAudioHardwarePropertyDevices)
         AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &devicesAddress, .main) { _, _ in
             Task { @MainActor in AudioDeviceManager.shared.reload() }
@@ -404,11 +412,10 @@ final class AudioDeviceManager: ObservableObject {
     }
 
     private func defaultOutputChanged() {
-        let previous = currentOutputID
         reload()
-        guard currentOutputID != previous,
-              let device = currentOutput,
-              device.isBluetooth else { return }
+        guard currentOutputID != handledOutputID else { return }
+        handledOutputID = currentOutputID
+        guard let device = currentOutput, device.isBluetooth else { return }
         announceHeadphones(device)
     }
 
@@ -600,6 +607,7 @@ final class PrivacyMonitor: ObservableObject {
             let microphoneApp = Self.microphoneApp()
             let microphone = microphoneApp != nil || Self.defaultInputIsRunning()
             let camera = Self.cameraIsRunning()
+            // "" means recording by a process without an app to name.
             let appName = microphoneApp.flatMap { $0.isEmpty ? nil : $0 }
             DispatchQueue.main.async {
                 let monitor = PrivacyMonitor.shared
@@ -617,7 +625,9 @@ final class PrivacyMonitor: ObservableObject {
 
     // MARK: Readers
 
-    /// The first app with a running input stream (macOS 14+), or nil.
+    /// The app with a running input stream (macOS 14+): its name, "" when
+    /// only system processes record (Safari's WebKit audio, FaceTime's
+    /// conferencing daemon), or nil when nothing does.
     nonisolated private static func microphoneApp() -> String? {
         guard #available(macOS 14.0, *) else { return nil }
         var address = AudioObjectPropertyAddress(
@@ -633,6 +643,7 @@ final class PrivacyMonitor: ObservableObject {
         guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &processes) == noErr else {
             return nil
         }
+        var unnamedProcessRecords = false
         for process in processes {
             guard uint32Property(process, kAudioProcessPropertyIsRunningInput) != 0 else { continue }
             var pidAddress = AudioObjectPropertyAddress(
@@ -644,11 +655,27 @@ final class PrivacyMonitor: ObservableObject {
             var pidSize = UInt32(MemoryLayout<pid_t>.size)
             AudioObjectGetPropertyData(process, &pidAddress, 0, nil, &pidSize, &pid)
             guard pid != ProcessInfo.processInfo.processIdentifier else { continue }
-            // System services (Siri, dictation) have no app bundle and are
-            // skipped; macOS doesn't light its indicator for them either.
-            if let name = appName(for: pid) { return name }
+            // Helpers and XPC services record for the app responsible for them.
+            if let name = appName(for: responsiblePID(for: pid)) ?? appName(for: pid) { return name }
+            unnamedProcessRecords = true
         }
-        return nil
+        return unnamedProcessRecords ? "" : nil
+    }
+
+    private typealias ResponsiblePIDFunction = @convention(c) (pid_t) -> pid_t
+    nonisolated(unsafe) private static let responsiblePIDFunction: ResponsiblePIDFunction? = {
+        guard let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "responsibility_get_pid_responsible_for_pid") else {
+            return nil
+        }
+        return unsafeBitCast(symbol, to: ResponsiblePIDFunction.self)
+    }()
+
+    /// The app macOS holds responsible for a process (Safari for its WebKit
+    /// helpers); the process itself when unknown.
+    nonisolated private static func responsiblePID(for pid: pid_t) -> pid_t {
+        guard let function = responsiblePIDFunction else { return pid }
+        let responsible = function(pid)
+        return responsible > 0 ? responsible : pid
     }
 
     /// Fallback for macOS 13, which can't say which process records.
@@ -773,9 +800,16 @@ final class LyricsManager: ObservableObject {
         task = Task { [weak self] in
             let result = await Self.fetch(title: title, artist: artist, album: album, duration: duration)
             guard !Task.isCancelled, let self else { return }
-            // A failed request isn't cached, so the next look tries again.
-            if let result { self.cache[key] = result }
-            if self.trackKey == key { self.state = result ?? .notFound }
+            guard self.trackKey == key else { return }
+            if let result {
+                self.cache[key] = result
+                self.state = result
+            } else {
+                // LRCLIB couldn't be reached: forget the key so the next
+                // look (or the lyrics button) tries again.
+                self.trackKey = ""
+                self.state = .notFound
+            }
         }
     }
 
@@ -1122,6 +1156,21 @@ struct HotKey: Codable, Equatable {
         return result
     }
 
+    /// Keys that type nothing, so ⌥ alone is enough with them (⌥Space).
+    static let nonCharacterKeys: Set<Int> = [
+        kVK_Space, kVK_Return, kVK_Tab, kVK_Delete, kVK_ForwardDelete,
+        kVK_LeftArrow, kVK_RightArrow, kVK_UpArrow, kVK_DownArrow,
+        kVK_Home, kVK_End, kVK_PageUp, kVK_PageDown
+    ]
+
+    /// A system-wide shortcut swallows its keys everywhere, so ⇧A or ⌥Q
+    /// (@ on Turkish keyboards) would stop people typing those characters.
+    static func isAllowed(keyCode: Int, flags: NSEvent.ModifierFlags) -> Bool {
+        if functionKeys.contains(keyCode) { return true }
+        if flags.contains(.command) || flags.contains(.control) { return true }
+        return flags.contains(.option) && nonCharacterKeys.contains(keyCode)
+    }
+
     static let functionKeys: Set<Int> = [
         kVK_F1, kVK_F2, kVK_F3, kVK_F4, kVK_F5, kVK_F6, kVK_F7, kVK_F8, kVK_F9, kVK_F10,
         kVK_F11, kVK_F12, kVK_F13, kVK_F14, kVK_F15, kVK_F16, kVK_F17, kVK_F18, kVK_F19, kVK_F20
@@ -1156,7 +1205,7 @@ struct HotKey: Codable, Equatable {
             var characters = [UniChar](repeating: 0, count: 4)
             let status = UCKeyTranslate(
                 layout, UInt16(keyCode), UInt16(kUCKeyActionDisplay), 0, UInt32(LMGetKbdType()),
-                OptionBits(kUCKeyTranslateNoDeadKeysBit), &deadKeys, characters.count, &length, &characters
+                OptionBits(kUCKeyTranslateNoDeadKeysMask), &deadKeys, characters.count, &length, &characters
             )
             guard status == noErr, length > 0 else { return nil }
             return String(utf16CodeUnits: characters, count: length)
@@ -1204,7 +1253,8 @@ final class HotKeyManager {
         let identifier = EventHotKeyID(signature: OSType(0x69_73_6C_6F), id: 1) // 'islo'
         let status = RegisterEventHotKey(
             hotKey.keyCode, hotKey.modifiers, identifier,
-            GetApplicationEventTarget(), 0, &ref
+            // Exclusive, so a shortcut another app holds fails visibly.
+            GetApplicationEventTarget(), OptionBits(kEventHotKeyExclusive), &ref
         )
         guard status == noErr, let ref else { return false }
         hotKeyRef = ref

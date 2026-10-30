@@ -40,6 +40,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         settings.applyApplicationAppearance()
         configureMenuBarItem()
         observeSettings()
+        // Menu-bar apps are rarely "active", so read permissions at launch too.
+        settings.refreshPermissionState()
         configureNotifications()
 
         let mediaManager = MediaManager()
@@ -321,6 +323,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             .sink { [weak self] _ in
                 self?.configureMenuBarItem()
             }
+            .store(in: &cancellables)
+
+        // Permission checks finish asynchronously; keep the menu's warning
+        // in step with them.
+        settings.$isAccessibilityTrusted.map { _ in () }
+            .merge(with: settings.$automationStates.map { _ in () })
+            .merge(with: CalendarManager.shared.$authorization.map { _ in () })
+            .merge(with: settings.$calendarEnabled.map { _ in () })
+            .receive(on: RunLoop.main)
+            .sink { [weak self] in self?.updateMissingPermissionMenuItems() }
             .store(in: &cancellables)
 
         settings.$calendarEnabled

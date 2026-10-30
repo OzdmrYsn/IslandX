@@ -783,6 +783,13 @@ final class AppSettings: ObservableObject {
 
     func requestAutomationPermission(for target: AutomationTarget) {
         let previous = automationStates[target]
+        // Resetting clears every app islo. may control; when another one is
+        // already allowed, switch this one on in System Settings instead.
+        let othersGranted = automationStates.contains { $0.key != target && $0.value == .granted }
+        if previous == .missing, othersGranted {
+            openAutomationSettings()
+            return
+        }
         DispatchQueue.global(qos: .userInitiated).async {
             // macOS never asks again once access was turned off; resetting
             // islo.'s Automation entries brings the prompt back.

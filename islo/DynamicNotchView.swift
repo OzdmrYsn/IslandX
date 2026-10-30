@@ -161,6 +161,12 @@ struct DynamicNotchView: View {
     @State private var selectedClipboardID: UUID?
     @State private var notificationFilter: String?
     @State private var isCommandEchoVisible = false
+    /// The event the HUD shows, fixed when it's accepted, so later events
+    /// that aren't shown can't change what's on screen.
+    @State private var displayedEcho: CommandEchoKind = .copied
+    @State private var displayedEchoRevision = 0
+    /// A meeting alert that arrived while the dashboard was open.
+    @State private var pendingEventAlert: CalendarEventInfo?
     @State private var commandEchoTask: Task<Void, Never>?
     @State private var pendingSkipDirection: MediaSkipDirection?
     /// The visible silhouette. It animates inside a window that only ever
@@ -411,7 +417,12 @@ struct DynamicNotchView: View {
         }
         .onReceive(calendarManager.$alertRevision.dropFirst()) { _ in
             guard let event = calendarManager.alertEvent else { return }
-            commandEchoManager.showUpcomingEvent(event)
+            // The HUD only shows over the closed notch; keep it for later.
+            if presentation == .idle {
+                commandEchoManager.showUpcomingEvent(event)
+            } else {
+                pendingEventAlert = event
+            }
         }
         .onChange(of: settings.dashboardFocusTimerEnabled) { enabled in
             if !enabled, dashboardSection == .timer { dashboardSection = .home }
@@ -1313,7 +1324,7 @@ struct DynamicNotchView: View {
             Text(title)
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(primaryColor.opacity(0.55))
-            minuteStepper(value: value, range: range, set: set)
+            minuteStepper(value: value, range: range, name: title, set: set)
         }
     }
 
@@ -1321,12 +1332,15 @@ struct DynamicNotchView: View {
     private func minuteStepper(
         value: Int,
         range: ClosedRange<Int>,
+        name: String? = nil,
         set: @escaping (Int) -> Void
     ) -> some View {
         let isLocked = focusTimerManager.isRunning
+        let decrease = name.map { localized("\($0) süresini azalt", "Shorten \($0.lowercased())") } ?? localized("Süreyi azalt", "Shorten")
+        let increase = name.map { localized("\($0) süresini artır", "Lengthen \($0.lowercased())") } ?? localized("Süreyi artır", "Lengthen")
 
         return HStack(spacing: 2) {
-            stepperButton("minus", label: localized("Azalt", "Decrease"), isEnabled: !isLocked && value > range.lowerBound) {
+            stepperButton("minus", label: decrease, isEnabled: !isLocked && value > range.lowerBound) {
                 set(FocusTimerManager.steppedMinutes(value, up: false, range: range))
             }
             Text(minutesText(value))
@@ -1334,7 +1348,7 @@ struct DynamicNotchView: View {
                 .foregroundStyle(primaryColor.opacity(isLocked ? 0.5 : 1))
                 .lineLimit(1)
                 .frame(minWidth: 50)
-            stepperButton("plus", label: localized("Artır", "Increase"), isEnabled: !isLocked && value < range.upperBound) {
+            stepperButton("plus", label: increase, isEnabled: !isLocked && value < range.upperBound) {
                 set(FocusTimerManager.steppedMinutes(value, up: true, range: range))
             }
         }
@@ -2109,17 +2123,27 @@ struct DynamicNotchView: View {
     }
 
     /// Rows spread over the card's full height, so nothing pools at the top.
+    /// Displays without a notch get a shorter dashboard, so a compact
+    /// version takes over when the full one doesn't fit.
     private var dashboardMediaPane: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .center, spacing: 14) {
-                sourceArtwork(size: 68, cornerRadius: 15)
+        ViewThatFits(in: .vertical) {
+            mediaPane(compact: false)
+            mediaPane(compact: true)
+        }
+    }
+
+    private func mediaPane(compact: Bool) -> some View {
+        let artworkSize: CGFloat = compact ? 52 : 68
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .center, spacing: compact ? 12 : 14) {
+                sourceArtwork(size: artworkSize, cornerRadius: compact ? 12 : 15)
                     .shadow(color: .black.opacity(0.35), radius: 10, y: 4)
 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: compact ? 2 : 3) {
                     playbackStatusLabel
 
                     Text(trackTitle)
-                        .font(.system(size: 17, weight: .semibold))
+                        .font(.system(size: compact ? 15 : 17, weight: .semibold))
                         .foregroundStyle(primaryColor)
                         .lineLimit(1)
 
@@ -2139,9 +2163,9 @@ struct DynamicNotchView: View {
                     Spacer(minLength: 0)
                 }
             }
-            .frame(height: 68)
+            .frame(height: artworkSize)
 
-            Spacer(minLength: 8)
+            Spacer(minLength: 4)
 
             if settings.lyricsEnabled && showsLyrics {
                 lyricsSection
@@ -2149,14 +2173,14 @@ struct DynamicNotchView: View {
                 progressSection
             }
 
-            Spacer(minLength: 6)
+            Spacer(minLength: 4)
 
             if showsOutputPicker {
                 outputPicker
                     .transition(.opacity.combined(with: .move(edge: .trailing)))
             } else {
                 HStack(spacing: 8) {
-                    compactPlaybackControls
+                    playbackControls(compact: compact)
                     Spacer(minLength: 4)
                     outputButton
                     volumeSection
@@ -2269,7 +2293,7 @@ struct DynamicNotchView: View {
                     .transition(.opacity)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(height: 38, alignment: .leading)
+            .frame(height: 34, alignment: .leading)
             .clipped()
             .animation(.easeOut(duration: 0.28), value: content.index)
         }
@@ -2401,15 +2425,15 @@ struct DynamicNotchView: View {
 
     private var commandEchoHUD: some View {
         Group {
-            if case .notification(let item) = commandEchoManager.event {
+            if case .notification(let item) = displayedEcho {
                 notificationHUD(item)
-            } else if case .timerFinished = commandEchoManager.event {
+            } else if case .timerFinished = displayedEcho {
                 systemEchoHUD
                     .contentShape(Rectangle())
                     .onTapGesture { openDashboard(at: .timer) }
-            } else if case .upcomingEvent(let event) = commandEchoManager.event {
+            } else if case .upcomingEvent(let event) = displayedEcho {
                 eventHUD(event)
-            } else if case .headphones(let battery) = commandEchoManager.event {
+            } else if case .headphones(let battery) = displayedEcho {
                 headphoneHUD(battery)
             } else {
                 systemEchoHUD
@@ -2423,7 +2447,7 @@ struct DynamicNotchView: View {
         HStack(spacing: 0) {
             HStack(spacing: 8) {
                 RingingSymbol(symbol: "calendar", tint: Color(nsColor: event.color))
-                    .id(commandEchoManager.revision)
+                    .id(displayedEchoRevision)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(event.title)
                         .font(.system(size: 11, weight: .semibold))
@@ -2481,7 +2505,7 @@ struct DynamicNotchView: View {
             HStack(spacing: 8) {
                 Image(systemName: battery.symbolName)
                     .font(.system(size: 14, weight: .semibold))
-                    .id(commandEchoManager.revision)
+                    .id(displayedEchoRevision)
                     .transition(.scale(scale: 0.6).combined(with: .opacity))
                 Text(battery.name)
                     .font(.system(size: 11, weight: .semibold))
@@ -2658,7 +2682,7 @@ struct DynamicNotchView: View {
         .foregroundStyle(.white)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(localized("Sistem değişikliği", "System change"))
+        .accessibilityLabel(Text([commandEchoTitle, commandEchoDetail].filter { !$0.isEmpty }.joined(separator: ", ")))
     }
 
     /// A dashed drop zone under the camera housing with one target for the
@@ -2744,23 +2768,23 @@ struct DynamicNotchView: View {
 
     private var commandEchoLeading: some View {
         HStack(spacing: 9) {
-            if case .timerFinished = commandEchoManager.event {
-                RingingSymbol(symbol: commandEchoManager.event.symbolName, tint: accent)
-                    .id(commandEchoManager.revision)
-            } else if case .privacy(let usage) = commandEchoManager.event {
+            if case .timerFinished = displayedEcho {
+                RingingSymbol(symbol: displayedEcho.symbolName, tint: accent)
+                    .id(displayedEchoRevision)
+            } else if case .privacy(let usage) = displayedEcho {
                 PrivacyDots(usage: usage, size: 9)
-            } else if case .power(let event) = commandEchoManager.event {
+            } else if case .power(let event) = displayedEcho {
                 switch event {
                 case .pluggedIn(let level, let charging):
-                    BatteryGlyph(level: level, isCharging: charging).id(commandEchoManager.revision)
+                    BatteryGlyph(level: level, isCharging: charging).id(displayedEchoRevision)
                 case .unplugged(let level), .low(let level):
-                    BatteryGlyph(level: level, isCharging: false).id(commandEchoManager.revision)
+                    BatteryGlyph(level: level, isCharging: false).id(displayedEchoRevision)
                 }
             } else {
-                Image(systemName: commandEchoManager.event.symbolName)
+                Image(systemName: displayedEcho.symbolName)
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(.white)
-                    .id(commandEchoManager.revision)
+                    .id(displayedEchoRevision)
                     .transition(.opacity.combined(with: .scale(scale: 0.72)))
             }
 
@@ -2788,12 +2812,12 @@ struct DynamicNotchView: View {
     }
 
     private var isPowerEcho: Bool {
-        if case .power = commandEchoManager.event { return true }
+        if case .power = displayedEcho { return true }
         return false
     }
 
     private var commandEchoValue: Double? {
-        switch commandEchoManager.event {
+        switch displayedEcho {
         case .volume(let value), .brightness(let value): value
         case .power(let event):
             switch event {
@@ -2805,7 +2829,7 @@ struct DynamicNotchView: View {
     }
 
     private var commandEchoTitle: String {
-        switch commandEchoManager.event {
+        switch displayedEcho {
         case .volume: localized("Ses", "Volume")
         case .brightness: localized("Parlaklık", "Brightness")
         case .copied: localized("Kopyalandı", "Copied")
@@ -2836,7 +2860,7 @@ struct DynamicNotchView: View {
     }
 
     private var commandEchoDetail: String {
-        switch commandEchoManager.event {
+        switch displayedEcho {
         case .screenshot(let filename): filename
         case .copied: localized("Panoya eklendi", "Added to clipboard")
         case .pasted: localized("Panodan yapıştırıldı", "Pasted from clipboard")
@@ -2865,8 +2889,9 @@ struct DynamicNotchView: View {
     private func showCommandEchoIfNeeded() {
         // The open dashboard already shows volume and playback; swapping it
         // for a HUD would yank it away mid-interaction.
+        let incoming = commandEchoManager.event
         let isAllowed: Bool
-        switch commandEchoManager.event {
+        switch incoming {
         case .notification: isAllowed = settings.dashboardNotificationsEnabled
         // The user set this countdown; always say when it ends.
         case .timerFinished: isAllowed = true
@@ -2876,7 +2901,12 @@ struct DynamicNotchView: View {
         default: isAllowed = settings.dashboardCommandEchoEnabled
         }
         guard isAllowed, presentation == .idle else { return }
+        // Volume, copy and the like never cover a notification, a meeting,
+        // a finished timer or a device/privacy alert that is showing.
+        if isCommandEchoVisible, displayedEcho.isImportant, !incoming.isImportant { return }
         commandEchoTask?.cancel()
+        displayedEcho = incoming
+        displayedEchoRevision &+= 1
         let echoAnimation: Animation = reduceMotion
             ? .easeOut(duration: 0.12)
             : .spring(response: 0.3, dampingFraction: 0.86)
@@ -2886,21 +2916,21 @@ struct DynamicNotchView: View {
         resizeSurface(to: preferredSize, animation: echoAnimation)
         commandEchoTask = Task {
             let duration: Duration
-            if case .notification = commandEchoManager.event {
+            if case .notification = incoming {
                 duration = .seconds(4.5)
-            } else if case .timerFinished = commandEchoManager.event {
+            } else if case .timerFinished = incoming {
                 duration = .seconds(5)
-            } else if case .upcomingEvent = commandEchoManager.event {
+            } else if case .upcomingEvent = incoming {
                 duration = .seconds(10)
-            } else if case .headphones = commandEchoManager.event {
+            } else if case .headphones = incoming {
                 duration = .seconds(4.5)
-            } else if case .power = commandEchoManager.event {
+            } else if case .power = incoming {
                 duration = .seconds(3)
-            } else if case .privacy = commandEchoManager.event {
+            } else if case .privacy = incoming {
                 duration = .seconds(3.5)
-            } else if case .screenshot = commandEchoManager.event {
+            } else if case .screenshot = incoming {
                 duration = .seconds(3.2)
-            } else if case .trackChanged = commandEchoManager.event {
+            } else if case .trackChanged = incoming {
                 duration = .seconds(2.2)
             } else {
                 duration = .seconds(1.45)
@@ -3020,9 +3050,11 @@ struct DynamicNotchView: View {
         }
     }
 
-    private var compactPlaybackControls: some View {
-        HStack(spacing: 4) {
+    private func playbackControls(compact: Bool) -> some View {
+        let height: CGFloat = compact ? 30 : 34
+        return HStack(spacing: 4) {
             compactPlaybackModeButton(
+                height: height,
                 icon: "shuffle",
                 label: mediaManager.isShuffleEnabled
                     ? localized("Karışık çalmayı kapat", "Turn shuffle off")
@@ -3032,6 +3064,7 @@ struct DynamicNotchView: View {
             )
 
             compactMediaControlButton(
+                height: height,
                 icon: "backward.fill",
                 label: localized("Önceki parça", "Previous track"),
                 action: { skipTrack(.previous) }
@@ -3041,7 +3074,7 @@ struct DynamicNotchView: View {
                 Image(systemName: mediaManager.isPlaying ? "pause.fill" : "play.fill")
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(panelColor)
-                    .frame(width: 34, height: 34)
+                    .frame(width: height, height: height)
                     .background(Circle().fill(primaryColor))
                     .contentShape(Circle())
             }
@@ -3050,12 +3083,14 @@ struct DynamicNotchView: View {
             .opacity(mediaManager.hasActiveTrack ? 1 : 0.45)
 
             compactMediaControlButton(
+                height: height,
                 icon: "forward.fill",
                 label: localized("Sonraki parça", "Next track"),
                 action: { skipTrack(.next) }
             )
 
             compactPlaybackModeButton(
+                height: height,
                 icon: mediaManager.repeatMode == .one
                     ? "repeat.1"
                     : "repeat",
@@ -3189,6 +3224,7 @@ struct DynamicNotchView: View {
     }
 
     private func compactMediaControlButton(
+        height: CGFloat = 34,
         icon: String,
         label: String,
         action: @escaping () -> Void
@@ -3197,7 +3233,7 @@ struct DynamicNotchView: View {
             Image(systemName: icon)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(primaryColor.opacity(0.88))
-                .frame(width: 30, height: 34)
+                .frame(width: 30, height: height)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -3208,6 +3244,7 @@ struct DynamicNotchView: View {
     }
 
     private func compactPlaybackModeButton(
+        height: CGFloat = 34,
         icon: String,
         label: String,
         isActive: Bool,
@@ -3219,7 +3256,7 @@ struct DynamicNotchView: View {
                 .foregroundStyle(
                     isActive ? accent : primaryColor.opacity(0.62)
                 )
-                .frame(width: 28, height: 34)
+                .frame(width: 28, height: height)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -3410,12 +3447,21 @@ struct DynamicNotchView: View {
         if newValue == .idle {
             trackChangeTask?.cancel()
             isTemporaryTrackPreview = false
+            showsOutputPicker = false
+            if let pending = pendingEventAlert {
+                pendingEventAlert = nil
+                if pending.start > Date() {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                        commandEchoManager.showUpcomingEvent(pending)
+                    }
+                }
+            }
         } else {
             // Opening replaces a system-change HUD instead of stretching it.
             commandEchoTask?.cancel()
             if isCommandEchoVisible,
                settings.dashboardNotificationsEnabled,
-               case .notification = commandEchoManager.event {
+               case .notification = displayedEcho {
                 dashboardSection = .notifications
             }
         }
@@ -3519,16 +3565,20 @@ struct DynamicNotchView: View {
 
     /// Visible Island means "visible while music plays"; otherwise the notch
     /// rests at the size of the camera housing.
+    /// Music respects Hidden Mini; a running timer and the camera/mic
+    /// indicator are things the user asked to see, so they show anyway.
     private var effectiveIdleMode: NotchIdleMode {
-        settings.notchIdleMode == .hiddenMini || idleActivity == .none
-            ? .hiddenMini
-            : .visibleIsland
+        switch idleActivity {
+        case .none: .hiddenMini
+        case .timer, .privacy: .visibleIsland
+        case .music: settings.notchIdleMode == .hiddenMini ? .hiddenMini : .visibleIsland
+        }
     }
 
     private var commandEchoPreferredSize: CGSize {
         // A notification with its content gets a second row under the
         // camera housing for the title and message.
-        if case .notification = commandEchoManager.event,
+        if case .notification = displayedEcho,
            settings.notificationPreviewStyle == .content {
             let width = layout.hasCameraHousing
                 ? min(max(layout.cameraHousingWidth + 340, 520), layout.screenWidth - 24)
@@ -3537,7 +3587,7 @@ struct DynamicNotchView: View {
             return CGSize(width: width, height: height)
         }
         let extensionWidth: CGFloat
-        switch commandEchoManager.event {
+        switch displayedEcho {
         case .trackChanged: extensionWidth = 380
         case .timerFinished: extensionWidth = 330
         case .upcomingEvent: extensionWidth = 400
