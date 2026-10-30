@@ -76,44 +76,105 @@ struct SettingsView: View {
                 )
                     .padding(.vertical, 4)
 
-                Picker(
-                    text("Çentik boşta görünümü", "Notch idle appearance"),
-                    selection: $settings.notchIdleMode
-                ) {
-                    ForEach(NotchIdleMode.allCases) { mode in
-                        Text(mode.title(language: settings.language))
-                            .tag(mode)
+                if settings.contentMode == .music {
+                    Picker(
+                        text("Çentik boşta görünümü", "Notch idle appearance"),
+                        selection: $settings.notchIdleMode
+                    ) {
+                        ForEach(NotchIdleMode.allCases) { mode in
+                            Text(mode.title(language: settings.language))
+                                .tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    Text(
+                        settings.notchIdleMode.subtitle(
+                            language: settings.language
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+            }
+
+            if settings.contentMode == .dashboard {
+                Section(text("Genel Görünüm Özellikleri", "General View Features")) {
+                    Toggle(
+                        text(
+                            "Üzerine gelince genişlet",
+                            "Expand on hover"
+                        ),
+                        isOn: $settings.dashboardHoverExpansionEnabled
+                    )
+
+                    Toggle(
+                        text(
+                            "Boştayken kamera çentiğinde gizle",
+                            "Hide inside the camera notch while idle"
+                        ),
+                        isOn: $settings.dashboardAutoHideWhenIdle
+                    )
+
+                    Toggle(
+                        text(
+                            "Reaktif ışık çizgisini göster",
+                            "Show the reactive light line"
+                        ),
+                        isOn: $settings.dashboardReactiveLightEnabled
+                    )
+
+                    Toggle(
+                        text(
+                            "Güce bağlanınca şarj animasyonu göster",
+                            "Show a charging animation when power connects"
+                        ),
+                        isOn: $settings.dashboardChargingAnimationEnabled
+                    )
+
+                    Text(
+                        text(
+                            "Bu seçenekler yalnızca Genel düzeni etkiler.",
+                            "These options only affect the General layout."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                    HStack {
+                        Spacer()
+                        Button(
+                            text(
+                                "Genel Özellik Varsayılanlarını Geri Yükle",
+                                "Restore General Feature Defaults"
+                            )
+                        ) {
+                            settings.resetDashboardFeatureDefaults()
+                        }
                     }
                 }
-                .pickerStyle(.segmented)
-
-                Text(
-                    settings.notchIdleMode.subtitle(
-                        language: settings.language
-                    )
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
             }
 
             Section(text("Etkileşim", "Interaction")) {
-                Picker(
-                    text("Açılma davranışı", "Opening behavior"),
-                    selection: $settings.activationMode
-                ) {
-                    ForEach(NotchActivationMode.allCases) { mode in
-                        Text(mode.title(language: settings.language))
-                            .tag(mode)
+                if settings.contentMode == .music {
+                    Picker(
+                        text("Açılma davranışı", "Opening behavior"),
+                        selection: $settings.activationMode
+                    ) {
+                        ForEach(NotchActivationMode.allCases) { mode in
+                            Text(mode.title(language: settings.language))
+                                .tag(mode)
+                        }
                     }
-                }
 
-                Text(
-                    settings.activationMode.subtitle(
-                        language: settings.language
+                    Text(
+                        settings.activationMode.subtitle(
+                            language: settings.language
+                        )
                     )
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
 
                 Toggle(
                     text(

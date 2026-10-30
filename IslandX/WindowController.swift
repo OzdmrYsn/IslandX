@@ -14,14 +14,20 @@ private final class FloatingNotchPanel: NSPanel {
 @MainActor
 final class FloatingNotchWindowController: NSWindowController {
     private let mediaManager: MediaManager
+    private let powerMonitor: PowerMonitor
     private let settings: AppSettings
     private var layout: NotchLayout
     private var currentSize: CGSize
     private var visibilityTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
 
-    init(mediaManager: MediaManager, settings: AppSettings) {
+    init(
+        mediaManager: MediaManager,
+        powerMonitor: PowerMonitor,
+        settings: AppSettings
+    ) {
         self.mediaManager = mediaManager
+        self.powerMonitor = powerMonitor
         self.settings = settings
 
         let targetScreen = NSScreen.screens.first ?? NSScreen.main
@@ -29,7 +35,7 @@ final class FloatingNotchWindowController: NSWindowController {
         self.layout = layout
         currentSize = layout.size(
             for: .idle,
-            idleMode: settings.notchIdleMode
+            idleMode: settings.effectiveIdleMode
         )
 
         let panel = FloatingNotchPanel(
@@ -130,6 +136,7 @@ final class FloatingNotchWindowController: NSWindowController {
     private func installRootView(in panel: FloatingNotchPanel) {
         let rootView = DynamicNotchView(
             mediaManager: mediaManager,
+            powerMonitor: powerMonitor,
             settings: settings,
             layout: layout
         ) { [weak self] preferredSize, animated in
@@ -196,7 +203,7 @@ final class FloatingNotchWindowController: NSWindowController {
         layout = updatedLayout
         currentSize = updatedLayout.size(
             for: .idle,
-            idleMode: settings.notchIdleMode
+            idleMode: settings.effectiveIdleMode
         )
 
         if let panel = window as? FloatingNotchPanel {
