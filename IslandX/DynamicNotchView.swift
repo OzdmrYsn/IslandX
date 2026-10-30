@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import SwiftUI
+import UniformTypeIdentifiers
 
 enum NotchPresentationState: Equatable {
     case idle
@@ -11,6 +12,7 @@ private enum DashboardSection: String, CaseIterable {
     case home
     case calendar
     case timer
+    case shelf
     case battery
 }
 
@@ -121,6 +123,10 @@ struct NotchLayout: Equatable {
 struct DynamicNotchView: View {
     @ObservedObject private var mediaManager: MediaManager
     @ObservedObject private var settings: AppSettings
+    @ObservedObject private var commandEchoManager: CommandEchoManager
+    @ObservedObject private var focusTimerManager: FocusTimerManager
+    @ObservedObject private var keepAwakeManager: KeepAwakeManager
+    @ObservedObject private var fileShelfManager: FileShelfManager
 
     private let layout: NotchLayout
     private let onPreferredSizeChange: (CGSize, Bool) -> Void
@@ -147,20 +153,31 @@ struct DynamicNotchView: View {
     @State private var isScrubbing = false
     @State private var expansionProgress: CGFloat = 0
     @State private var dashboardSection: DashboardSection = .home
+    @State private var isFileDropTargeted = false
+    @State private var isCommandEchoVisible = false
+    @State private var commandEchoTask: Task<Void, Never>?
 
     init(
         mediaManager: MediaManager,
         settings: AppSettings,
+        commandEchoManager: CommandEchoManager,
+        focusTimerManager: FocusTimerManager,
+        keepAwakeManager: KeepAwakeManager,
+        fileShelfManager: FileShelfManager,
         layout: NotchLayout,
         onPreferredSizeChange: @escaping (CGSize, Bool) -> Void = { _, _ in }
     ) {
         _mediaManager = ObservedObject(wrappedValue: mediaManager)
         _settings = ObservedObject(wrappedValue: settings)
+        _commandEchoManager = ObservedObject(wrappedValue: commandEchoManager)
+        _focusTimerManager = ObservedObject(wrappedValue: focusTimerManager)
+        _keepAwakeManager = ObservedObject(wrappedValue: keepAwakeManager)
+        _fileShelfManager = ObservedObject(wrappedValue: fileShelfManager)
         self.layout = layout
         self.onPreferredSizeChange = onPreferredSizeChange
     }
 
-    var body: some View {
+    private var renderedSurface: some View {
         ZStack(alignment: .top) {
             if presentation == .idle {
                 compactContent
@@ -197,7 +214,43 @@ struct DynamicNotchView: View {
                     .stroke(primaryColor.opacity(0.13), lineWidth: 0.5)
             }
         }
+        .overlay(alignment: .topTrailing) {
+            if isCommandEchoVisible,
+               settings.contentMode == .dashboard,
+               settings.dashboardCommandEchoEnabled {
+                commandEchoHUD
+                    .padding(.top, layout.hasCameraHousing ? 5 : 7)
+                    .padding(.trailing, 12)
+                    .transition(.scale(scale: 0.88).combined(with: .opacity))
+            }
+        }
+        .overlay {
+            if isFileDropTargeted {
+                notchShape
+                    .stroke(Color.accentColor, lineWidth: 2)
+                    .padding(2)
+                    .allowsHitTesting(false)
+            }
+        }
         .contentShape(notchShape)
+        .onDrop(
+            of: [UTType.fileURL.identifier],
+            isTargeted: $isFileDropTargeted
+        ) { providers in
+            guard settings.contentMode == .dashboard,
+                  settings.dashboardFileShelfEnabled else { return false }
+            let accepted = fileShelfManager.receive(providers)
+            if accepted {
+                isPinned = true
+                setPresentation(.expanded)
+                selectDashboardSection(.shelf)
+            }
+            return accepted
+        }
+    }
+
+    var body: some View {
+        renderedSurface
         .onContinuousHover(perform: handleContinuousHover)
         .onAppear {
             scrubValue = mediaManager.playbackPosition
@@ -207,6 +260,7 @@ struct DynamicNotchView: View {
         .onDisappear {
             hoverTask?.cancel()
             trackChangeTask?.cancel()
+            commandEchoTask?.cancel()
         }
         .onReceive(mediaManager.$playbackPosition) { newValue in
             guard !isScrubbing else { return }
@@ -243,6 +297,23 @@ struct DynamicNotchView: View {
         }
         .onReceive(mediaManager.$trackChangeRevision.dropFirst()) { _ in
             showTrackChangePreviewIfNeeded()
+        }
+        .onReceive(mediaManager.$volume.dropFirst().removeDuplicates()) { value in
+            guard settings.contentMode == .dashboard,
+                  settings.dashboardCommandEchoEnabled else { return }
+            commandEchoManager.showVolume(value)
+        }
+        .onReceive(commandEchoManager.$revision.dropFirst()) { _ in
+            showCommandEchoIfNeeded()
+        }
+        .onChange(of: settings.dashboardFocusTimerEnabled) { enabled in
+            if !enabled, dashboardSection == .timer { dashboardSection = .home }
+        }
+        .onChange(of: settings.dashboardFileShelfEnabled) { enabled in
+            if !enabled, dashboardSection == .shelf { dashboardSection = .home }
+        }
+        .onChange(of: settings.dashboardKeepAwakeEnabled) { enabled in
+            if !enabled { keepAwakeManager.setActive(false) }
         }
         .onReceive(
             NotificationCenter.default.publisher(for: .islandXCollapse)
@@ -416,7 +487,17 @@ struct DynamicNotchView: View {
             dashboardNavigationRow
 
             HStack(spacing: 18) {
-                dashboardMediaPane
+                Group {
+                    switch dashboardSection {
+                    case .timer where settings.dashboardFocusTimerEnabled:
+                        dashboardFocusPane
+                    case .shelf where settings.dashboardFileShelfEnabled:
+                        dashboardShelfPane
+                    default:
+                        dashboardMediaPane
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 Divider()
                     .overlay(primaryColor.opacity(0.13))
@@ -489,7 +570,12 @@ struct DynamicNotchView: View {
             .help(localized("Ana özeti göster", "Show home summary"))
 
             dashboardNavigationIcon("calendar", section: .calendar)
-            dashboardNavigationIcon("timer", section: .timer)
+            if settings.dashboardFocusTimerEnabled {
+                dashboardNavigationIcon("timer", section: .timer)
+            }
+            if settings.dashboardFileShelfEnabled {
+                dashboardNavigationIcon("tray.full", section: .shelf)
+            }
             dashboardNavigationIcon("battery.75percent", section: .battery)
         }
     }
@@ -598,6 +684,170 @@ struct DynamicNotchView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private var dashboardFocusPane: some View {
+        HStack(spacing: 18) {
+            ZStack {
+                Circle()
+                    .stroke(primaryColor.opacity(0.1), lineWidth: 7)
+                Circle()
+                    .trim(from: 0, to: max(focusTimerManager.progress, 0.002))
+                    .stroke(
+                        Color.accentColor,
+                        style: StrokeStyle(lineWidth: 7, lineCap: .round)
+                    )
+                    .rotationEffect(.degrees(-90))
+
+                VStack(spacing: 2) {
+                    Text(focusTimerManager.formattedTime)
+                        .font(.system(size: 20, weight: .bold).monospacedDigit())
+                    Text(
+                        focusTimerManager.isBreak
+                            ? localized("Mola", "Break")
+                            : localized("Odak", "Focus")
+                    )
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(primaryColor.opacity(0.5))
+                }
+            }
+            .frame(width: 92, height: 92)
+
+            VStack(alignment: .leading, spacing: 10) {
+                Picker("", selection: $focusTimerManager.mode) {
+                    Text(localized("Zamanlayıcı", "Timer"))
+                        .tag(FocusTimerMode.timer)
+                    Text("Pomodoro").tag(FocusTimerMode.pomodoro)
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+
+                if focusTimerManager.mode == .timer {
+                    HStack(spacing: 6) {
+                        ForEach([5, 10, 25], id: \.self) { minutes in
+                            Button("\(minutes) dk") {
+                                focusTimerManager.timerMinutes = minutes
+                                focusTimerManager.reset()
+                            }
+                            .buttonStyle(.borderless)
+                            .font(.system(size: 9, weight: .semibold))
+                        }
+                    }
+                } else {
+                    Text(localized("25 dk odak · 5 dk mola", "25 min focus · 5 min break"))
+                        .font(.system(size: 9))
+                        .foregroundStyle(primaryColor.opacity(0.5))
+                }
+
+                HStack(spacing: 8) {
+                    Button {
+                        focusTimerManager.toggle()
+                    } label: {
+                        Label(
+                            focusTimerManager.isRunning
+                                ? localized("Duraklat", "Pause")
+                                : localized("Başlat", "Start"),
+                            systemImage: focusTimerManager.isRunning
+                                ? "pause.fill"
+                                : "play.fill"
+                        )
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+
+                    Button(localized("Sıfırla", "Reset")) {
+                        focusTimerManager.reset()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+
+                    if focusTimerManager.mode == .pomodoro {
+                        Button {
+                            focusTimerManager.skipPhase()
+                        } label: {
+                            Image(systemName: "forward.end.fill")
+                        }
+                        .buttonStyle(.borderless)
+                        .help(localized("Sonraki aşama", "Next phase"))
+                    }
+                }
+            }
+        }
+        .foregroundStyle(primaryColor)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var dashboardShelfPane: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label(
+                    localized("Dosya Rafı", "File Shelf"),
+                    systemImage: "tray.full.fill"
+                )
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(primaryColor)
+
+                Spacer()
+
+                Text(localized("Dosyaları buraya bırak", "Drop files here"))
+                    .font(.system(size: 9))
+                    .foregroundStyle(primaryColor.opacity(0.45))
+            }
+
+            if fileShelfManager.items.isEmpty {
+                HStack(spacing: 10) {
+                    Image(systemName: "arrow.down.doc.fill")
+                        .font(.system(size: 23))
+                        .foregroundStyle(Color.accentColor)
+                    Text(
+                        localized(
+                            "Geçici bir dosya rafı oluşturmak için Finder'dan sürükle.",
+                            "Drag from Finder to create a temporary file shelf."
+                        )
+                    )
+                    .font(.system(size: 10))
+                    .foregroundStyle(primaryColor.opacity(0.55))
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(primaryColor.opacity(0.06))
+                )
+            } else {
+                HStack(spacing: 10) {
+                    ForEach(fileShelfManager.items.prefix(5), id: \.self) { url in
+                        VStack(spacing: 5) {
+                            Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 40, height: 40)
+                            Text(url.lastPathComponent)
+                                .font(.system(size: 8, weight: .medium))
+                                .foregroundStyle(primaryColor.opacity(0.7))
+                                .lineLimit(1)
+                                .frame(width: 58)
+                        }
+                        .onDrag { NSItemProvider(contentsOf: url) ?? NSItemProvider() }
+                        .onTapGesture { fileShelfManager.reveal(url) }
+                        .contextMenu {
+                            Button(localized("AirDrop ile Gönder", "Send via AirDrop")) {
+                                fileShelfManager.sendViaAirDrop(url)
+                            }
+                            Button(localized("Finder'da Göster", "Show in Finder")) {
+                                fileShelfManager.reveal(url)
+                            }
+                            Divider()
+                            Button(localized("Raftan Kaldır", "Remove from Shelf")) {
+                                fileShelfManager.remove(url)
+                            }
+                        }
+                    }
+                    Spacer(minLength: 0)
+                }
+                .frame(maxHeight: .infinity)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
     private var dashboardSidePane: some View {
         TimelineView(.periodic(from: .now, by: 60)) { context in
             VStack(alignment: .leading, spacing: 7) {
@@ -649,18 +899,42 @@ struct DynamicNotchView: View {
             )
         case .timer:
             dashboardSummaryCard(
-                icon: "timer",
-                title: localized("Zamanlayıcıları aç", "Open timers"),
-                subtitle: localized("Saat uygulamasında yönet", "Manage in the Clock app"),
-                action: openClock
+                icon: focusTimerManager.isRunning ? "pause.fill" : "play.fill",
+                title: focusTimerManager.isRunning
+                    ? localized("Duraklat", "Pause")
+                    : localized("Başlat", "Start"),
+                subtitle: focusTimerManager.formattedTime,
+                action: focusTimerManager.toggle
+            )
+        case .shelf:
+            dashboardSummaryCard(
+                icon: "airplayaudio",
+                title: localized("AirDrop ile gönder", "Send with AirDrop"),
+                subtitle: fileShelfManager.items.first?.lastPathComponent
+                    ?? localized("Önce bir dosya bırak", "Drop a file first"),
+                action: {
+                    guard let item = fileShelfManager.items.first else { return }
+                    fileShelfManager.sendViaAirDrop(item)
+                }
             )
         case .battery:
-            dashboardSummaryCard(
-                icon: "battery.75percent",
-                title: localized("Pil ayarlarını aç", "Open Battery settings"),
-                subtitle: localized("Enerji kullanımını yönet", "Manage energy usage"),
-                action: openBatterySettings
-            )
+            if settings.dashboardKeepAwakeEnabled {
+                dashboardSummaryCard(
+                    icon: keepAwakeManager.isActive ? "cup.and.saucer.fill" : "moon.zzz.fill",
+                    title: keepAwakeManager.isActive
+                        ? localized("Mac uyanık kalıyor", "Mac is staying awake")
+                        : localized("Uyanık Tut'u aç", "Enable Keep Awake"),
+                    subtitle: localized("Uyku ve ekran kapanmasını denetler", "Controls sleep and display idle"),
+                    action: keepAwakeManager.toggle
+                )
+            } else {
+                dashboardSummaryCard(
+                    icon: "battery.75percent",
+                    title: localized("Pil ayarlarını aç", "Open Battery settings"),
+                    subtitle: localized("Enerji kullanımını yönet", "Manage energy usage"),
+                    action: openBatterySettings
+                )
+            }
         }
     }
 
@@ -676,10 +950,22 @@ struct DynamicNotchView: View {
             )
         case .timer:
             dashboardSummaryCard(
-                icon: "alarm",
-                title: localized("Alarm ve kronometre", "Alarm and stopwatch"),
-                subtitle: localized("Saat'i öne getir", "Bring Clock forward"),
-                action: openClock
+                icon: "arrow.counterclockwise",
+                title: localized("Zamanlayıcıyı sıfırla", "Reset timer"),
+                subtitle: focusTimerManager.mode == .pomodoro
+                    ? "Pomodoro 25/5"
+                    : "\(focusTimerManager.timerMinutes) dk",
+                action: focusTimerManager.reset
+            )
+        case .shelf:
+            dashboardSummaryCard(
+                icon: "folder",
+                title: localized("Finder'da göster", "Show in Finder"),
+                subtitle: localized("İlk dosyanın konumunu aç", "Reveal the first file"),
+                action: {
+                    guard let item = fileShelfManager.items.first else { return }
+                    fileShelfManager.reveal(item)
+                }
             )
         case .battery:
             dashboardSummaryCard(
@@ -739,11 +1025,59 @@ struct DynamicNotchView: View {
         .help(title)
     }
 
+    private var commandEchoHUD: some View {
+        HStack(spacing: 7) {
+            Image(systemName: commandEchoManager.event.symbolName)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(Color.accentColor)
+
+            switch commandEchoManager.event {
+            case .volume(let value), .brightness(let value):
+                ProgressView(value: value)
+                    .progressViewStyle(.linear)
+                    .frame(width: 48)
+            case .copied:
+                Text(localized("Kopyalandı", "Copied"))
+                    .font(.system(size: 9, weight: .semibold))
+            case .capsLock(let enabled):
+                Text(enabled ? "Caps Lock" : localized("Caps kapalı", "Caps off"))
+                    .font(.system(size: 9, weight: .semibold))
+            }
+        }
+        .foregroundStyle(primaryColor)
+        .padding(.horizontal, 10)
+        .frame(height: 27)
+        .background(
+            Capsule()
+                .fill(primaryColor.opacity(0.1))
+        )
+        .accessibilityLabel(localized("Sistem değişikliği", "System change"))
+    }
+
+    private func showCommandEchoIfNeeded() {
+        guard settings.contentMode == .dashboard,
+              settings.dashboardCommandEchoEnabled else { return }
+        commandEchoTask?.cancel()
+        withAnimation(.easeOut(duration: 0.16)) {
+            isCommandEchoVisible = true
+        }
+        commandEchoTask = Task {
+            try? await Task.sleep(for: .seconds(1.35))
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                withAnimation(.easeIn(duration: 0.18)) {
+                    isCommandEchoVisible = false
+                }
+            }
+        }
+    }
+
     private func dashboardSectionLabel(_ section: DashboardSection) -> String {
         switch section {
         case .home: localized("Ana", "Home")
         case .calendar: localized("Takvim", "Calendar")
         case .timer: localized("Zamanlayıcı", "Timer")
+        case .shelf: localized("Dosya Rafı", "File Shelf")
         case .battery: localized("Pil", "Battery")
         }
     }
@@ -752,6 +1086,7 @@ struct DynamicNotchView: View {
         switch dashboardSection {
         case .home, .calendar: dashboardWeekday(date).uppercased()
         case .timer: localized("ZAMANLAYICI", "TIMER")
+        case .shelf: localized("DOSYA RAFI", "FILE SHELF")
         case .battery: localized("PİL", "BATTERY")
         }
     }
@@ -760,6 +1095,7 @@ struct DynamicNotchView: View {
         switch dashboardSection {
         case .home, .calendar: dashboardDate(date)
         case .timer: dashboardTime(date)
+        case .shelf: localized("Paylaş", "Share")
         case .battery: localized("Enerji", "Energy")
         }
     }
@@ -767,7 +1103,8 @@ struct DynamicNotchView: View {
     private func dashboardTrailingText(_ date: Date) -> String {
         switch dashboardSection {
         case .home, .calendar: dashboardTime(date)
-        case .timer: localized("Saat", "Clock")
+        case .timer: focusTimerManager.formattedTime
+        case .shelf: "\(fileShelfManager.items.count)"
         case .battery:
             ProcessInfo.processInfo.isLowPowerModeEnabled
                 ? localized("Açık", "On")

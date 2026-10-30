@@ -15,14 +15,29 @@ private final class FloatingNotchPanel: NSPanel {
 final class FloatingNotchWindowController: NSWindowController {
     private let mediaManager: MediaManager
     private let settings: AppSettings
+    private let commandEchoManager: CommandEchoManager
+    private let focusTimerManager: FocusTimerManager
+    private let keepAwakeManager: KeepAwakeManager
+    private let fileShelfManager: FileShelfManager
     private var layout: NotchLayout
     private var currentSize: CGSize
     private var visibilityTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
 
-    init(mediaManager: MediaManager, settings: AppSettings) {
+    init(
+        mediaManager: MediaManager,
+        settings: AppSettings,
+        commandEchoManager: CommandEchoManager,
+        focusTimerManager: FocusTimerManager,
+        keepAwakeManager: KeepAwakeManager,
+        fileShelfManager: FileShelfManager
+    ) {
         self.mediaManager = mediaManager
         self.settings = settings
+        self.commandEchoManager = commandEchoManager
+        self.focusTimerManager = focusTimerManager
+        self.keepAwakeManager = keepAwakeManager
+        self.fileShelfManager = fileShelfManager
 
         let targetScreen = NSScreen.screens.first ?? NSScreen.main
         let layout = NotchLayout(screen: targetScreen)
@@ -131,6 +146,10 @@ final class FloatingNotchWindowController: NSWindowController {
         let rootView = DynamicNotchView(
             mediaManager: mediaManager,
             settings: settings,
+            commandEchoManager: commandEchoManager,
+            focusTimerManager: focusTimerManager,
+            keepAwakeManager: keepAwakeManager,
+            fileShelfManager: fileShelfManager,
             layout: layout
         ) { [weak self] preferredSize, animated in
             self?.resizeWindow(to: preferredSize, animated: animated)

@@ -7,6 +7,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let updateManager = UpdateManager.shared
 
     private var mediaManager: MediaManager?
+    private let commandEchoManager = CommandEchoManager()
+    private let focusTimerManager = FocusTimerManager()
+    private let keepAwakeManager = KeepAwakeManager()
+    private let fileShelfManager = FileShelfManager()
     private var notchWindowController: FloatingNotchWindowController?
     private var settingsWindowController: SettingsWindowController?
     private var onboardingWindowController: OnboardingWindowController?
@@ -31,7 +35,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let mediaManager = MediaManager()
         let windowController = FloatingNotchWindowController(
             mediaManager: mediaManager,
-            settings: settings
+            settings: settings,
+            commandEchoManager: commandEchoManager,
+            focusTimerManager: focusTimerManager,
+            keepAwakeManager: keepAwakeManager,
+            fileShelfManager: fileShelfManager
         )
 
         self.mediaManager = mediaManager
@@ -39,6 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         windowController.showWindow(nil)
         mediaManager.startMonitoring()
+        commandEchoManager.startMonitoring()
 
         if !settings.onboardingCompleted {
             DispatchQueue.main.async { [weak self] in
@@ -49,6 +58,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         mediaManager?.stopMonitoring()
+        commandEchoManager.stopMonitoring()
+        keepAwakeManager.setActive(false)
         NotificationCenter.default.removeObserver(self)
     }
 

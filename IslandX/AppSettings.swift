@@ -234,6 +234,10 @@ final class AppSettings: ObservableObject {
         static let showOnTrackChange = "interaction.showOnTrackChange"
         static let trackChangeDisplayDuration = "interaction.trackChangeDisplayDuration"
         static let hideInFullScreen = "interaction.hideInFullScreen"
+        static let dashboardCommandEchoEnabled = "dashboard.commandEcho.enabled"
+        static let dashboardFocusTimerEnabled = "dashboard.focusTimer.enabled"
+        static let dashboardKeepAwakeEnabled = "dashboard.keepAwake.enabled"
+        static let dashboardFileShelfEnabled = "dashboard.fileShelf.enabled"
         static let onboardingCompleted = "onboarding.completed"
     }
 
@@ -297,6 +301,22 @@ final class AppSettings: ObservableObject {
         didSet {
             defaults.set(hideInFullScreen, forKey: Key.hideInFullScreen)
         }
+    }
+
+    @Published var dashboardCommandEchoEnabled: Bool {
+        didSet { defaults.set(dashboardCommandEchoEnabled, forKey: Key.dashboardCommandEchoEnabled) }
+    }
+
+    @Published var dashboardFocusTimerEnabled: Bool {
+        didSet { defaults.set(dashboardFocusTimerEnabled, forKey: Key.dashboardFocusTimerEnabled) }
+    }
+
+    @Published var dashboardKeepAwakeEnabled: Bool {
+        didSet { defaults.set(dashboardKeepAwakeEnabled, forKey: Key.dashboardKeepAwakeEnabled) }
+    }
+
+    @Published var dashboardFileShelfEnabled: Bool {
+        didSet { defaults.set(dashboardFileShelfEnabled, forKey: Key.dashboardFileShelfEnabled) }
     }
 
     @Published private(set) var onboardingCompleted: Bool
@@ -366,6 +386,27 @@ final class AppSettings: ObservableObject {
 
         hideInFullScreen = defaults.bool(forKey: Key.hideInFullScreen)
 
+        dashboardCommandEchoEnabled = Self.bool(
+            forKey: Key.dashboardCommandEchoEnabled,
+            defaults: defaults,
+            fallback: true
+        )
+        dashboardFocusTimerEnabled = Self.bool(
+            forKey: Key.dashboardFocusTimerEnabled,
+            defaults: defaults,
+            fallback: true
+        )
+        dashboardKeepAwakeEnabled = Self.bool(
+            forKey: Key.dashboardKeepAwakeEnabled,
+            defaults: defaults,
+            fallback: true
+        )
+        dashboardFileShelfEnabled = Self.bool(
+            forKey: Key.dashboardFileShelfEnabled,
+            defaults: defaults,
+            fallback: true
+        )
+
         onboardingCompleted = defaults.bool(
             forKey: Key.onboardingCompleted
         )
@@ -398,6 +439,21 @@ final class AppSettings: ObservableObject {
         showOnTrackChange = true
         trackChangeDisplayDuration = 3.5
         hideInFullScreen = false
+    }
+
+    func resetDashboardFeatureDefaults() {
+        dashboardCommandEchoEnabled = true
+        dashboardFocusTimerEnabled = true
+        dashboardKeepAwakeEnabled = true
+        dashboardFileShelfEnabled = true
+    }
+
+    private static func bool(
+        forKey key: String,
+        defaults: UserDefaults,
+        fallback: Bool
+    ) -> Bool {
+        defaults.object(forKey: key) == nil ? fallback : defaults.bool(forKey: key)
     }
 
     func setLaunchAtLogin(_ enabled: Bool) {

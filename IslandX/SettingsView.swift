@@ -173,6 +173,54 @@ struct SettingsView: View {
                 }
             }
 
+            if settings.contentMode == .dashboard {
+                Section(text("Genel Modülleri", "General Modules")) {
+                    Text(
+                        text(
+                            "Yalnızca Genel görünümünde göstermek istediğiniz araçları seçin.",
+                            "Choose which tools appear in the General layout."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                    Toggle(
+                        text("Command Echo", "Command Echo"),
+                        isOn: $settings.dashboardCommandEchoEnabled
+                    )
+                    Text(
+                        text(
+                            "Ses, parlaklık, kopyalama ve Caps Lock değişikliklerini çentikte gösterir.",
+                            "Shows volume, brightness, copy and Caps Lock changes in the notch."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                    Toggle(
+                        text("Zamanlayıcı + Pomodoro", "Timer + Pomodoro"),
+                        isOn: $settings.dashboardFocusTimerEnabled
+                    )
+
+                    Toggle(
+                        text("Uyanık Tut", "Keep Awake"),
+                        isOn: $settings.dashboardKeepAwakeEnabled
+                    )
+
+                    Toggle(
+                        text("Dosya Rafı + AirDrop", "File Shelf + AirDrop"),
+                        isOn: $settings.dashboardFileShelfEnabled
+                    )
+
+                    HStack {
+                        Spacer()
+                        Button(text("Modül Varsayılanlarını Geri Yükle", "Restore Module Defaults")) {
+                            settings.resetDashboardFeatureDefaults()
+                        }
+                    }
+                }
+            }
+
             Section(text("Güncellemeler", "Updates")) {
                 Toggle(
                     text(
