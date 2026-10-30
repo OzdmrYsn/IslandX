@@ -390,7 +390,11 @@ final class MediaManager: ObservableObject {
     @Published private(set) var albumName = ""
     @Published private(set) var artwork: NSImage?
     @Published private(set) var isPlaying = false
-    @Published private(set) var playbackPosition: TimeInterval = 0
+    @Published private(set) var playbackPosition: TimeInterval = 0 {
+        didSet { positionUpdatedAt = Date() }
+    }
+    /// When `playbackPosition` was last read, to estimate it in between.
+    private(set) var positionUpdatedAt = Date()
     @Published private(set) var duration: TimeInterval = 0
     @Published private(set) var volume: Double = 0
     @Published private(set) var isShuffleEnabled = false
@@ -412,6 +416,13 @@ final class MediaManager: ObservableObject {
 
     var hasActiveTrack: Bool {
         source != .none && !trackName.isEmpty
+    }
+
+    /// The position between the once-a-second reads, for lyrics.
+    func estimatedPosition(at date: Date = Date()) -> TimeInterval {
+        guard isPlaying else { return playbackPosition }
+        let estimate = playbackPosition + date.timeIntervalSince(positionUpdatedAt)
+        return duration > 0 ? min(estimate, duration) : estimate
     }
 
     func startMonitoring() {

@@ -261,6 +261,9 @@ struct SettingsView: View {
                 rowDivider
                 toggleRow(symbol: "tray.full.fill", title: text("Dosya Rafı + AirDrop", "File Shelf + AirDrop"), subtitle: text("Dosyaları çentiğe bırakın, taşıyın veya AirDrop ile gönderin.", "Drop files on the notch, move them, or send them with AirDrop."), isOn: $settings.dashboardFileShelfEnabled)
             }
+            settingsCard(title: text("Müzik", "Music")) {
+                toggleRow(symbol: "quote.bubble.fill", title: text("Şarkı sözleri", "Lyrics"), subtitle: text("Şarkı kartındaki söz düğmesiyle sözler satır satır akar. Sözler ücretsiz LRCLIB'den gelir; bunun için şarkının adı ve sanatçısı oraya gönderilir.", "The lyrics button in the song card shows synced lyrics line by line. They come from the free LRCLIB service, which receives the song's title and artist."), isOn: $settings.lyricsEnabled)
+            }
             settingsCard(title: text("Cihazlar", "Devices")) {
                 toggleRow(symbol: "battery.100percent.bolt", title: text("Şarj ve kulaklık pili", "Charging and headphone battery"), subtitle: text("Şarj takılınca ya da pil azalınca çentik haber verir; Bluetooth kulaklık (AirPods vb.) bağlanınca pil seviyelerini gösterir.", "The notch tells you when the charger is plugged in or the battery runs low, and shows Bluetooth headphones' (AirPods etc.) battery when they connect."), isOn: $settings.devicesHUDEnabled)
                 rowDivider

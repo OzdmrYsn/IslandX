@@ -724,3 +724,186 @@ final class PrivacyMonitor: ObservableObject {
         return name
     }
 }
+
+// MARK: - Lyrics
+
+struct LyricLine: Equatable {
+    let time: TimeInterval
+    let text: String
+}
+
+enum LyricsState: Equatable {
+    case idle
+    case loading
+    case synced([LyricLine])
+    case unsynced
+    case instrumental
+    case notFound
+}
+
+/// Time-synced lyrics from LRCLIB, a free lyrics database. Only the
+/// track's title, artist, album and length are sent.
+@MainActor
+final class LyricsManager: ObservableObject {
+    static let shared = LyricsManager()
+
+    @Published private(set) var state: LyricsState = .idle
+
+    private var trackKey = ""
+    private var cache: [String: LyricsState] = [:]
+    private var task: Task<Void, Never>?
+
+    private init() {}
+
+    func load(title: String, artist: String, album: String, duration: TimeInterval) {
+        let key = "\(artist.lowercased())|\(title.lowercased())"
+        guard key != trackKey else { return }
+        trackKey = key
+        task?.cancel()
+        guard !title.isEmpty else {
+            state = .idle
+            return
+        }
+        if let cached = cache[key] {
+            state = cached
+            return
+        }
+        state = .loading
+        task = Task { [weak self] in
+            let result = await Self.fetch(title: title, artist: artist, album: album, duration: duration)
+            guard !Task.isCancelled, let self else { return }
+            // A failed request isn't cached, so the next look tries again.
+            if let result { self.cache[key] = result }
+            if self.trackKey == key { self.state = result ?? .notFound }
+        }
+    }
+
+    func reset() {
+        task?.cancel()
+        trackKey = ""
+        state = .idle
+    }
+
+    /// The line being sung at `time`, if any has started yet.
+    static func lineIndex(in lines: [LyricLine], at time: TimeInterval) -> Int? {
+        var low = 0
+        var high = lines.count - 1
+        var found: Int?
+        while low <= high {
+            let middle = (low + high) / 2
+            if lines[middle].time <= time {
+                found = middle
+                low = middle + 1
+            } else {
+                high = middle - 1
+            }
+        }
+        return found
+    }
+
+    // MARK: Network
+
+    private struct Record: Decodable {
+        let duration: Double?
+        let instrumental: Bool?
+        let plainLyrics: String?
+        let syncedLyrics: String?
+    }
+
+    /// nil when LRCLIB couldn't be reached.
+    nonisolated private static func fetch(
+        title: String,
+        artist: String,
+        album: String,
+        duration: TimeInterval
+    ) async -> LyricsState? {
+        var items = [
+            URLQueryItem(name: "track_name", value: title),
+            URLQueryItem(name: "artist_name", value: artist)
+        ]
+        if !album.isEmpty { items.append(URLQueryItem(name: "album_name", value: album)) }
+        if duration > 0 { items.append(URLQueryItem(name: "duration", value: String(Int(duration.rounded())))) }
+
+        switch await request(path: "/api/get", items: items) {
+        case .failure:
+            return nil
+        case .success(let data):
+            if let data, let record = try? JSONDecoder().decode(Record.self, from: data),
+               let state = state(from: record) {
+                return state
+            }
+        }
+
+        // No exact match: search and take the closest length.
+        let searchItems = [
+            URLQueryItem(name: "track_name", value: title),
+            URLQueryItem(name: "artist_name", value: artist)
+        ]
+        guard case .success(let data) = await request(path: "/api/search", items: searchItems) else { return nil }
+        guard let data, let records = try? JSONDecoder().decode([Record].self, from: data) else {
+            return .notFound
+        }
+        let ranked = records.sorted {
+            abs(($0.duration ?? 0) - duration) < abs(($1.duration ?? 0) - duration)
+        }
+        if let synced = ranked.first(where: { $0.syncedLyrics?.isEmpty == false }),
+           let state = state(from: synced) {
+            return state
+        }
+        return ranked.first.flatMap(state(from:)) ?? .notFound
+    }
+
+    nonisolated private static func state(from record: Record) -> LyricsState? {
+        if record.instrumental == true { return .instrumental }
+        if let synced = record.syncedLyrics, !synced.isEmpty {
+            let lines = parse(synced)
+            if !lines.isEmpty { return .synced(lines) }
+        }
+        if record.plainLyrics?.isEmpty == false { return .unsynced }
+        return nil
+    }
+
+    /// `.success(nil)` means "not found".
+    nonisolated private static func request(path: String, items: [URLQueryItem]) async -> Result<Data?, Error> {
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = "lrclib.net"
+        components.path = path
+        components.queryItems = items
+        guard let url = components.url else { return .success(nil) }
+        var request = URLRequest(url: url, timeoutInterval: 10)
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2"
+        request.setValue("islo/\(version) (https://github.com/OzdmrYsn/islo)", forHTTPHeaderField: "User-Agent")
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            if status == 404 { return .success(nil) }
+            guard (200..<300).contains(status) else { return .failure(URLError(.badServerResponse)) }
+            return .success(data)
+        } catch {
+            return .failure(error)
+        }
+    }
+
+    /// Parses LRC lines such as "[01:02.50]text"; a line may carry several
+    /// timestamps, and empty lines become a musical pause.
+    nonisolated static func parse(_ lrc: String) -> [LyricLine] {
+        guard let pattern = try? NSRegularExpression(pattern: #"\[(\d{1,3}):(\d{1,2}(?:[.:]\d{1,3})?)\]"#) else {
+            return []
+        }
+        var lines: [LyricLine] = []
+        for raw in lrc.components(separatedBy: .newlines) {
+            let range = NSRange(raw.startIndex..., in: raw)
+            let matches = pattern.matches(in: raw, range: range)
+            guard let last = matches.last, let textRange = Range(last.range, in: raw) else { continue }
+            let text = raw[textRange.upperBound...].trimmingCharacters(in: .whitespaces)
+            for match in matches {
+                guard let minutes = Range(match.range(at: 1), in: raw).flatMap({ Double(raw[$0]) }),
+                      let seconds = Range(match.range(at: 2), in: raw)
+                        .flatMap({ Double(raw[$0].replacingOccurrences(of: ":", with: ".")) }) else { continue }
+                lines.append(LyricLine(time: minutes * 60 + seconds, text: text.isEmpty ? "♪" : text))
+            }
+        }
+        return lines.sorted { $0.time < $1.time }
+    }
+}

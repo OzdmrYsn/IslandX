@@ -125,6 +125,8 @@ struct DynamicNotchView: View {
     @ObservedObject private var powerMonitor = PowerMonitor.shared
     @ObservedObject private var audioDevices = AudioDeviceManager.shared
     @ObservedObject private var privacyMonitor = PrivacyMonitor.shared
+    @ObservedObject private var lyricsManager = LyricsManager.shared
+    @AppStorage("dashboard.lyrics.visible") private var showsLyrics = false
 
     private let layout: NotchLayout
     private let onPreferredSizeChange: (CGSize, Bool) -> Void
@@ -372,6 +374,13 @@ struct DynamicNotchView: View {
         }
         .onReceive(mediaManager.$trackChangeRevision.dropFirst()) { _ in
             showTrackChangePreviewIfNeeded()
+        }
+        // Next run-loop pass, once the artist and album have caught up too.
+        .onReceive(mediaManager.$trackName.removeDuplicates().receive(on: RunLoop.main)) { _ in
+            if showsLyrics { loadLyrics() }
+        }
+        .onChange(of: settings.lyricsEnabled) { enabled in
+            if !enabled { lyricsManager.reset() }
         }
         .onReceive(mediaManager.$volume.dropFirst().removeDuplicates()) { value in
             guard settings.dashboardCommandEchoEnabled else { return }
@@ -2149,7 +2158,10 @@ struct DynamicNotchView: View {
                 Spacer(minLength: 8)
 
                 VStack {
-                    sourceBadge
+                    HStack(spacing: 6) {
+                        if settings.lyricsEnabled { lyricsToggle }
+                        sourceBadge
+                    }
                     Spacer(minLength: 0)
                 }
             }
@@ -2157,7 +2169,11 @@ struct DynamicNotchView: View {
 
             Spacer(minLength: 8)
 
-            progressSection
+            if settings.lyricsEnabled && showsLyrics {
+                lyricsSection
+            } else {
+                progressSection
+            }
 
             Spacer(minLength: 6)
 
@@ -2169,6 +2185,86 @@ struct DynamicNotchView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var lyricsToggle: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) { showsLyrics.toggle() }
+            if showsLyrics { loadLyrics() }
+        } label: {
+            Image(systemName: "quote.bubble.fill")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(showsLyrics ? Color.white : primaryColor.opacity(0.72))
+                .frame(width: 30, height: 22)
+                .background(Capsule().fill(showsLyrics ? accent : primaryColor.opacity(0.09)))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .help(showsLyrics ? localized("İlerleme çubuğunu göster", "Show progress") : localized("Şarkı sözlerini göster", "Show lyrics"))
+        .accessibilityLabel(Text(localized("Şarkı sözleri", "Lyrics")))
+    }
+
+    /// The line being sung, big, and the next one, dim; it slides up as the
+    /// song moves on.
+    private var lyricsSection: some View {
+        TimelineView(.animation(minimumInterval: 0.2, paused: !mediaManager.isPlaying)) { context in
+            let content = lyricsContent(at: mediaManager.estimatedPosition(at: context.date))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(content.current)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(primaryColor)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .id("current-\(content.index)")
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .bottom).combined(with: .opacity),
+                        removal: .move(edge: .top).combined(with: .opacity)
+                    ))
+                Text(content.next)
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(primaryColor.opacity(0.42))
+                    .lineLimit(1)
+                    .id("next-\(content.index)")
+                    .transition(.opacity)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: 38, alignment: .leading)
+            .clipped()
+            .animation(.easeOut(duration: 0.28), value: content.index)
+        }
+        .onAppear(perform: loadLyrics)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func lyricsContent(at time: TimeInterval) -> (index: Int, current: String, next: String) {
+        switch lyricsManager.state {
+        case .synced(let lines):
+            // A hair early, so the line appears as it's sung.
+            if let index = LyricsManager.lineIndex(in: lines, at: time + 0.15) {
+                return (index, lines[index].text, index + 1 < lines.count ? lines[index + 1].text : "")
+            }
+            return (-1, "♪", lines.first?.text ?? "")
+        case .loading:
+            return (-2, localized("Sözler yükleniyor…", "Loading lyrics…"), "")
+        case .instrumental:
+            return (-3, localized("♪ Enstrümantal", "♪ Instrumental"), "")
+        case .unsynced:
+            return (-4, localized("Bu şarkının zamanlı sözü yok", "No synced lyrics for this song"), "LRCLIB")
+        case .notFound:
+            return (-5, localized("Söz bulunamadı", "No lyrics found"), "LRCLIB")
+        case .idle:
+            return (-6, mediaManager.hasActiveTrack ? "♪" : localized("Çalan şarkı yok", "Nothing playing"), "")
+        }
+    }
+
+    private func loadLyrics() {
+        guard settings.lyricsEnabled, mediaManager.hasActiveTrack else { return }
+        lyricsManager.load(
+            title: mediaManager.trackName,
+            artist: mediaManager.artistName,
+            album: mediaManager.albumName,
+            duration: mediaManager.duration
+        )
     }
 
     @ViewBuilder
