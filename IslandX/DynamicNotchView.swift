@@ -120,7 +120,6 @@ struct NotchLayout: Equatable {
 
 struct DynamicNotchView: View {
     @ObservedObject private var mediaManager: MediaManager
-    @ObservedObject private var powerMonitor: PowerMonitor
     @ObservedObject private var settings: AppSettings
 
     private let layout: NotchLayout
@@ -143,8 +142,6 @@ struct DynamicNotchView: View {
     @State private var isInteracting = false
     @State private var hoverTask: Task<Void, Never>?
     @State private var trackChangeTask: Task<Void, Never>?
-    @State private var chargingAnimationTask: Task<Void, Never>?
-    @State private var isChargingAnimationVisible = false
     @State private var isTemporaryTrackPreview = false
     @State private var scrubValue: Double = 0
     @State private var isScrubbing = false
@@ -153,13 +150,11 @@ struct DynamicNotchView: View {
 
     init(
         mediaManager: MediaManager,
-        powerMonitor: PowerMonitor,
         settings: AppSettings,
         layout: NotchLayout,
         onPreferredSizeChange: @escaping (CGSize, Bool) -> Void = { _, _ in }
     ) {
         _mediaManager = ObservedObject(wrappedValue: mediaManager)
-        _powerMonitor = ObservedObject(wrappedValue: powerMonitor)
         _settings = ObservedObject(wrappedValue: settings)
         self.layout = layout
         self.onPreferredSizeChange = onPreferredSizeChange
@@ -197,32 +192,9 @@ struct DynamicNotchView: View {
         }
         .clipShape(notchShape)
         .overlay {
-            ZStack {
-                if !layout.hasCameraHousing {
-                    notchShape
-                        .stroke(primaryColor.opacity(0.13), lineWidth: 0.5)
-                }
-
-                if settings.contentMode == .dashboard,
-                   settings.dashboardReactiveLightEnabled,
-                   !isHiddenMiniIdle {
-                    ReactiveNotchLight(
-                        layout: layout,
-                        expansionProgress: expansionProgress,
-                        isActive: mediaManager.isPlaying || presentation == .expanded,
-                        reduceMotion: reduceMotion
-                    )
-                }
-
-                if isChargingAnimationVisible {
-                    ChargingConnectionOverlay(
-                        layout: layout,
-                        expansionProgress: expansionProgress,
-                        batteryPercentage: powerMonitor.batteryPercentage,
-                        reduceMotion: reduceMotion
-                    )
-                    .transition(.opacity)
-                }
+            if !layout.hasCameraHousing {
+                notchShape
+                    .stroke(primaryColor.opacity(0.13), lineWidth: 0.5)
             }
         }
         .contentShape(notchShape)
@@ -235,7 +207,6 @@ struct DynamicNotchView: View {
         .onDisappear {
             hoverTask?.cancel()
             trackChangeTask?.cancel()
-            chargingAnimationTask?.cancel()
         }
         .onReceive(mediaManager.$playbackPosition) { newValue in
             guard !isScrubbing else { return }
@@ -257,27 +228,8 @@ struct DynamicNotchView: View {
             guard presentation == .idle else { return }
             onPreferredSizeChange(preferredSize, !reduceMotion)
         }
-        .onChange(of: settings.dashboardAutoHideWhenIdle) { _ in
-            guard presentation == .idle,
-                  settings.contentMode == .dashboard else { return }
-            onPreferredSizeChange(preferredSize, !reduceMotion)
-        }
-        .onChange(of: settings.dashboardHoverExpansionEnabled) { enabled in
-            guard !enabled,
-                  settings.contentMode == .dashboard,
-                  presentation == .expanded,
-                  !isPinned,
-                  !isTemporaryTrackPreview else { return }
-            setPresentation(.idle)
-        }
-        .onChange(of: settings.dashboardChargingAnimationEnabled) { enabled in
-            if enabled, powerMonitor.isConnectedToPower {
-                showChargingConnectionAnimation()
-            } else if !enabled {
-                hideChargingConnectionAnimation()
-            }
-        }
         .onChange(of: settings.contentMode) { _ in
+            guard presentation == .expanded else { return }
             onPreferredSizeChange(preferredSize, !reduceMotion)
         }
         .onReceive(
@@ -291,9 +243,6 @@ struct DynamicNotchView: View {
         }
         .onReceive(mediaManager.$trackChangeRevision.dropFirst()) { _ in
             showTrackChangePreviewIfNeeded()
-        }
-        .onReceive(powerMonitor.$connectionRevision.dropFirst()) { _ in
-            showChargingConnectionAnimation()
         }
         .onReceive(
             NotificationCenter.default.publisher(for: .islandXCollapse)
@@ -1454,17 +1403,13 @@ struct DynamicNotchView: View {
             }
 
             let shouldExpand: Bool
-            if settings.contentMode == .dashboard {
-                shouldExpand = settings.dashboardHoverExpansionEnabled
-            } else {
-                switch settings.activationMode {
-                case .hover:
-                    shouldExpand = true
-                case .click:
-                    shouldExpand = false
-                case .activationZone:
-                    shouldExpand = isInsideActivationZone(location)
-                }
+            switch settings.activationMode {
+            case .hover:
+                shouldExpand = true
+            case .click:
+                shouldExpand = false
+            case .activationZone:
+                shouldExpand = isInsideActivationZone(location)
             }
 
             if shouldExpand {
@@ -1479,14 +1424,7 @@ struct DynamicNotchView: View {
             guard !isPinned, !isInteracting else { return }
             guard presentation == .expanded else { return }
 
-            let collapsesAfterHover: Bool
-            if settings.contentMode == .dashboard {
-                collapsesAfterHover = settings.dashboardHoverExpansionEnabled
-            } else {
-                collapsesAfterHover = settings.activationMode != .click
-            }
-
-            if collapsesAfterHover || isTemporaryTrackPreview {
+            if settings.activationMode != .click || isTemporaryTrackPreview {
                 schedulePresentation(.idle)
             }
         }
@@ -1541,41 +1479,6 @@ struct DynamicNotchView: View {
 
             isTemporaryTrackPreview = false
             setPresentation(.idle)
-        }
-    }
-
-    private func showChargingConnectionAnimation() {
-        guard settings.contentMode == .dashboard,
-              settings.dashboardChargingAnimationEnabled,
-              powerMonitor.isConnectedToPower else {
-            return
-        }
-
-        chargingAnimationTask?.cancel()
-        withAnimation(.easeOut(duration: 0.18)) {
-            isChargingAnimationVisible = true
-        }
-
-        chargingAnimationTask = Task { @MainActor in
-            do {
-                try await Task<Never, Never>.sleep(
-                    nanoseconds: 2_600_000_000
-                )
-            } catch {
-                return
-            }
-
-            guard !Task.isCancelled else { return }
-            withAnimation(.easeOut(duration: 0.3)) {
-                isChargingAnimationVisible = false
-            }
-        }
-    }
-
-    private func hideChargingConnectionAnimation() {
-        chargingAnimationTask?.cancel()
-        withAnimation(.easeOut(duration: 0.2)) {
-            isChargingAnimationVisible = false
         }
     }
 
@@ -1652,7 +1555,7 @@ struct DynamicNotchView: View {
         onPreferredSizeChange(
             layout.size(
                 for: newValue,
-                idleMode: settings.effectiveIdleMode,
+                idleMode: settings.notchIdleMode,
                 contentMode: settings.contentMode
             ),
             !reduceMotion
@@ -1669,14 +1572,14 @@ struct DynamicNotchView: View {
     private var preferredSize: CGSize {
         layout.size(
             for: presentation,
-            idleMode: settings.effectiveIdleMode,
+            idleMode: settings.notchIdleMode,
             contentMode: settings.contentMode
         )
     }
 
     private var isHiddenMiniIdle: Bool {
         layout.hasCameraHousing &&
-            settings.effectiveIdleMode == .hiddenMini &&
+            settings.notchIdleMode == .hiddenMini &&
             presentation == .idle
     }
 
@@ -1882,129 +1785,6 @@ private struct AdaptiveNotchShape: Shape {
         progress: CGFloat
     ) -> CGFloat {
         start + (end - start) * progress
-    }
-}
-
-private struct ReactiveNotchLight: View {
-    let layout: NotchLayout
-    let expansionProgress: CGFloat
-    let isActive: Bool
-    let reduceMotion: Bool
-
-    var body: some View {
-        TimelineView(
-            .animation(
-                minimumInterval: 1.0 / 24.0,
-                paused: reduceMotion || !isActive
-            )
-        ) { context in
-            let elapsed = context.date.timeIntervalSinceReferenceDate
-            let rotation = reduceMotion
-                ? 0
-                : elapsed.truncatingRemainder(dividingBy: 6) * 60
-
-            AdaptiveNotchShape(
-                layout: layout,
-                expansionProgress: expansionProgress
-            )
-            .stroke(
-                AngularGradient(
-                    gradient: Gradient(colors: [
-                        Color.cyan.opacity(0.9),
-                        Color.blue.opacity(0.78),
-                        Color.purple.opacity(0.9),
-                        Color.cyan.opacity(0.9)
-                    ]),
-                    center: .center,
-                    angle: .degrees(rotation)
-                ),
-                style: StrokeStyle(
-                    lineWidth: isActive ? 1.7 : 1.1,
-                    lineCap: .round,
-                    lineJoin: .round
-                )
-            )
-            .opacity(isActive ? 0.9 : 0.58)
-            .shadow(
-                color: Color.cyan.opacity(isActive ? 0.42 : 0.18),
-                radius: isActive ? 5 : 2
-            )
-        }
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
-}
-
-private struct ChargingConnectionOverlay: View {
-    let layout: NotchLayout
-    let expansionProgress: CGFloat
-    let batteryPercentage: Int?
-    let reduceMotion: Bool
-
-    @State private var pulse = false
-
-    var body: some View {
-        GeometryReader { proxy in
-            ZStack(alignment: .top) {
-                AdaptiveNotchShape(
-                    layout: layout,
-                    expansionProgress: expansionProgress
-                )
-                .stroke(
-                    Color.green.opacity(pulse ? 0.95 : 0.45),
-                    lineWidth: pulse ? 2.4 : 1.4
-                )
-                .shadow(
-                    color: Color.green.opacity(pulse ? 0.65 : 0.25),
-                    radius: pulse ? 9 : 3
-                )
-
-                if layout.hasCameraHousing {
-                    let wingWidth = max(
-                        (proxy.size.width - layout.cameraHousingWidth) / 2,
-                        0
-                    )
-
-                    HStack(spacing: 0) {
-                        Color.clear.frame(width: wingWidth)
-                        Color.clear.frame(width: layout.cameraHousingWidth)
-                        chargingBadge
-                            .frame(width: wingWidth, alignment: .leading)
-                    }
-                    .frame(height: layout.notchBandHeight + 8)
-                } else {
-                    chargingBadge
-                        .padding(.top, 7)
-                }
-            }
-        }
-        .onAppear {
-            guard !reduceMotion else { return }
-            withAnimation(
-                .easeInOut(duration: 0.65)
-                    .repeatForever(autoreverses: true)
-            ) {
-                pulse = true
-            }
-        }
-        .allowsHitTesting(false)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Connected to power"))
-    }
-
-    private var chargingBadge: some View {
-        HStack(spacing: 3) {
-            Image(systemName: "bolt.fill")
-                .font(.system(size: 10, weight: .bold))
-
-            if let batteryPercentage {
-                Text("\(batteryPercentage)%")
-                    .font(.system(size: 8, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-            }
-        }
-        .foregroundStyle(Color.green)
-        .padding(.leading, 9)
     }
 }
 

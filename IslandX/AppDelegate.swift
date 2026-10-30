@@ -5,7 +5,6 @@ import Combine
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let settings = AppSettings.shared
     private let updateManager = UpdateManager.shared
-    private let powerMonitor = PowerMonitor()
 
     private var mediaManager: MediaManager?
     private var notchWindowController: FloatingNotchWindowController?
@@ -32,7 +31,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let mediaManager = MediaManager()
         let windowController = FloatingNotchWindowController(
             mediaManager: mediaManager,
-            powerMonitor: powerMonitor,
             settings: settings
         )
 
@@ -41,7 +39,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         windowController.showWindow(nil)
         mediaManager.startMonitoring()
-        powerMonitor.startMonitoring()
 
         if !settings.onboardingCompleted {
             DispatchQueue.main.async { [weak self] in
@@ -52,7 +49,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         mediaManager?.stopMonitoring()
-        powerMonitor.stopMonitoring()
         NotificationCenter.default.removeObserver(self)
     }
 

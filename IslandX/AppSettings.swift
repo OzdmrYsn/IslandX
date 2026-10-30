@@ -234,10 +234,6 @@ final class AppSettings: ObservableObject {
         static let showOnTrackChange = "interaction.showOnTrackChange"
         static let trackChangeDisplayDuration = "interaction.trackChangeDisplayDuration"
         static let hideInFullScreen = "interaction.hideInFullScreen"
-        static let dashboardHoverExpansion = "dashboard.hoverExpansion"
-        static let dashboardAutoHideWhenIdle = "dashboard.autoHideWhenIdle"
-        static let dashboardReactiveLight = "dashboard.reactiveLight"
-        static let dashboardChargingAnimation = "dashboard.chargingAnimation"
         static let onboardingCompleted = "onboarding.completed"
     }
 
@@ -300,42 +296,6 @@ final class AppSettings: ObservableObject {
     @Published var hideInFullScreen: Bool {
         didSet {
             defaults.set(hideInFullScreen, forKey: Key.hideInFullScreen)
-        }
-    }
-
-    @Published var dashboardHoverExpansionEnabled: Bool {
-        didSet {
-            defaults.set(
-                dashboardHoverExpansionEnabled,
-                forKey: Key.dashboardHoverExpansion
-            )
-        }
-    }
-
-    @Published var dashboardAutoHideWhenIdle: Bool {
-        didSet {
-            defaults.set(
-                dashboardAutoHideWhenIdle,
-                forKey: Key.dashboardAutoHideWhenIdle
-            )
-        }
-    }
-
-    @Published var dashboardReactiveLightEnabled: Bool {
-        didSet {
-            defaults.set(
-                dashboardReactiveLightEnabled,
-                forKey: Key.dashboardReactiveLight
-            )
-        }
-    }
-
-    @Published var dashboardChargingAnimationEnabled: Bool {
-        didSet {
-            defaults.set(
-                dashboardChargingAnimationEnabled,
-                forKey: Key.dashboardChargingAnimation
-            )
         }
     }
 
@@ -406,27 +366,6 @@ final class AppSettings: ObservableObject {
 
         hideInFullScreen = defaults.bool(forKey: Key.hideInFullScreen)
 
-        dashboardHoverExpansionEnabled = Self.boolPreference(
-            defaults,
-            key: Key.dashboardHoverExpansion,
-            defaultValue: true
-        )
-        dashboardAutoHideWhenIdle = Self.boolPreference(
-            defaults,
-            key: Key.dashboardAutoHideWhenIdle,
-            defaultValue: false
-        )
-        dashboardReactiveLightEnabled = Self.boolPreference(
-            defaults,
-            key: Key.dashboardReactiveLight,
-            defaultValue: true
-        )
-        dashboardChargingAnimationEnabled = Self.boolPreference(
-            defaults,
-            key: Key.dashboardChargingAnimation,
-            defaultValue: true
-        )
-
         onboardingCompleted = defaults.bool(
             forKey: Key.onboardingCompleted
         )
@@ -459,20 +398,6 @@ final class AppSettings: ObservableObject {
         showOnTrackChange = true
         trackChangeDisplayDuration = 3.5
         hideInFullScreen = false
-    }
-
-    func resetDashboardFeatureDefaults() {
-        dashboardHoverExpansionEnabled = true
-        dashboardAutoHideWhenIdle = false
-        dashboardReactiveLightEnabled = true
-        dashboardChargingAnimationEnabled = true
-    }
-
-    var effectiveIdleMode: NotchIdleMode {
-        if contentMode == .dashboard {
-            return dashboardAutoHideWhenIdle ? .hiddenMini : .visibleIsland
-        }
-        return notchIdleMode
     }
 
     func setLaunchAtLogin(_ enabled: Bool) {
@@ -514,16 +439,5 @@ final class AppSettings: ObservableObject {
         _ status: SMAppService.Status
     ) -> Bool {
         status == .enabled || status == .requiresApproval
-    }
-
-    private static func boolPreference(
-        _ defaults: UserDefaults,
-        key: String,
-        defaultValue: Bool
-    ) -> Bool {
-        guard defaults.object(forKey: key) != nil else {
-            return defaultValue
-        }
-        return defaults.bool(forKey: key)
     }
 }

@@ -19,7 +19,6 @@
 		A10000000000000000000010 /* AuxiliaryWindowControllers.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000013 /* AuxiliaryWindowControllers.swift */; };
 		B10000000000000000000001 /* UpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000001 /* UpdateManager.swift */; };
 		B10000000000000000000002 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = B40000000000000000000001 /* Sparkle */; };
-		C10000000000000000000001 /* PowerMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000001 /* PowerMonitor.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -37,7 +36,6 @@
 		A20000000000000000000012 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		A20000000000000000000013 /* AuxiliaryWindowControllers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuxiliaryWindowControllers.swift; sourceTree = "<group>"; };
 		B20000000000000000000001 /* UpdateManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateManager.swift; sourceTree = "<group>"; };
-		C20000000000000000000001 /* PowerMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerMonitor.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -71,7 +69,6 @@
 				A20000000000000000000012 /* OnboardingView.swift */,
 				A20000000000000000000013 /* AuxiliaryWindowControllers.swift */,
 				B20000000000000000000001 /* UpdateManager.swift */,
-				C20000000000000000000001 /* PowerMonitor.swift */,
 				A20000000000000000000003 /* WindowController.swift */,
 				A20000000000000000000004 /* MediaManager.swift */,
 				A20000000000000000000005 /* DynamicNotchView.swift */,
@@ -174,7 +171,6 @@
 				A10000000000000000000009 /* OnboardingView.swift in Sources */,
 				A10000000000000000000010 /* AuxiliaryWindowControllers.swift in Sources */,
 				B10000000000000000000001 /* UpdateManager.swift in Sources */,
-				C10000000000000000000001 /* PowerMonitor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
