@@ -14,10 +14,10 @@ let language = 'tr';
 const copy = {
   tr: {
     captions: {
-      home: 'Ana: çalan parça, kontroller ve günün özeti tek bakışta.',
+      home: 'Ana: yeni şarkı kartı — sözler, tek tıkla ses çıkışı — yanında hava durumu ve sıradaki toplantın.',
       notifications: 'Bildirimler: gelen her şey tek listede, uygulamaya göre filtrelenir.',
-      calendar: 'Takvim: bugün, bu hafta ve tek dokunuşla yeni etkinlik.',
-      timer: 'Zamanlayıcı: Pomodoro ya da serbest süre, çentiğin kendi tasarımıyla.',
+      calendar: 'Takvim: bu hafta ve gerçek etkinliklerin; video görüşmelerine tek tıkla katıl.',
+      timer: 'Zamanlayıcı: kadranı çevir ya da −/+ ile istediğin süre; sağda bugünkü odağın.',
       shelf: 'Dosya Rafı: sürükle bırak; küçük resimler, filtreler ve AirDrop.',
       clipboard: 'Pano: son kopyaların; bağlantılar tek tıkla açılır.'
     },
@@ -25,16 +25,33 @@ const copy = {
   },
   en: {
     captions: {
-      home: 'Home: what’s playing, controls, and your day at a glance.',
+      home: 'Home: the new song card — lyrics, one-click audio output — with the weather and your next meeting beside it.',
       notifications: 'Notifications: everything that arrived, filtered by app.',
-      calendar: 'Calendar: today, this week, and a new event in one tap.',
-      timer: 'Timer: Pomodoro or a free countdown, in the notch’s own design.',
+      calendar: 'Calendar: this week and your real events; join video calls in one click.',
+      timer: 'Timer: turn the dial or use −/+ for any length; today’s focus on the right.',
       shelf: 'File Shelf: drag and drop, with thumbnails, filters, and AirDrop.',
       clipboard: 'Clipboard: your recent copies; links open in one click.'
     },
     notchLabel: 'The islo. notch — click to open'
   }
 };
+
+/* Invented lines for the made-up track on this page. */
+const lyricLines = {
+  tr: ['Şehrin ışıkları camda', 'Bir tren geçer gece yarısı', 'Raylar adını fısıldar', 'Sabaha kadar yol bizim', '♪'],
+  en: ['City lights on the window', 'A train rolls past midnight', 'The rails whisper your name', 'The road is ours till morning', '♪']
+};
+
+const t = (tr, en) => (language === 'tr' ? tr : en);
+const pct = (value) => (language === 'tr' ? `%${value}` : `${value}%`);
+
+function minutesText(minutes) {
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (!hours) return t(`${minutes} dk`, `${minutes} min`);
+  if (!rest) return t(`${hours} sa`, `${hours} h`);
+  return t(`${hours} sa ${rest} dk`, `${hours} h ${rest} min`);
+}
 
 function setLanguage(next) {
   language = next === 'en' ? 'en' : 'tr';
@@ -43,6 +60,7 @@ function setLanguage(next) {
   $$('[data-tr]').forEach((el) => { el.textContent = el.dataset[language]; });
   $$('[data-tr-html]').forEach((el) => { el.innerHTML = el.dataset[`${language}Html`]; });
   $$('[data-tr-aria]').forEach((el) => { el.setAttribute('aria-label', el.dataset[`${language}Aria`]); });
+  $$('.js-pct').forEach((el) => { el.textContent = pct(el.dataset.v); });
   $$('[data-language]').forEach((button) => {
     button.setAttribute('aria-pressed', String(button.dataset.language === language));
   });
@@ -51,6 +69,8 @@ function setLanguage(next) {
   refreshDates();
   updateCaption();
   updateThemeName();
+  renderTimer();
+  renderLyric(false);
 }
 
 $$('[data-language]').forEach((button) => {
@@ -60,12 +80,23 @@ $$('[data-language]').forEach((button) => {
 /* ---------------------------------------------------------- Date & time */
 
 function locale() { return language === 'tr' ? 'tr-TR' : 'en-US'; }
+function clock(date) { return new Intl.DateTimeFormat(locale(), { hour: '2-digit', minute: '2-digit' }).format(date); }
+function minutesFromNow(minutes) {
+  const date = new Date(Date.now() + minutes * 60000);
+  date.setSeconds(0, 0);
+  return date;
+}
+function todayAt(hours, minutes) {
+  const date = new Date();
+  date.setHours(hours, minutes, 0, 0);
+  return date;
+}
 
 function refreshDates() {
   const now = new Date();
   const fmt = (options) => new Intl.DateTimeFormat(locale(), options).format(now);
 
-  const time = fmt({ hour: '2-digit', minute: '2-digit' });
+  const time = clock(now);
   $$('.js-time, .js-clock').forEach((el) => { el.textContent = time; });
   $$('.js-weekday').forEach((el) => { el.textContent = fmt({ weekday: 'long' }).toLocaleUpperCase(locale()); });
   $$('.js-date').forEach((el) => { el.textContent = fmt({ day: 'numeric', month: 'short' }); });
@@ -73,6 +104,13 @@ function refreshDates() {
   $$('.js-monthyear').forEach((el) => { el.textContent = fmt({ month: 'long', year: 'numeric' }); });
   $$('.js-longdate').forEach((el) => { el.textContent = fmt({ day: 'numeric', month: 'long', year: 'numeric' }); });
   $$('.js-year').forEach((el) => { el.textContent = String(now.getFullYear()); });
+
+  // Events keep a fixed distance from "now", like a real calendar would.
+  const soon = clock(minutesFromNow(12));
+  const meeting = clock(minutesFromNow(5));
+  $$('.js-ev-soon').forEach((el) => { el.textContent = t(`12 dk sonra · ${soon}`, `In 12 min · ${soon}`); });
+  $$('.js-meet-time').forEach((el) => { el.textContent = t(`5 dk sonra · ${meeting}`, `In 5 min · ${meeting}`); });
+  $$('.js-ev-later').forEach((el) => { el.textContent = `${clock(todayAt(19, 30))} – ${clock(todayAt(21, 0))}`; });
 
   const week = $('.js-week');
   if (week) {
@@ -94,7 +132,7 @@ function refreshDates() {
   }
 }
 
-setInterval(refreshDates, 20000);
+setInterval(() => { refreshDates(); renderTimer(); }, 20000);
 
 /* ---------------------------------------------------------------- Theme */
 
@@ -120,7 +158,7 @@ const tones = [
 let theme = { accent: 'blue', tone: 'subtle' };
 try {
   const saved = JSON.parse(localStorage.getItem('islo-theme') || 'null');
-  if (saved && accents.some((a) => a.id === saved.accent) && tones.some((t) => t.id === saved.tone)) theme = saved;
+  if (saved && accents.some((a) => a.id === saved.accent) && tones.some((tone) => tone.id === saved.tone)) theme = saved;
 } catch { /* ignore */ }
 
 function hexToRgb(hex) {
@@ -131,7 +169,7 @@ function hexToRgb(hex) {
 function applyTheme(next, { announce = false } = {}) {
   theme = { ...theme, ...next };
   const accent = accents.find((a) => a.id === theme.accent);
-  const tone = tones.find((t) => t.id === theme.tone);
+  const tone = tones.find((item) => item.id === theme.tone);
   const root = document.documentElement.style;
   root.setProperty('--accent', accent.hex);
   root.setProperty('--accent-rgb', hexToRgb(accent.hex));
@@ -147,7 +185,7 @@ function applyTheme(next, { announce = false } = {}) {
 
 function updateThemeName() {
   const accent = accents.find((a) => a.id === theme.accent);
-  const tone = tones.find((t) => t.id === theme.tone);
+  const tone = tones.find((item) => item.id === theme.tone);
   $$('.js-theme-name').forEach((el) => { el.textContent = `${accent[language]} · ${tone[language]}`; });
   $$('.swatch').forEach((el) => {
     const item = accents.find((a) => a.id === el.dataset.accent);
@@ -155,7 +193,7 @@ function updateThemeName() {
     el.title = item[language];
   });
   $$('.tone').forEach((el) => {
-    const item = tones.find((t) => t.id === el.dataset.tone);
+    const item = tones.find((tone) => tone.id === el.dataset.tone);
     $('span', el).textContent = item[language];
   });
 }
@@ -213,14 +251,24 @@ function animateVolume() {
   }, 110);
 }
 
+/* The hero's story: a day with islo., one moment after another. */
 const story = [
   ['idle', 1000],
-  ['music', 2600],
-  ['volume', 2300],
-  ['music', 1500],
-  ['notification', 3800],
-  ['music', 2200]
+  ['music', 2400],
+  ['volume', 2200],
+  ['countdown', 2800],
+  ['timesup', 2600],
+  ['music', 1400],
+  ['meeting', 3600],
+  ['charging', 2600],
+  ['airpods', 3000],
+  ['privacy', 2600],
+  ['notification', 3600],
+  ['music', 2000]
 ];
+
+const flashDurations = { notification: 4200, meeting: 4200, airpods: 3600, timesup: 3000 };
+const sequences = { devices: [['charging', 2600], ['airpods', 3200]] };
 
 function stopStory() {
   clearTimeout(storyTimer);
@@ -242,12 +290,21 @@ function showBase() {
   setState(baseMode);
 }
 
-function flashNotch(state, duration = 3000) {
-  if (isOpen) return;
+function flashSequence(steps) {
+  if (isOpen || !steps.length) return;
   stopStory();
   clearTimeout(flashTimer);
+  const [[state, duration], ...rest] = steps;
   setState(state);
-  flashTimer = setTimeout(() => { flashTimer = null; showBase(); }, duration);
+  flashTimer = setTimeout(() => {
+    flashTimer = null;
+    if (rest.length) flashSequence(rest);
+    else showBase();
+  }, duration);
+}
+
+function flashNotch(state, duration = flashDurations[state] || 3200) {
+  flashSequence(sequences[state] || [[state, duration]]);
 }
 
 function openNotch() {
@@ -285,20 +342,27 @@ document.addEventListener('click', (event) => {
   if (isOpen && !notch.contains(event.target)) closeNotch();
 });
 
+/* ⌥Space toggles the page's notch, like the app's shortcut. */
+document.addEventListener('keydown', (event) => {
+  if (event.altKey && event.code === 'Space' && !event.metaKey && !event.ctrlKey) {
+    event.preventDefault();
+    isOpen ? closeNotch() : openNotch();
+  }
+});
+
 const playButton = $('.nd-play', notch);
 playButton.addEventListener('click', (event) => {
   event.stopPropagation();
-  const waves = $$('.wave');
   const paused = playButton.classList.toggle('is-paused');
   $('use', playButton).setAttribute('href', paused ? '#i-play' : '#i-pause');
-  waves.forEach((wave) => wave.classList.toggle('paused', paused));
+  $$('.wave').forEach((wave) => wave.classList.toggle('paused', paused));
 });
 
 $$('[data-play]').forEach((button) => {
   button.addEventListener('click', () => {
     const state = button.dataset.play;
     if (state === 'story') { baseMode = 'story'; isOpen = false; playStory(0); return; }
-    flashNotch(state, state === 'notification' ? 4200 : 3200);
+    flashNotch(state);
   });
 });
 
@@ -318,10 +382,30 @@ const momentObserver = new IntersectionObserver((entries) => {
   entries.forEach((entry) => {
     if (!entry.isIntersecting) return;
     momentObserver.unobserve(entry.target);
-    flashNotch(entry.target.dataset.notch, 3200);
+    flashNotch(entry.target.dataset.notch);
   });
 }, { threshold: 0.85 });
 $$('.moment[data-notch]').forEach((card) => momentObserver.observe(card));
+
+/* The closed notch's countdown wings tick for real. */
+const countdownTime = $('.js-cd-time');
+const countdownRing = $('.js-cd-ring');
+const countdownLength = 2 * Math.PI * 9;
+const countdownTotal = 25 * 60;
+let countdownLeft = 24 * 60 + 12;
+
+function renderCountdown() {
+  const minutes = String(Math.floor(countdownLeft / 60)).padStart(2, '0');
+  const seconds = String(countdownLeft % 60).padStart(2, '0');
+  countdownTime.textContent = `${minutes}:${seconds}`;
+  countdownRing.style.strokeDashoffset = String(countdownLength * (1 - countdownLeft / countdownTotal));
+}
+if (!reduceMotion) {
+  setInterval(() => {
+    countdownLeft = countdownLeft > 0 ? countdownLeft - 1 : countdownTotal;
+    renderCountdown();
+  }, 1000);
+}
 
 /* ------------------------------------------------------------- Showcase */
 
@@ -332,11 +416,30 @@ const tabs = $$('.d-tab');
 const tabOrder = tabs.map((tab) => tab.dataset.tab);
 let autoTab = !reduceMotion;
 let tabTimer = null;
+let lyricsTourTimer = null;
+
+function stopTour() {
+  autoTab = false;
+  clearTimeout(tabTimer);
+  clearTimeout(lyricsTourTimer);
+}
 
 function selectTab(tab) {
   dash.dataset.tab = tab;
   tabs.forEach((button) => button.setAttribute('aria-selected', String(button.dataset.tab === tab)));
   updateCaption();
+  setOutputs(false);
+  setLyrics(false);
+  scheduleLyricsTour();
+}
+
+/* On the tour, Home turns its lyrics on halfway through. */
+function scheduleLyricsTour() {
+  clearTimeout(lyricsTourTimer);
+  if (!autoTab || dash.dataset.tab !== 'home') return;
+  lyricsTourTimer = setTimeout(() => {
+    if (autoTab && dash.dataset.tab === 'home') setLyrics(true);
+  }, 2600);
 }
 
 function updateCaption() {
@@ -351,13 +454,12 @@ function scheduleNextTab() {
     const next = tabOrder[(tabOrder.indexOf(dash.dataset.tab) + 1) % tabOrder.length];
     selectTab(next);
     scheduleNextTab();
-  }, 5200);
+  }, 5600);
 }
 
 tabs.forEach((tab) => {
   tab.addEventListener('click', () => {
-    autoTab = false;
-    clearTimeout(tabTimer);
+    stopTour();
     selectTab(tab.dataset.tab);
   });
 });
@@ -372,44 +474,312 @@ new ResizeObserver(fitDash).observe(screen);
 /* Start the tab tour only once the device is on screen. */
 const deviceObserver = new IntersectionObserver((entries) => {
   entries.forEach((entry) => {
-    if (entry.isIntersecting) scheduleNextTab();
-    else clearTimeout(tabTimer);
+    if (entry.isIntersecting) {
+      scheduleNextTab();
+      if (!mediaCard.classList.contains('show-lyrics')) scheduleLyricsTour();
+    } else {
+      clearTimeout(tabTimer);
+      clearTimeout(lyricsTourTimer);
+    }
   });
 }, { threshold: 0.4 });
 deviceObserver.observe($('#device'));
 
-/* A working Pomodoro in the timer tab. */
-const ring = $('.js-ring');
-const timerLabel = $('.js-timer');
+/* Home: the song plays on, lyrics scroll, and the output can change. */
+const mediaCard = $('#mediaCard');
+const lyricsToggle = $('.js-lyrics-toggle');
+const lyricsBox = $('.js-lyrics');
+const songLength = 179;
+let songTime = 69;
+let lyricIndex = 0;
+let lyricTimer = null;
+
+function formatSongTime(seconds) {
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
+function renderSong() {
+  $('.js-song-progress').style.setProperty('--p', (songTime / songLength).toFixed(4));
+  $('.js-song-elapsed').textContent = formatSongTime(songTime);
+  $('.js-song-left').textContent = `-${formatSongTime(songLength - songTime)}`;
+}
+if (!reduceMotion) {
+  setInterval(() => {
+    songTime = songTime >= songLength ? 0 : songTime + 1;
+    renderSong();
+  }, 1000);
+}
+
+function renderLyric(animate) {
+  const lines = lyricLines[language];
+  $('.js-lyric-now').textContent = lines[lyricIndex % lines.length];
+  $('.js-lyric-next').textContent = lines[(lyricIndex + 1) % lines.length];
+  if (animate) {
+    lyricsBox.classList.remove('swap');
+    void lyricsBox.offsetWidth;
+    lyricsBox.classList.add('swap');
+  }
+}
+
+function setLyrics(on) {
+  mediaCard.classList.toggle('show-lyrics', on);
+  lyricsToggle.setAttribute('aria-pressed', String(on));
+  clearInterval(lyricTimer);
+  if (!on) return;
+  renderLyric(false);
+  if (!reduceMotion) {
+    lyricTimer = setInterval(() => {
+      lyricIndex += 1;
+      renderLyric(true);
+    }, 2600);
+  }
+}
+
+lyricsToggle.addEventListener('click', () => {
+  stopTour();
+  setLyrics(!mediaCard.classList.contains('show-lyrics'));
+});
+
+function setOutputs(on) {
+  mediaCard.classList.toggle('show-outputs', on);
+}
+$('.js-output-toggle').addEventListener('click', () => { stopTour(); setOutputs(true); });
+$('.js-output-close').addEventListener('click', () => setOutputs(false));
+$$('.out-chip').forEach((chip) => {
+  chip.addEventListener('click', () => {
+    $$('.out-chip').forEach((other) => other.classList.toggle('on', other === chip));
+    $('.js-output-icon').setAttribute('href', `#i-${chip.dataset.out}`);
+    setTimeout(() => setOutputs(false), 350);
+  });
+});
+
+/* Timer: a working Pomodoro and a kitchen-timer dial. */
+const timerCard = $('#timerCard');
+const dial = $('.js-dial');
+const dialArc = $('.js-dial-arc');
+const dialHead = $('.js-dial-head');
 const timerToggle = $('.js-timer-toggle');
-const ringLength = 2 * Math.PI * 52;
-const total = 25 * 60;
-let remaining = total;
-let countdown = null;
+const arcLength = 2 * Math.PI * 55;
+const ranges = { minutes: [1, 180], focus: [5, 90], brk: [1, 30] };
+const timer = {
+  mode: 'pomodoro',
+  minutes: 10,
+  focus: 25,
+  brk: 5,
+  isBreak: false,
+  remaining: 25 * 60,
+  running: false,
+  focusDone: 50,
+  sessions: 2
+};
+let timerInterval = null;
+
+function buildTicks() {
+  const group = $('.js-ticks');
+  const ns = 'http://www.w3.org/2000/svg';
+  for (let i = 0; i < 60; i += 1) {
+    const major = i % 5 === 0;
+    const angle = (i / 60) * 2 * Math.PI;
+    const outer = 69;
+    const inner = outer - (major ? 5 : 2.5);
+    const line = document.createElementNS(ns, 'line');
+    line.setAttribute('x1', (70 + outer * Math.sin(angle)).toFixed(2));
+    line.setAttribute('y1', (70 - outer * Math.cos(angle)).toFixed(2));
+    line.setAttribute('x2', (70 + inner * Math.sin(angle)).toFixed(2));
+    line.setAttribute('y2', (70 - inner * Math.cos(angle)).toFixed(2));
+    if (major) line.classList.add('major');
+    group.append(line);
+  }
+}
+
+function totalSeconds() {
+  if (timer.mode === 'timer') return timer.minutes * 60;
+  return (timer.isBreak ? timer.brk : timer.focus) * 60;
+}
+
+/* Timer mode: one turn is an hour. Pomodoro: what's left of the phase. */
+function dialFraction() {
+  if (timer.mode === 'timer') return Math.min(timer.remaining / 3600, 1);
+  return timer.remaining / totalSeconds();
+}
+
+/* Single minutes up to 10, then fives — like the app. */
+function stepped(value, up, [low, high]) {
+  const next = up
+    ? (value < 10 ? value + 1 : (Math.floor(value / 5) + 1) * 5)
+    : (value <= 10 ? value - 1 : Math.floor((value - 1) / 5) * 5);
+  return Math.min(Math.max(next, low), high);
+}
+
+function formatClock(seconds) {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = String(Math.floor(seconds / 60) % 60).padStart(2, '0');
+  const rest = String(seconds % 60).padStart(2, '0');
+  return hours ? `${hours}:${minutes}:${rest}` : `${minutes}:${rest}`;
+}
+
+function focusTotalText(minutes) {
+  return minutes < 60 ? t(`${minutes} dk`, `${minutes} min`) : minutesText(minutes);
+}
 
 function renderTimer() {
-  const minutes = String(Math.floor(remaining / 60)).padStart(2, '0');
-  const seconds = String(remaining % 60).padStart(2, '0');
-  timerLabel.textContent = `${minutes}:${seconds}`;
-  const progress = Math.max(1 - remaining / total, 0.004);
-  ring.style.strokeDasharray = String(ringLength);
-  ring.style.strokeDashoffset = String(ringLength * (1 - progress));
+  if (!timerCard) return;
+  timerCard.dataset.mode = timer.mode;
+  timerCard.classList.toggle('running', timer.running);
+
+  $('.js-timer').textContent = formatClock(timer.remaining);
+  const fraction = Math.max(dialFraction(), 0);
+  dialArc.style.strokeDasharray = String(arcLength);
+  dialArc.style.strokeDashoffset = String(arcLength * (1 - Math.max(fraction, 0.002)));
+  const angle = fraction * 2 * Math.PI;
+  dialHead.setAttribute('cx', (70 + 55 * Math.sin(angle)).toFixed(2));
+  dialHead.setAttribute('cy', (70 - 55 * Math.cos(angle)).toFixed(2));
+  dialHead.style.opacity = fraction > 0.004 ? '1' : '0';
+
+  $('.js-phase').textContent = timer.mode === 'timer'
+    ? t('Zamanlayıcı', 'Timer')
+    : (timer.isBreak ? t('Mola', 'Break') : t('Odak', 'Focus'));
+  $$('.js-seg button').forEach((button) => button.classList.toggle('on', button.dataset.mode === timer.mode));
+
+  $('.js-focus-value').textContent = minutesText(timer.focus);
+  $('.js-break-value').textContent = minutesText(timer.brk);
+  $('.js-minutes-value').textContent = minutesText(timer.minutes);
+  $$('[data-step]').forEach((button) => {
+    const [key, direction] = button.dataset.step.split(':');
+    const [low, high] = ranges[key];
+    button.disabled = timer.running || (direction === '-' ? timer[key] <= low : timer[key] >= high);
+  });
+  $$('.js-presets button').forEach((button) => {
+    button.classList.toggle('on', Number(button.dataset.min) === timer.minutes);
+  });
+
+  $('use', timerToggle).setAttribute('href', timer.running ? '#i-pause' : '#i-play');
+  timerToggle.setAttribute('aria-label', timer.running ? t('Duraklat', 'Pause') : t('Başlat', 'Start'));
+
+  $('.js-focus-total').textContent = focusTotalText(timer.focusDone);
+  $$('.js-session-bars i').forEach((bar, index) => bar.classList.toggle('on', index < timer.sessions % 4));
+  $('.js-sessions').textContent = t(
+    `${timer.sessions} seans tamamlandı`,
+    `${timer.sessions} ${timer.sessions === 1 ? 'session' : 'sessions'} done`
+  );
+  $('.js-end-label').textContent = timer.running ? t('Bitiş', 'Ends') : t('Şimdi başlarsan', 'If you start now');
+  $('.js-end-time').textContent = clock(new Date(Date.now() + timer.remaining * 1000));
+  $('.js-next-row').hidden = timer.mode !== 'pomodoro';
+  $('.js-next-text').textContent = timer.isBreak
+    ? t(`${timer.focus} dk odak`, `${timer.focus} min focus`)
+    : t(`${timer.brk} dk mola`, `${timer.brk} min break`);
+  $('use', $('.js-next-icon')).setAttribute('href', timer.isBreak ? '#i-timer' : '#i-cup');
+}
+
+function setDuration(key, value) {
+  timer[key] = value;
+  const isCurrent = timer.mode === 'timer' ? key === 'minutes' : key === (timer.isBreak ? 'brk' : 'focus');
+  if (isCurrent && !timer.running) timer.remaining = totalSeconds();
+  renderTimer();
+}
+
+function stopCountdown() {
+  clearInterval(timerInterval);
+  timerInterval = null;
+  timer.running = false;
+}
+
+function tickTimer() {
+  timer.remaining -= 1;
+  if (timer.remaining > 0) { renderTimer(); return; }
+  stopCountdown();
+  if (timer.mode === 'timer' || !timer.isBreak) {
+    timer.focusDone += Math.round(totalSeconds() / 60);
+    if (timer.mode === 'pomodoro') timer.sessions += 1;
+  }
+  if (timer.mode === 'pomodoro') timer.isBreak = !timer.isBreak;
+  timer.remaining = totalSeconds();
+  renderTimer();
+  flashNotch('timesup');
 }
 
 timerToggle.addEventListener('click', () => {
-  autoTab = false;
-  clearTimeout(tabTimer);
-  if (countdown) {
-    clearInterval(countdown);
-    countdown = null;
-    $('use', timerToggle).setAttribute('href', '#i-play');
-    return;
+  stopTour();
+  if (timer.running) {
+    stopCountdown();
+  } else {
+    if (timer.remaining <= 0) timer.remaining = totalSeconds();
+    timer.running = true;
+    timerInterval = setInterval(tickTimer, 1000);
   }
-  $('use', timerToggle).setAttribute('href', '#i-pause');
-  countdown = setInterval(() => {
-    remaining = remaining > 0 ? remaining - 1 : total;
+  renderTimer();
+});
+
+$('.js-timer-reset').addEventListener('click', () => {
+  stopTour();
+  stopCountdown();
+  timer.isBreak = false;
+  timer.remaining = totalSeconds();
+  renderTimer();
+});
+
+$('.js-timer-skip').addEventListener('click', () => {
+  stopTour();
+  if (timer.mode !== 'pomodoro') return;
+  stopCountdown();
+  timer.isBreak = !timer.isBreak;
+  timer.remaining = totalSeconds();
+  renderTimer();
+});
+
+$$('.js-seg button').forEach((button) => {
+  button.addEventListener('click', () => {
+    stopTour();
+    stopCountdown();
+    timer.mode = button.dataset.mode;
+    timer.isBreak = false;
+    timer.remaining = totalSeconds();
     renderTimer();
-  }, 1000);
+  });
+});
+
+$$('[data-step]').forEach((button) => {
+  button.addEventListener('click', () => {
+    stopTour();
+    const [key, direction] = button.dataset.step.split(':');
+    setDuration(key, stepped(timer[key], direction === '+', ranges[key]));
+  });
+});
+
+$$('.js-presets button').forEach((button) => {
+  button.addEventListener('click', () => {
+    stopTour();
+    setDuration('minutes', Number(button.dataset.min));
+  });
+});
+
+/* Drag around the dial to set up to an hour. */
+let draggingDial = false;
+function minutesAt(event) {
+  const box = dial.getBoundingClientRect();
+  const dx = event.clientX - (box.left + box.width / 2);
+  const dy = event.clientY - (box.top + box.height / 2);
+  if (Math.hypot(dx, dy) < box.width * 0.22) return null;
+  let angle = Math.atan2(dx, -dy);
+  if (angle < 0) angle += 2 * Math.PI;
+  const minutes = Math.round((angle / (2 * Math.PI)) * 60);
+  return minutes === 0 ? 60 : minutes;
+}
+dial.addEventListener('pointerdown', (event) => {
+  if (timer.mode !== 'timer' || timer.running) return;
+  stopTour();
+  draggingDial = true;
+  try { dial.setPointerCapture(event.pointerId); } catch { /* not a live pointer */ }
+  const minutes = minutesAt(event);
+  if (minutes) setDuration('minutes', minutes);
+});
+dial.addEventListener('pointermove', (event) => {
+  if (!draggingDial) return;
+  const minutes = minutesAt(event);
+  if (minutes && minutes !== timer.minutes) setDuration('minutes', minutes);
+});
+['pointerup', 'pointercancel'].forEach((type) => {
+  dial.addEventListener(type, () => { draggingDial = false; });
 });
 
 /* Mini volume HUD in the moments section. */
@@ -437,8 +807,11 @@ $$('.reveal').forEach((el) => revealObserver.observe(el));
 
 buildThemePicker();
 applyTheme(theme);
+buildTicks();
+renderSong();
+renderCountdown();
 selectTab('home');
-renderTimer();
+clearTimeout(lyricsTourTimer);
 
 let initialLanguage = navigator.language.toLowerCase().startsWith('tr') ? 'tr' : 'en';
 try { initialLanguage = localStorage.getItem('islo-language') || initialLanguage; } catch { /* ignore */ }

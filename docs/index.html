@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#050507">
   <meta name="color-scheme" content="dark">
-  <meta name="description" content="islo. 2.0 — MacBook çentiğini müziğe, bildirimlere, dosyalara ve gününe açılan bir kapıya dönüştürür.">
+  <meta name="description" content="islo. 2.1 — MacBook çentiğini müziğe, takvime, bildirimlere, dosyalara ve gününe açılan canlı bir kapıya dönüştürür.">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="islo. 2.0 — Çentiğin artık bir işi var">
-  <meta property="og:description" content="Müzik, bildirimler, dosya rafı, pano ve zamanlayıcı — hepsi MacBook çentiğinde.">
+  <meta property="og:title" content="islo. 2.1 — Çentiğin artık bir işi var">
+  <meta property="og:description" content="Müzik ve şarkı sözleri, takvim, zamanlayıcı, şarj ve AirPods, bildirimler, dosya rafı ve pano — hepsi MacBook çentiğinde.">
   <meta property="og:url" content="https://ozdmrysn.github.io/islo/">
   <meta property="og:image" content="https://ozdmrysn.github.io/islo/assets/islo-icon.png">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="islo. 2.0">
+  <meta name="twitter:title" content="islo. 2.1">
   <meta name="twitter:description" content="Your MacBook notch, finally useful.">
   <meta name="twitter:image" content="https://ozdmrysn.github.io/islo/assets/islo-icon.png">
   <title>islo. — Çentiğin artık bir işi var</title>
@@ -34,7 +34,6 @@
       <symbol id="i-tray" viewBox="0 0 24 24"><path d="M3 13.5 5.5 5h13L21 13.5V19a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 19Zm0 0h5l1.5 2.5h5L16 13.5h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
       <symbol id="i-clip" viewBox="0 0 24 24"><path d="M9 3.5h6v3H9z" fill="currentColor"/><path d="M8 5H6.5A1.5 1.5 0 0 0 5 6.5v13A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5v-13A1.5 1.5 0 0 0 17.5 5H16M8.5 11h7M8.5 15h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
       <symbol id="i-gear" viewBox="0 0 24 24"><path d="M12 8.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8Zm8.5 4.6v-2.4l-2.3-.5a6.7 6.7 0 0 0-.7-1.6l1.3-2-1.7-1.7-2 1.3a6.7 6.7 0 0 0-1.6-.7L13 3.5h-2.4l-.5 2.3a6.7 6.7 0 0 0-1.6.7l-2-1.3-1.7 1.7 1.3 2a6.7 6.7 0 0 0-.7 1.6l-2.3.5v2.4l2.3.5c.2.6.4 1.1.7 1.6l-1.3 2 1.7 1.7 2-1.3c.5.3 1 .5 1.6.7l.5 2.3H13l.5-2.3c.6-.2 1.1-.4 1.6-.7l2 1.3 1.7-1.7-1.3-2c.3-.5.5-1 .7-1.6z" fill="currentColor"/></symbol>
-      <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="10" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
       <symbol id="i-chevron-up" viewBox="0 0 24 24"><path d="m6 15 6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12.5-7.5z" fill="currentColor"/></symbol>
       <symbol id="i-pause" viewBox="0 0 24 24"><path d="M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z" fill="currentColor"/></symbol>
@@ -60,6 +59,17 @@
       <symbol id="i-message" viewBox="0 0 24 24"><path d="M12 4C7 4 3.5 7.2 3.5 11c0 2.1 1.1 4 2.9 5.3L5.5 20l4-2.1c.8.2 1.6.3 2.5.3 5 0 8.5-3.2 8.5-7.1S17 4 12 4Z" fill="currentColor"/></symbol>
       <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5.5" width="18" height="13" rx="2.5" fill="currentColor"/><path d="m4 7.5 8 6 8-6" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="i-note" viewBox="0 0 24 24"><path d="M9 18V6l11-2v12" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="6.5" cy="18" r="2.6" fill="currentColor"/><circle cx="17.5" cy="16" r="2.6" fill="currentColor"/></symbol>
+      <symbol id="i-quote" viewBox="0 0 24 24"><path d="M12 3.5c-5 0-9 3.3-9 7.4 0 2.2 1.1 4.1 2.9 5.5L5 20.5l4.4-2.3c.8.2 1.7.3 2.6.3 5 0 9-3.3 9-7.5S17 3.5 12 3.5Z" fill="currentColor"/><path d="M8.4 13.4c0-1.8.9-3 2.5-3.7l.4.9c-.8.4-1.3 1-1.3 1.7h1.3v2.4H8.4zm4.6 0c0-1.8.9-3 2.5-3.7l.4.9c-.8.4-1.3 1-1.3 1.7h1.3v2.4H13z" fill="#000" fill-opacity=".5"/></symbol>
+      <symbol id="i-laptop" viewBox="0 0 24 24"><rect x="4.5" y="5" width="15" height="10.5" rx="1.6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M2.5 18.5h19" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+      <symbol id="i-display" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 16v4M8 20.5h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+      <symbol id="i-airpods" viewBox="0 0 24 24"><path d="M7.2 4a3.4 3.4 0 0 0-3.4 3.5c0 1.8 1.3 3.2 3 3.4v7.8a1.4 1.4 0 0 0 2.8 0V7.8A3.6 3.6 0 0 0 7.2 4Zm9.6 0a3.4 3.4 0 0 1 3.4 3.5c0 1.8-1.3 3.2-3 3.4v7.8a1.4 1.4 0 0 1-2.8 0V7.8A3.6 3.6 0 0 1 16.8 4Z" fill="currentColor"/></symbol>
+      <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13.5 2 5 13.5h6L10 22l9-12h-6.2z" fill="currentColor"/></symbol>
+      <symbol id="i-cloud-sun" viewBox="0 0 24 24"><circle cx="8.5" cy="8.5" r="4" fill="#ffcc33"/><path d="M8.5 1.8v1.6M2 8.5h1.6M3.9 3.9l1.1 1.1M13.1 3.9 12 5" stroke="#ffcc33" stroke-width="1.8" stroke-linecap="round"/><path d="M17.5 11a4.6 4.6 0 0 0-8.7 1.4A3.6 3.6 0 0 0 9.2 20h8.6a4.5 4.5 0 0 0-.3-9Z" fill="#fff"/></symbol>
+      <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5.5 21V4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M6.5 4.5h11l-2.2 4 2.2 4h-11z" fill="currentColor"/></symbol>
+      <symbol id="i-cup" viewBox="0 0 24 24"><path d="M4 9h12v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5zm12 1.5h1.5a2.5 2.5 0 0 1 0 5H16" fill="currentColor"/><path d="M3 21h15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+      <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></symbol>
+      <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2.8 4.5 5.6v5.6c0 4.6 3.2 8.5 7.5 9.8 4.3-1.3 7.5-5.2 7.5-9.8V5.6z" fill="currentColor"/><path d="m8.5 12 2.4 2.4 4.6-4.8" fill="none" stroke="#000" stroke-opacity=".55" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     </defs>
   </svg>
 
@@ -103,7 +113,38 @@
 
     <div class="nl nl-ready" aria-hidden="true">
       <svg class="nl-icon"><use href="#i-download"/></svg>
-      <span class="nl-pct" data-tr="islo. 2.0 hazır" data-en="islo. 2.0 is ready">islo. 2.0 hazır</span>
+      <span class="nl-pct" data-tr="islo. 2.1 hazır" data-en="islo. 2.1 is ready">islo. 2.1 hazır</span>
+    </div>
+
+    <!-- A running timer: the closed notch's wings count down. -->
+    <div class="nl nl-countdown" aria-hidden="true">
+      <span class="cd-ring"><svg viewBox="0 0 24 24"><circle class="cd-bg" cx="12" cy="12" r="9"/><circle class="cd-fg js-cd-ring" cx="12" cy="12" r="9"/></svg><svg class="cd-ico"><use href="#i-timer"/></svg></span>
+      <span class="cd-time js-cd-time">24:12</span>
+    </div>
+
+    <div class="nl nl-timesup" aria-hidden="true">
+      <span class="nl-lead"><svg class="nl-icon ring-bell"><use href="#i-bell"/></svg><span data-tr="Süre doldu" data-en="Time's up">Süre doldu</span></span>
+      <span class="nl-detail" data-tr="Zamanlayıcı bitti" data-en="Timer finished">Zamanlayıcı bitti</span>
+    </div>
+
+    <div class="nl nl-meeting" aria-hidden="true">
+      <span class="nl-lead"><span class="cal-ico"><svg><use href="#i-calendar"/></svg></span><span class="two"><b data-tr="Tasarım incelemesi" data-en="Design review">Tasarım incelemesi</b><small class="js-meet-time">5 dk sonra · 14:00</small></span></span>
+      <span class="join" data-tr="Katıl" data-en="Join">Katıl</span>
+    </div>
+
+    <div class="nl nl-charging" aria-hidden="true">
+      <span class="nl-lead"><span class="battery"><i></i><svg class="bolt"><use href="#i-bolt"/></svg></span><span data-tr="Şarj oluyor" data-en="Charging">Şarj oluyor</span></span>
+      <span class="nl-pct">64%</span>
+    </div>
+
+    <div class="nl nl-airpods" aria-hidden="true">
+      <span class="nl-lead"><svg class="nl-icon"><use href="#i-airpods"/></svg><span>AirPods Pro</span></span>
+      <span class="levels"><span><i data-tr="Sol" data-en="L">Sol</i><span class="js-pct" data-v="82">%82</span></span><span><i data-tr="Sağ" data-en="R">Sağ</i><span class="js-pct" data-v="78">%78</span></span><span class="lv-case"><i data-tr="Kutu" data-en="Case">Kutu</i><span class="js-pct" data-v="45">%45</span></span></span>
+    </div>
+
+    <div class="nl nl-privacy" aria-hidden="true">
+      <span class="pdots"><i class="cam"></i><i class="mic"></i></span>
+      <span class="pname">Zoom</span>
     </div>
 
     <div class="nl nl-dash">
@@ -116,6 +157,7 @@
         <div class="nd-card nd-media">
           <span class="mini-art big"></span>
           <div class="nd-track">
+            <small class="nd-status"><span class="wave tiny"><i></i><i></i><i></i><i></i></span><span data-tr="ŞİMDİ ÇALIYOR" data-en="NOW PLAYING">ŞİMDİ ÇALIYOR</span></small>
             <strong data-tr="Gece Yarısı Treni" data-en="Midnight Train">Gece Yarısı Treni</strong>
             <span>Lofi Ensemble</span>
             <span class="nd-progress"><i></i></span>
@@ -123,6 +165,7 @@
           <button class="nd-play" type="button" aria-label="Oynat / duraklat" data-tr-aria="Oynat / duraklat" data-en-aria="Play / pause"><svg><use href="#i-pause"/></svg></button>
         </div>
         <div class="nd-card nd-day">
+          <span class="nd-weather"><svg><use href="#i-cloud-sun"/></svg>18° <small>İstanbul</small></span>
           <span class="eyebrow-red js-weekday">CUMA</span>
           <strong class="js-date">30 Eki</strong>
           <span class="js-time">21:07</span>
@@ -160,9 +203,9 @@
     <!-- Hero -->
     <section class="hero" data-notch="story">
       <div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
-      <p class="hero-badge reveal"><span class="pulse"></span><span data-tr="Yeni · islo. 2.0" data-en="New · islo. 2.0">Yeni · islo. 2.0</span></p>
+      <p class="hero-badge reveal"><span class="pulse"></span><span data-tr="Yeni · islo. 2.1 · Canlı çentik" data-en="New · islo. 2.1 · A live notch">Yeni · islo. 2.1 · Canlı çentik</span></p>
       <h1 class="reveal" data-tr-html="Çentiğin artık <em>bir işi</em> var." data-en-html="Your notch, <em>finally</em> useful.">Çentiğin artık <em>bir işi</em> var.</h1>
-      <p class="lead reveal" data-tr="islo., MacBook'unun kamera çentiğini müziğe, bildirimlere, dosyalara ve gününe açılan küçük bir kapıya dönüştürür." data-en="islo. turns your MacBook's camera notch into a small door to your music, notifications, files, and day.">islo., MacBook'unun kamera çentiğini müziğe, bildirimlere, dosyalara ve gününe açılan küçük bir kapıya dönüştürür.</p>
+      <p class="lead reveal" data-tr="islo., MacBook'unun kamera çentiğini müziğe, takvimine, bildirimlere, dosyalara ve gününe açılan küçük bir kapıya dönüştürür — ve gerektiğinde kendisi haber verir." data-en="islo. turns your MacBook's camera notch into a small door to your music, calendar, notifications, files, and day — and it speaks up when something needs you.">islo., MacBook'unun kamera çentiğini müziğe, takvimine, bildirimlere, dosyalara ve gününe açılan küçük bir kapıya dönüştürür — ve gerektiğinde kendisi haber verir.</p>
       <div class="hero-actions reveal">
         <a class="btn btn-primary" href="https://github.com/OzdmrYsn/islo/releases/latest/download/islo.dmg">
           <svg><use href="#i-download"/></svg><span data-tr="macOS için indir" data-en="Download for macOS">macOS için indir</span>
@@ -171,7 +214,7 @@
           <svg><use href="#i-github"/></svg><span data-tr="Yenilikler" data-en="Release notes">Yenilikler</span>
         </a>
       </div>
-      <p class="hero-meta reveal">2.0.0 · macOS 13+ · Apple Silicon &amp; Intel · <span data-tr="Ücretsiz" data-en="Free">Ücretsiz</span></p>
+      <p class="hero-meta reveal">2.1.0 · macOS 13+ · Apple Silicon &amp; Intel · <span data-tr="Ücretsiz" data-en="Free">Ücretsiz</span></p>
 
       <button class="look-up reveal" type="button" data-play="story">
         <span class="look-arrow" aria-hidden="true">↑</span>
@@ -184,7 +227,7 @@
       <header class="section-head reveal">
         <p class="eyebrow" data-tr="Bir çentik, altı alan" data-en="One notch, six places">Bir çentik, altı alan</p>
         <h2 data-tr-html="Açıldığında, <em>gününün tamamı.</em>" data-en-html="Open it, and there's <em>your whole day.</em>">Açıldığında, <em>gününün tamamı.</em></h2>
-        <p data-tr="Üzerine gel ya da tıkla: çentik yukarıdan büyür, içinde müzik, bildirimler, takvim, zamanlayıcı, dosyalar ve pano bekler." data-en="Hover or click: the notch grows from the top, with music, notifications, calendar, timer, files, and clipboard inside.">Üzerine gel ya da tıkla: çentik yukarıdan büyür, içinde müzik, bildirimler, takvim, zamanlayıcı, dosyalar ve pano bekler.</p>
+        <p data-tr="Üzerine gel, tıkla ya da ⌥Space'e bas: çentik yukarıdan büyür; içinde şarkı ve sözleri, hava durumu, sıradaki toplantın, zamanlayıcı, bildirimler, dosyalar ve pano bekler." data-en="Hover, click, or press ⌥Space: the notch grows from the top, with your song and its lyrics, the weather, your next meeting, a timer, notifications, files, and clipboard inside.">Üzerine gel, tıkla ya da ⌥Space'e bas: çentik yukarıdan büyür; içinde şarkı ve sözleri, hava durumu, sıradaki toplantın, zamanlayıcı, bildirimler, dosyalar ve pano bekler.</p>
       </header>
 
       <div class="device reveal" id="device">
@@ -208,7 +251,6 @@
                 </div>
                 <div class="d-housing" aria-hidden="true"></div>
                 <div class="d-actions" aria-hidden="true">
-                  <span class="d-round"><svg><use href="#i-sliders"/></svg></span>
                   <span class="d-round"><svg><use href="#i-gear"/></svg></span>
                   <span class="d-round"><svg><use href="#i-chevron-up"/></svg></span>
                 </div>
@@ -217,34 +259,53 @@
               <!-- Home -->
               <div class="d-pane" data-pane="home">
                 <div class="d-row">
-                  <div class="d-card d-grow">
-                    <div class="media-head">
-                      <span class="art art-1"></span>
-                      <div class="media-meta">
+                  <div class="d-card d-grow d-media" id="mediaCard">
+                    <div class="m-head">
+                      <span class="art lg"></span>
+                      <div class="m-meta">
+                        <small class="m-status"><span class="wave tiny"><i></i><i></i><i></i><i></i></span><span data-tr="ŞİMDİ ÇALIYOR" data-en="NOW PLAYING">ŞİMDİ ÇALIYOR</span></small>
                         <strong data-tr="Gece Yarısı Treni" data-en="Midnight Train">Gece Yarısı Treni</strong>
                         <span>Lofi Ensemble</span>
                       </div>
-                      <span class="source"><svg><use href="#i-note"/></svg>Music</span>
+                      <div class="m-badges">
+                        <button class="q-btn js-lyrics-toggle" type="button" aria-pressed="false" aria-label="Şarkı sözleri" data-tr-aria="Şarkı sözleri" data-en-aria="Lyrics"><svg><use href="#i-quote"/></svg></button>
+                        <span class="src-cap"><svg><use href="#i-note"/></svg>Music</span>
+                      </div>
                     </div>
-                    <div class="scrub"><i style="--p:.62"></i><b style="--p:.62"></b></div>
-                    <div class="scrub-times"><span>2:14</span><span>-1:21</span></div>
-                    <div class="controls">
-                      <svg class="c-mode on"><use href="#i-shuffle"/></svg>
+                    <div class="m-middle">
+                      <div class="m-progress">
+                        <span class="thin"><i class="js-song-progress" style="--p:.38"></i></span>
+                        <div class="scrub-times"><span class="js-song-elapsed">1:09</span><span class="js-song-left">-1:50</span></div>
+                      </div>
+                      <div class="m-lyrics js-lyrics">
+                        <b class="js-lyric-now">♪</b>
+                        <small class="js-lyric-next"></small>
+                      </div>
+                    </div>
+                    <div class="m-controls">
+                      <svg class="c-mode"><use href="#i-shuffle"/></svg>
                       <svg class="c-skip"><use href="#i-prev"/></svg>
                       <span class="c-play"><svg><use href="#i-pause"/></svg></span>
                       <svg class="c-skip"><use href="#i-next"/></svg>
                       <svg class="c-mode on"><use href="#i-repeat"/></svg>
-                      <span class="c-divider"></span>
+                      <span class="m-flex"></span>
+                      <button class="out-btn js-output-toggle" type="button" aria-label="Ses çıkışı" data-tr-aria="Ses çıkışı" data-en-aria="Audio output"><svg><use class="js-output-icon" href="#i-laptop"/></svg></button>
                       <svg class="c-vol"><use href="#i-speaker"/></svg>
-                      <span class="vol-track"><i style="--p:.7"></i></span>
+                      <span class="thin vol"><i style="--p:.56"></i></span>
+                    </div>
+                    <div class="m-outputs">
+                      <button class="out-chip on" data-out="laptop" type="button"><svg><use href="#i-laptop"/></svg><span data-tr="MacBook Pro Hoparlörü" data-en="MacBook Pro Speakers">MacBook Pro Hoparlörü</span></button>
+                      <button class="out-chip" data-out="airpods" type="button"><svg><use href="#i-airpods"/></svg><span>AirPods Pro</span></button>
+                      <button class="out-chip" data-out="display" type="button"><svg><use href="#i-display"/></svg><span>Studio Display</span></button>
+                      <button class="out-close js-output-close" type="button" aria-label="Kapat" data-tr-aria="Kapat" data-en-aria="Close"><svg><use href="#i-x"/></svg></button>
                     </div>
                   </div>
                   <div class="d-card d-side">
-                    <span class="eyebrow-red js-weekday">CUMA</span>
+                    <div class="side-top"><span class="eyebrow-red js-weekday">CUMA</span><span class="wx"><svg><use href="#i-cloud-sun"/></svg><b>18°</b><small>İstanbul</small></span></div>
                     <div class="side-head"><strong class="js-date">30 Eki</strong><span class="js-time">21:07</span></div>
-                    <div class="summary"><span class="s-icon"><svg><use href="#i-calendar"/></svg></span><div><b data-tr="Bugün için hazırsın" data-en="You're clear for today">Bugün için hazırsın</b><small data-tr="Takvimi aç" data-en="Open Calendar">Takvimi aç</small></div></div>
+                    <div class="ev ev-purple"><i class="ev-bar"></i><div><b data-tr="Tasarım incelemesi" data-en="Design review">Tasarım incelemesi</b><small class="js-ev-soon">12 dk sonra · 14:00</small></div><span class="join" data-tr="Katıl" data-en="Join">Katıl</span></div>
                     <small class="s-label" data-tr="Sıradaki" data-en="Up next">Sıradaki</small>
-                    <div class="summary"><span class="s-icon"><svg><use href="#i-plus"/></svg></span><div><b data-tr="Yeni etkinlik" data-en="New event">Yeni etkinlik</b><small data-tr="Takvim'de oluştur" data-en="Create in Calendar">Takvim'de oluştur</small></div></div>
+                    <div class="ev ev-orange"><i class="ev-bar"></i><div><b data-tr="Ekip yemeği" data-en="Team dinner">Ekip yemeği</b><small class="js-ev-later">19:30 – 21:00</small></div><svg class="ev-chev"><use href="#i-chevron-right"/></svg></div>
                   </div>
                 </div>
               </div>
@@ -281,8 +342,8 @@
                     <small class="s-label" data-tr="Bu hafta" data-en="This week">Bu hafta</small>
                     <div class="week js-week"></div>
                     <div class="summary-pair">
-                      <div class="summary"><span class="s-icon"><svg><use href="#i-calendar"/></svg></span><div><b data-tr="Takvimi aç" data-en="Open Calendar">Takvimi aç</b><small class="js-longdate">30 Ekim 2026</small></div></div>
-                      <div class="summary"><span class="s-icon"><svg><use href="#i-plus"/></svg></span><div><b data-tr="Yeni etkinlik" data-en="New event">Yeni etkinlik</b><small data-tr="Takvim'de oluştur" data-en="Create in Calendar">Takvim'de oluştur</small></div></div>
+                      <div class="ev ev-purple"><i class="ev-bar"></i><div><b data-tr="Tasarım incelemesi" data-en="Design review">Tasarım incelemesi</b><small class="js-ev-soon">12 dk sonra · 14:00</small></div><span class="join" data-tr="Katıl" data-en="Join">Katıl</span></div>
+                      <div class="ev ev-orange"><i class="ev-bar"></i><div><b data-tr="Ekip yemeği" data-en="Team dinner">Ekip yemeği</b><small class="js-ev-later">19:30 – 21:00</small></div><svg class="ev-chev"><use href="#i-chevron-right"/></svg></div>
                     </div>
                   </div>
                 </div>
@@ -291,19 +352,48 @@
               <!-- Timer -->
               <div class="d-pane" data-pane="timer">
                 <div class="d-row">
-                  <div class="d-card d-grow timer-card">
-                    <div class="ring">
-                      <svg viewBox="0 0 120 120"><circle class="ring-bg" cx="60" cy="60" r="52"/><circle class="ring-fg js-ring" cx="60" cy="60" r="52"/></svg>
-                      <div class="ring-label"><strong class="js-timer">25:00</strong><small><i></i><span data-tr="Odak" data-en="Focus">Odak</span></small></div>
+                  <div class="d-card d-grow timer2" id="timerCard" data-mode="pomodoro">
+                    <div class="dial js-dial">
+                      <svg viewBox="0 0 140 140" aria-hidden="true">
+                        <g class="ticks js-ticks"></g>
+                        <circle class="dial-bg" cx="70" cy="70" r="55"/>
+                        <circle class="dial-fg js-dial-arc" cx="70" cy="70" r="55" transform="rotate(-90 70 70)"/>
+                        <circle class="dial-head js-dial-head" cx="70" cy="15" r="2.6"/>
+                      </svg>
+                      <div class="dial-label">
+                        <strong class="js-timer">25:00</strong>
+                        <small><i></i><span class="js-phase">Odak</span></small>
+                        <span class="dial-hint" data-tr="Halkayı çevir" data-en="Turn the dial">Halkayı çevir</span>
+                      </div>
                     </div>
-                    <div class="timer-side">
-                      <div class="seg"><span data-tr="Zamanlayıcı" data-en="Timer">Zamanlayıcı</span><span class="on">Pomodoro</span></div>
-                      <div class="chips"><span class="chip accent" data-tr="Odak · 25 dk" data-en="Focus · 25 min">Odak · 25 dk</span><span class="chip" data-tr="Mola · 5 dk" data-en="Break · 5 min">Mola · 5 dk</span></div>
+                    <div class="t-side">
+                      <div class="seg js-seg"><button type="button" data-mode="timer" data-tr="Zamanlayıcı" data-en="Timer">Zamanlayıcı</button><button type="button" data-mode="pomodoro" class="on">Pomodoro</button></div>
+                      <div class="t-edit t-edit-pomo">
+                        <span class="t-lbl" data-tr="Odak" data-en="Focus">Odak</span>
+                        <span class="stepper"><button type="button" data-step="focus:-" aria-label="Azalt" data-tr-aria="Azalt" data-en-aria="Decrease"><svg><use href="#i-minus"/></svg></button><b class="js-focus-value">25 dk</b><button type="button" data-step="focus:+" aria-label="Artır" data-tr-aria="Artır" data-en-aria="Increase"><svg><use href="#i-plus"/></svg></button></span>
+                        <span class="t-lbl" data-tr="Mola" data-en="Break">Mola</span>
+                        <span class="stepper"><button type="button" data-step="brk:-" aria-label="Azalt" data-tr-aria="Azalt" data-en-aria="Decrease"><svg><use href="#i-minus"/></svg></button><b class="js-break-value">5 dk</b><button type="button" data-step="brk:+" aria-label="Artır" data-tr-aria="Artır" data-en-aria="Increase"><svg><use href="#i-plus"/></svg></button></span>
+                      </div>
+                      <div class="t-edit t-edit-timer">
+                        <span class="stepper"><button type="button" data-step="minutes:-" aria-label="Azalt" data-tr-aria="Azalt" data-en-aria="Decrease"><svg><use href="#i-minus"/></svg></button><b class="js-minutes-value">10 dk</b><button type="button" data-step="minutes:+" aria-label="Artır" data-tr-aria="Artır" data-en-aria="Increase"><svg><use href="#i-plus"/></svg></button></span>
+                        <span class="presets js-presets"><button type="button" data-min="5">5</button><button type="button" data-min="15">15</button><button type="button" data-min="25">25</button><button type="button" data-min="45">45</button></span>
+                      </div>
                       <div class="timer-controls">
                         <button class="t-play js-timer-toggle" type="button" aria-label="Başlat" data-tr-aria="Başlat" data-en-aria="Start"><svg><use href="#i-play"/></svg></button>
-                        <span class="t-round"><svg><use href="#i-reset"/></svg></span>
-                        <span class="t-round"><svg><use href="#i-skip"/></svg></span>
+                        <button class="t-round js-timer-reset" type="button" aria-label="Sıfırla" data-tr-aria="Sıfırla" data-en-aria="Reset"><svg><use href="#i-reset"/></svg></button>
+                        <button class="t-round js-timer-skip" type="button" aria-label="Sonraki aşama" data-tr-aria="Sonraki aşama" data-en-aria="Next phase"><svg><use href="#i-skip"/></svg></button>
                       </div>
+                    </div>
+                  </div>
+                  <div class="d-card today-card">
+                    <span class="today-eyebrow" data-tr="BUGÜN" data-en="TODAY">BUGÜN</span>
+                    <strong class="today-num js-focus-total">50 dk</strong>
+                    <small class="muted" data-tr="odaklandın" data-en="of focus">odaklandın</small>
+                    <div class="sessions js-session-bars"><i></i><i></i><i></i><i></i></div>
+                    <small class="muted js-sessions">2 seans tamamlandı</small>
+                    <div class="info-rows">
+                      <div class="info-row"><span class="ir-ico"><svg><use href="#i-flag"/></svg></span><span class="js-end-label">Şimdi başlarsan</span><b class="js-end-time">14:25</b></div>
+                      <div class="info-row js-next-row"><span class="ir-ico"><svg class="js-next-icon"><use href="#i-cup"/></svg></span><span data-tr="Sıradaki" data-en="Up next">Sıradaki</span><b class="js-next-text">5 dk mola</b></div>
                     </div>
                   </div>
                 </div>
@@ -386,6 +476,27 @@
           <p data-tr="Bir dosyayı tuttuğun anda çentik bırakma alanına dönüşür: rafa koy ya da doğrudan AirDrop ile gönder." data-en="The moment you pick up a file, the notch becomes a drop zone: keep it on the shelf or send it with AirDrop.">Bir dosyayı tuttuğun anda çentik bırakma alanına dönüşür: rafa koy ya da doğrudan AirDrop ile gönder.</p>
           <button class="play-in-notch" type="button" data-play="drop"><span data-tr="Çentikte oynat" data-en="Play in the notch">Çentikte oynat</span> ↑</button>
         </article>
+
+        <article class="moment reveal" data-notch="meeting">
+          <div class="mini-stage"><div class="mini-notch mn-meet"><span class="cal-ico"><svg><use href="#i-calendar"/></svg></span><div><b data-tr="Tasarım incelemesi" data-en="Design review">Tasarım incelemesi</b><small data-tr="5 dk sonra" data-en="In 5 min">5 dk sonra</small></div><span class="join" data-tr="Katıl" data-en="Join">Katıl</span></div></div>
+          <h3 data-tr="Toplantıya beş dakika" data-en="Five minutes to the meeting">Toplantıya beş dakika</h3>
+          <p data-tr="Takvimindeki etkinlik yaklaşınca çentik haber verir. Zoom, Meet ya da Teams bağlantısı varsa Katıl tek tıkla görüşmeyi açar." data-en="As an event on your calendar comes up, the notch tells you. If it has a Zoom, Meet, or Teams link, Join opens the call in one click.">Takvimindeki etkinlik yaklaşınca çentik haber verir. Zoom, Meet ya da Teams bağlantısı varsa Katıl tek tıkla görüşmeyi açar.</p>
+          <button class="play-in-notch" type="button" data-play="meeting"><span data-tr="Çentikte oynat" data-en="Play in the notch">Çentikte oynat</span> ↑</button>
+        </article>
+
+        <article class="moment reveal" data-notch="charging">
+          <div class="mini-stage"><div class="mini-notch mn-devices"><span class="mn-a"><span class="battery"><i></i><svg class="bolt"><use href="#i-bolt"/></svg></span><span class="mn-pct">64%</span></span><span class="mn-b"><svg><use href="#i-airpods"/></svg><span class="mn-levels"><span class="js-pct" data-v="82">%82</span><span class="js-pct" data-v="78">%78</span></span></span></div></div>
+          <h3 data-tr="Şarj ve AirPods" data-en="Charging and AirPods">Şarj ve AirPods</h3>
+          <p data-tr="Şarjı takınca pil yeşile dolar, azalınca uyarır. AirPods bağlanınca sol, sağ ve kutu pil seviyeleri bir bakışta." data-en="Plug in and the battery fills green; run low and it warns you. Connect AirPods and see left, right, and case battery at a glance.">Şarjı takınca pil yeşile dolar, azalınca uyarır. AirPods bağlanınca sol, sağ ve kutu pil seviyeleri bir bakışta.</p>
+          <button class="play-in-notch" type="button" data-play="devices"><span data-tr="Çentikte oynat" data-en="Play in the notch">Çentikte oynat</span> ↑</button>
+        </article>
+
+        <article class="moment reveal" data-notch="privacy">
+          <div class="mini-stage"><div class="mini-notch mn-privacy"><span class="pdots"><i class="cam"></i><i class="mic"></i></span><span class="pname">Zoom</span></div></div>
+          <h3 data-tr="Kamera, mikrofon" data-en="Camera, microphone">Kamera, mikrofon</h3>
+          <p data-tr="Bir uygulama kamerayı ya da mikrofonu açınca çentikte yeşil ve turuncu nokta, yanında uygulamanın adı belirir." data-en="When an app turns on the camera or microphone, a green and orange dot appear in the notch, with the app's name beside them.">Bir uygulama kamerayı ya da mikrofonu açınca çentikte yeşil ve turuncu nokta, yanında uygulamanın adı belirir.</p>
+          <button class="play-in-notch" type="button" data-play="privacy"><span data-tr="Çentikte oynat" data-en="Play in the notch">Çentikte oynat</span> ↑</button>
+        </article>
       </div>
     </section>
 
@@ -419,7 +530,7 @@
     </section>
 
     <!-- Features -->
-    <section class="features" id="features" data-notch="music">
+    <section class="features" id="features" data-notch="countdown">
       <header class="section-head reveal">
         <p class="eyebrow" data-tr="Ve dahası" data-en="And more">Ve dahası</p>
         <h2 data-tr-html="Küçük bir çentikte <em>çok iş.</em>" data-en-html="A lot of work in <em>a small notch.</em>">Küçük bir çentikte <em>çok iş.</em></h2>
@@ -427,36 +538,44 @@
 
       <div class="bento">
         <article class="b-card b-wide reveal">
-          <div class="b-visual wings-visual"><span class="housing"><span class="mini-art"></span><span class="gap"></span><span class="wave accent"><i></i><i></i><i></i><i></i></span></span></div>
-          <h3 data-tr="Müzik, tam zamanında" data-en="Music, right on time">Müzik, tam zamanında</h3>
-          <p data-tr="Spotify veya Music çalınca çentik hafifçe genişler, durunca standart çentiğe döner. Değişiklikler anında yansır." data-en="When Spotify or Music plays, the notch widens slightly and returns to the standard notch when it stops — instantly.">Spotify veya Music çalınca çentik hafifçe genişler, durunca standart çentiğe döner. Değişiklikler anında yansır.</p>
+          <div class="b-visual wings-visual">
+            <span class="housing"><span class="mini-art"></span><span class="gap"></span><span class="wave accent"><i></i><i></i><i></i><i></i></span></span>
+            <span class="lyric-lines" aria-hidden="true"><b data-tr="Bir tren geçer gece yarısı" data-en="A train rolls past midnight">Bir tren geçer gece yarısı</b><small data-tr="Raylar adını fısıldar" data-en="The rails whisper your name">Raylar adını fısıldar</small></span>
+          </div>
+          <h3 data-tr="Müzik, sözleriyle" data-en="Music, with the words">Müzik, sözleriyle</h3>
+          <p data-tr="Spotify veya Music çalınca çentik hafifçe genişler. Şarkı kartında sözler satır satır akar; çıkışı tek tıkla AirPods'a ya da hoparlöre al." data-en="When Spotify or Music plays, the notch widens slightly. The song card shows synced lyrics line by line, and moves the sound to AirPods or speakers in one click.">Spotify veya Music çalınca çentik hafifçe genişler. Şarkı kartında sözler satır satır akar; çıkışı tek tıkla AirPods'a ya da hoparlöre al.</p>
         </article>
         <article class="b-card reveal">
-          <div class="b-visual"><div class="ring small"><svg viewBox="0 0 120 120"><circle class="ring-bg" cx="60" cy="60" r="46"/><circle class="ring-fg spin" cx="60" cy="60" r="46"/></svg><strong>25:00</strong></div></div>
-          <h3 data-tr="Zamanlayıcı + Pomodoro" data-en="Timer + Pomodoro">Zamanlayıcı + Pomodoro</h3>
-          <p data-tr="Odak ve mola, çentiğin kendi tasarımında." data-en="Focus and breaks, in the notch's own design.">Odak ve mola, çentiğin kendi tasarımında.</p>
+          <div class="b-visual"><div class="ring small"><svg viewBox="0 0 120 120"><circle class="ring-bg" cx="60" cy="60" r="46"/><circle class="ring-fg spin" cx="60" cy="60" r="46"/></svg><strong>40:00</strong></div></div>
+          <h3 data-tr="Kendi süren" data-en="Your own length">Kendi süren</h3>
+          <p data-tr="Kadranı çevir ya da −/+ ile 3 saate kadar ayarla. Çalışırken kapalı çentikte geri sayar, bitince haber verir." data-en="Turn the dial or use −/+ for up to 3 hours. While it runs, the closed notch counts down — and rings when it's done.">Kadranı çevir ya da −/+ ile 3 saate kadar ayarla. Çalışırken kapalı çentikte geri sayar, bitince haber verir.</p>
+        </article>
+        <article class="b-card reveal">
+          <div class="b-visual weather-visual"><div class="wx-big"><svg><use href="#i-cloud-sun"/></svg><div><strong>18°</strong><small data-tr="İstanbul · Parçalı bulutlu" data-en="Istanbul · Partly cloudy">İstanbul · Parçalı bulutlu</small></div></div></div>
+          <h3 data-tr="Hava durumu" data-en="Weather">Hava durumu</h3>
+          <p data-tr="Ana sayfada, tarihin yanında. Konum izni istemez; şehri saat diliminden bulur ya da sen seçersin." data-en="On Home, next to the date. No location permission: the city comes from your time zone, or you pick one.">Ana sayfada, tarihin yanında. Konum izni istemez; şehri saat diliminden bulur ya da sen seçersin.</p>
+        </article>
+        <article class="b-card reveal">
+          <div class="b-visual keys-visual"><kbd>⌥</kbd><kbd class="wide">Space</kbd></div>
+          <h3 data-tr="Tek kısayol" data-en="One shortcut">Tek kısayol</h3>
+          <p data-tr="Hangi uygulamada olursan ol, ⌥Space çentiği açar ve kapatır. İstediğin tuşları Ayarlar'dan kaydet." data-en="In any app, ⌥Space opens and closes the notch. Record your own keys in Settings.">Hangi uygulamada olursan ol, ⌥Space çentiği açar ve kapatır. İstediğin tuşları Ayarlar'dan kaydet.</p>
         </article>
         <article class="b-card reveal">
           <div class="b-visual clip-visual"><span><svg><use href="#i-link"/></svg>ozdmrysn.github.io</span><span><svg><use href="#i-text"/></svg>npm run build</span><span><svg><use href="#i-text"/></svg>…</span></div>
           <h3 data-tr="Pano geçmişi" data-en="Clipboard history">Pano geçmişi</h3>
           <p data-tr="Son 40 kopyan; bağlantılar tek tıkla açılır. Yalnızca bellekte tutulur." data-en="Your last 40 copies; links open in one click. Kept in memory only.">Son 40 kopyan; bağlantılar tek tıkla açılır. Yalnızca bellekte tutulur.</p>
         </article>
-        <article class="b-card reveal">
-          <div class="b-visual icon-visual"><svg><use href="#i-lock"/></svg></div>
-          <h3 data-tr="Gizlilik önce" data-en="Private by design">Gizlilik önce</h3>
-          <p data-tr="Hesap yok, izleme yok. Pano ve bildirimler cihazından çıkmaz, uygulama kapanınca silinir." data-en="No account, no tracking. Clipboard and notifications never leave your Mac and vanish when you quit.">Hesap yok, izleme yok. Pano ve bildirimler cihazından çıkmaz, uygulama kapanınca silinir.</p>
-        </article>
-        <article class="b-card reveal">
-          <div class="b-visual icon-visual"><svg><use href="#i-chip"/></svg></div>
-          <h3 data-tr="Her Mac'te" data-en="On every Mac">Her Mac'te</h3>
-          <p data-tr="Apple Silicon ve Intel için tek paket. Çentiksiz ekranlarda zarif bir yüzen adaya dönüşür." data-en="One package for Apple Silicon and Intel. On displays without a notch, it becomes an elegant floating island.">Apple Silicon ve Intel için tek paket. Çentiksiz ekranlarda zarif bir yüzen adaya dönüşür.</p>
-        </article>
         <article class="b-card b-wide reveal">
           <div class="b-visual shape-visual" aria-hidden="true">
             <svg viewBox="0 0 320 80"><path class="shape-path" d="M0 0H320C314 0 313 4 313 8V58A14 14 0 0 1 299 72H21A14 14 0 0 1 7 58V8C7 4 6 0 0 0Z"/></svg>
           </div>
           <h3 data-tr="Gerçek çentik gibi" data-en="Shaped like the real notch">Gerçek çentik gibi</h3>
-          <p data-tr="İçbükey üst kavis, düz yanlar, yuvarlak alt köşeler. Açılırken ortadan değil, yukarıdan büyür." data-en="Concave top fillets, straight sides, round lower corners. It grows from the top, never from the middle.">İçbükey üst kavis, düz yanlar, yuvarlak alt köşeler. Açılırken ortadan değil, yukarıdan büyür.</p>
+          <p data-tr="İçbükey üst kavis, düz yanlar, yuvarlak alt köşeler. Açılırken ortadan değil, yukarıdan büyür. Apple Silicon ve Intel için tek paket; çentiksiz ekranlarda yüzen bir adaya dönüşür." data-en="Concave top fillets, straight sides, round lower corners. It grows from the top, never from the middle. One package for Apple Silicon and Intel; on displays without a notch it becomes a floating island.">İçbükey üst kavis, düz yanlar, yuvarlak alt köşeler. Açılırken ortadan değil, yukarıdan büyür. Apple Silicon ve Intel için tek paket; çentiksiz ekranlarda yüzen bir adaya dönüşür.</p>
+        </article>
+        <article class="b-card reveal">
+          <div class="b-visual icon-visual"><svg><use href="#i-shield"/></svg></div>
+          <h3 data-tr="Gizlilik önce" data-en="Private by design">Gizlilik önce</h3>
+          <p data-tr="Hesap yok, izleme yok. Pano ve bildirimler Mac'inden çıkmaz. İzinler sayfası eksikleri gösterir, tek tıkla onarır." data-en="No account, no tracking. Clipboard and notifications never leave your Mac. The Permissions page shows what's missing and repairs it in one click.">Hesap yok, izleme yok. Pano ve bildirimler Mac'inden çıkmaz. İzinler sayfası eksikleri gösterir, tek tıkla onarır.</p>
         </article>
       </div>
     </section>
@@ -465,20 +584,23 @@
     <section class="whatsnew reveal" data-notch="music">
       <div class="wn-card">
         <div class="wn-head">
-          <span class="wn-version">2.0</span>
+          <span class="wn-version">2.1</span>
           <div>
             <p class="eyebrow" data-tr="Bu sürümde" data-en="In this release">Bu sürümde</p>
-            <h2 data-tr-html="Yeniden <em>tasarlandı.</em>" data-en-html="Designed <em>again.</em>">Yeniden <em>tasarlandı.</em></h2>
+            <h2 data-tr-html="Çentik artık <em>canlı.</em>" data-en-html="The notch is <em>alive.</em>">Çentik artık <em>canlı.</em></h2>
           </div>
         </div>
         <ul class="wn-list">
-          <li data-tr="Bildirimler sekmesi ve genişleyen bildirim çubuğu" data-en="Notifications tab and a widening notification bar">Bildirimler sekmesi ve genişleyen bildirim çubuğu</li>
-          <li data-tr="10 renk × 4 tonluk tema" data-en="Themes: 10 colors × 4 tones">10 renk × 4 tonluk tema</li>
-          <li data-tr="macOS ses/parlaklık göstergesinin yerine Command Echo" data-en="Command Echo replaces the macOS volume/brightness indicator">macOS ses/parlaklık göstergesinin yerine Command Echo</li>
-          <li data-tr="Dosya tutunca açılan Raf / AirDrop alanı" data-en="Shelf / AirDrop zone that opens as you pick up a file">Dosya tutunca açılan Raf / AirDrop alanı</li>
-          <li data-tr="Yukarıdan açılan, gerçek çentik biçiminde yeni gövde" data-en="A new body shaped like the real notch, opening from the top">Yukarıdan açılan, gerçek çentik biçiminde yeni gövde</li>
-          <li data-tr="Yeni Zamanlayıcı ve Takvim, kayan Raf ve Pano" data-en="New Timer and Calendar, scrolling Shelf and Clipboard">Yeni Zamanlayıcı ve Takvim, kayan Raf ve Pano</li>
-          <li data-tr="İzinler sayfası ve kararlılık düzeltmeleri" data-en="A Permissions page and stability fixes">İzinler sayfası ve kararlılık düzeltmeleri</li>
+          <li data-tr="Kapalı çentikte geri sayım ve zil çalan “Süre doldu”" data-en="A countdown in the closed notch and a ringing “Time's up”">Kapalı çentikte geri sayım ve zil çalan “Süre doldu”</li>
+          <li data-tr="Gerçek takvim: sıradaki etkinlikler, 5 dakika önce uyarı, video görüşmelerine Katıl" data-en="Real calendar: next events, a heads-up 5 minutes before, Join for video calls">Gerçek takvim: sıradaki etkinlikler, 5 dakika önce uyarı, video görüşmelerine Katıl</li>
+          <li data-tr="Şarj animasyonu, düşük pil uyarısı, AirPods ve kulaklık pilleri" data-en="Charging animation, low-battery warning, AirPods and headphone batteries">Şarj animasyonu, düşük pil uyarısı, AirPods ve kulaklık pilleri</li>
+          <li data-tr="Kamerayı ya da mikrofonu kullanan uygulamayı gösteren gizlilik noktası" data-en="A privacy dot naming the app using the camera or microphone">Kamerayı ya da mikrofonu kullanan uygulamayı gösteren gizlilik noktası</li>
+          <li data-tr="LRCLIB'den satır satır şarkı sözleri ve tek tıkla ses çıkışı" data-en="Synced lyrics from LRCLIB and one-click audio output switching">LRCLIB'den satır satır şarkı sözleri ve tek tıkla ses çıkışı</li>
+          <li data-tr="Ana sayfada hava durumu — konum izni gerekmez" data-en="Weather on Home — no location permission">Ana sayfada hava durumu — konum izni gerekmez</li>
+          <li data-tr="Değiştirilebilir ⌥Space kısayolu" data-en="A customizable ⌥Space shortcut">Değiştirilebilir ⌥Space kısayolu</li>
+          <li data-tr="Yeni şarkı kartı ve süreyi kendin seçtiğin yeni zamanlayıcı" data-en="A new song card and a new timer with lengths you choose">Yeni şarkı kartı ve süreyi kendin seçtiğin yeni zamanlayıcı</li>
+          <li data-tr="Eksikleri gösteren, tek tıkla onaran İzinler sayfası" data-en="A Permissions page that shows what's missing and repairs it">Eksikleri gösteren, tek tıkla onaran İzinler sayfası</li>
+          <li data-tr="İzinler artık güncellemelerde korunur" data-en="Permissions now survive updates">İzinler artık güncellemelerde korunur</li>
         </ul>
         <a class="wn-link" href="https://github.com/OzdmrYsn/islo/releases/latest"><span data-tr="Tüm sürüm notları" data-en="Full release notes">Tüm sürüm notları</span> →</a>
       </div>
@@ -493,21 +615,21 @@
       <ol class="steps">
         <li class="step reveal"><span class="step-num">1</span><h3 data-tr="İndir ve sürükle" data-en="Download and drag">İndir ve sürükle</h3><p data-tr="DMG'yi aç, islo.'yu Uygulamalar klasörüne sürükle." data-en="Open the DMG and drag islo. into Applications.">DMG'yi aç, islo.'yu Uygulamalar klasörüne sürükle.</p></li>
         <li class="step reveal"><span class="step-num">2</span><h3 data-tr="İlk açılış" data-en="First launch">İlk açılış</h3><p data-tr="Uygulamaya Control-tıkla ve Aç'ı seç. Bu yalnızca bir kez gerekir." data-en="Control-click the app and choose Open. You only do this once.">Uygulamaya Control-tıkla ve Aç'ı seç. Bu yalnızca bir kez gerekir.</p></li>
-        <li class="step reveal"><span class="step-num">3</span><h3 data-tr="İzinler" data-en="Permissions">İzinler</h3><p data-tr="Bildirimler ve macOS göstergesinin gizlenmesi için Ayarlar › İzinler'den Erişilebilirlik iznini ver." data-en="For notifications and hiding the macOS indicator, allow Accessibility in Settings › Permissions.">Bildirimler ve macOS göstergesinin gizlenmesi için Ayarlar › İzinler'den Erişilebilirlik iznini ver.</p></li>
+        <li class="step reveal"><span class="step-num">3</span><h3 data-tr="İzinler" data-en="Permissions">İzinler</h3><p data-tr="Ayarlar › İzinler eksik olanı turuncu “Eksik” ile gösterir; İzin ver'e basman yeter. Verdiğin izinler güncellemelerde korunur." data-en="Settings › Permissions marks anything missing in orange; just click Allow. The permissions you give survive updates.">Ayarlar › İzinler eksik olanı turuncu “Eksik” ile gösterir; İzin ver'e basman yeter. Verdiğin izinler güncellemelerde korunur.</p></li>
       </ol>
 
       <div class="cta reveal">
         <img src="assets/islo-icon.png" alt="" width="96" height="96">
         <h2 data-tr-html="Çentiğine <em>bir iş</em> ver." data-en-html="Give your notch <em>a job.</em>">Çentiğine <em>bir iş</em> ver.</h2>
         <a class="btn btn-primary big" href="https://github.com/OzdmrYsn/islo/releases/latest/download/islo.dmg">
-          <svg><use href="#i-download"/></svg><span data-tr="islo. 2.0'ı indir" data-en="Download islo. 2.0">islo. 2.0'ı indir</span>
+          <svg><use href="#i-download"/></svg><span data-tr="islo. 2.1'i indir" data-en="Download islo. 2.1">islo. 2.1'i indir</span>
         </a>
-        <p class="hero-meta">2.0.0 · DMG · macOS 13+ · Universal</p>
+        <p class="hero-meta">2.1.0 · DMG · macOS 13+ · Universal</p>
       </div>
     </section>
 
     <!-- FAQ -->
-    <section class="faq" data-notch="music">
+    <section class="faq" data-notch="privacy">
       <header class="section-head reveal">
         <p class="eyebrow" data-tr="Sorular" data-en="Questions">Sorular</p>
       </header>
@@ -517,8 +639,16 @@
           <p data-tr="islo. henüz Apple tarafından notarize edilmedi. Uygulamaya Control-tıklayıp Aç dediğinde macOS bunu kalıcı olarak hatırlar." data-en="islo. isn't notarized by Apple yet. Control-click the app and choose Open, and macOS remembers it for good.">islo. henüz Apple tarafından notarize edilmedi. Uygulamaya Control-tıklayıp Aç dediğinde macOS bunu kalıcı olarak hatırlar.</p>
         </details>
         <details class="reveal">
-          <summary data-tr="Erişilebilirlik izni ne için?" data-en="What is Accessibility access for?">Erişilebilirlik izni ne için?</summary>
-          <p data-tr="Ekranda beliren bildirim afişlerini okuyup çentikte göstermek, ses ve parlaklık tuşlarında macOS'un kendi göstergesini gizlemek ve yapıştırma tuşunu algılamak için. Bunlar olmadan da islo. çalışır." data-en="To read on-screen notification banners for the notch, hide the macOS volume and brightness indicator, and detect paste. islo. works without it, too.">Ekranda beliren bildirim afişlerini okuyup çentikte göstermek, ses ve parlaklık tuşlarında macOS'un kendi göstergesini gizlemek ve yapıştırma tuşunu algılamak için. Bunlar olmadan da islo. çalışır.</p>
+          <summary data-tr="islo. hangi izinleri ister, neden?" data-en="Which permissions does islo. ask for, and why?">islo. hangi izinleri ister, neden?</summary>
+          <p data-tr="Erişilebilirlik: bildirimleri çentikte göstermek, macOS'un ses/parlaklık göstergesini gizlemek, yapıştırma ve medya tuşlarını algılamak için. Takvim: sıradaki etkinliği göstermek ve toplantıdan önce uyarmak için. Otomasyon: Music ve Spotify'ı kontrol etmek için. Hepsi isteğe bağlı; Ayarlar › İzinler eksik olanı gösterir ve tek tıkla onarır." data-en="Accessibility: to show notifications in the notch, hide the macOS volume/brightness indicator, and detect paste and media keys. Calendars: to show your next event and alert you before meetings. Automation: to control Music and Spotify. All optional; Settings › Permissions shows what's missing and repairs it in one click.">Erişilebilirlik: bildirimleri çentikte göstermek, macOS'un ses/parlaklık göstergesini gizlemek, yapıştırma ve medya tuşlarını algılamak için. Takvim: sıradaki etkinliği göstermek ve toplantıdan önce uyarmak için. Otomasyon: Music ve Spotify'ı kontrol etmek için. Hepsi isteğe bağlı; Ayarlar › İzinler eksik olanı gösterir ve tek tıkla onarır.</p>
+        </details>
+        <details class="reveal">
+          <summary data-tr="Şarkı sözleri ve hava durumu için ne gönderiliyor?" data-en="What's sent for lyrics and weather?">Şarkı sözleri ve hava durumu için ne gönderiliyor?</summary>
+          <p data-tr="Sözler açıkken yalnızca çalan şarkının adı, sanatçısı, albümü ve süresi ücretsiz LRCLIB servisine gider. Hava durumu için yalnızca şehrin koordinatları Open-Meteo'ya gider; şehir Mac'inin saat diliminden bulunur ya da Ayarlar'dan seçilir, konum izni istenmez. Hesap yok, izleme yok; ikisi de Ayarlar'dan kapatılabilir." data-en="While lyrics are on, only the song's title, artist, album, and length go to the free LRCLIB service. For weather, only a city's coordinates go to Open-Meteo; the city comes from your Mac's time zone or your choice in Settings, so no location permission is asked. No account, no tracking; both can be turned off in Settings.">Sözler açıkken yalnızca çalan şarkının adı, sanatçısı, albümü ve süresi ücretsiz LRCLIB servisine gider. Hava durumu için yalnızca şehrin koordinatları Open-Meteo'ya gider; şehir Mac'inin saat diliminden bulunur ya da Ayarlar'dan seçilir, konum izni istenmez. Hesap yok, izleme yok; ikisi de Ayarlar'dan kapatılabilir.</p>
+        </details>
+        <details class="reveal">
+          <summary data-tr="Kısayolu değiştirebilir miyim?" data-en="Can I change the shortcut?">Kısayolu değiştirebilir miyim?</summary>
+          <p data-tr="Evet. Ayarlar › Çentik ve Etkileşim › Kısayol tuşu bölümünde düğmeye tıkla ve yeni tuşlara bas; Esc vazgeçer. Varsayılan ⌥Space, istersen tamamen kapatabilirsin." data-en="Yes. In Settings › Notch & Interaction › Keyboard shortcut, click the button and press your new keys; Esc cancels. The default is ⌥Space, and you can turn it off entirely.">Evet. Ayarlar › Çentik ve Etkileşim › Kısayol tuşu bölümünde düğmeye tıkla ve yeni tuşlara bas; Esc vazgeçer. Varsayılan ⌥Space, istersen tamamen kapatabilirsin.</p>
         </details>
         <details class="reveal">
           <summary data-tr="Çentiği olmayan bir Mac'te çalışır mı?" data-en="Does it work on a Mac without a notch?">Çentiği olmayan bir Mac'te çalışır mı?</summary>
@@ -526,7 +656,7 @@
         </details>
         <details class="reveal">
           <summary data-tr="Nasıl güncellenir?" data-en="How does it update?">Nasıl güncellenir?</summary>
-          <p data-tr="islo. imzalı Sparkle güncellemeleri kullanır. Ayarlar › Güncellemeler'den denetleyebilir ya da otomatik güncellemeyi açabilirsin." data-en="islo. uses signed Sparkle updates. Check from Settings › Updates or turn on automatic updates.">islo. imzalı Sparkle güncellemeleri kullanır. Ayarlar › Güncellemeler'den denetleyebilir ya da otomatik güncellemeyi açabilirsin.</p>
+          <p data-tr="islo. imzalı Sparkle güncellemeleri kullanır. Ayarlar › Güncellemeler'den denetleyebilir ya da otomatik güncellemeyi açabilirsin. 2.1'den itibaren verdiğin izinler güncellemelerde korunur." data-en="islo. uses signed Sparkle updates. Check from Settings › Updates or turn on automatic updates. From 2.1 on, the permissions you give survive updates.">islo. imzalı Sparkle güncellemeleri kullanır. Ayarlar › Güncellemeler'den denetleyebilir ya da otomatik güncellemeyi açabilirsin. 2.1'den itibaren verdiğin izinler güncellemelerde korunur.</p>
         </details>
       </div>
     </section>
