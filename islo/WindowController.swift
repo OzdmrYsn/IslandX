@@ -120,7 +120,7 @@ final class FloatingNotchWindowController: NSWindowController {
         panel.acceptsMouseMovedEvents = true
         panel.ignoresMouseEvents = false
         panel.animationBehavior = .none
-        panel.identifier = NSUserInterfaceItemIdentifier("IslandXFloatingNotch")
+        panel.identifier = NSUserInterfaceItemIdentifier("isloFloatingNotch")
 
         panel.isFloatingPanel = true
         panel.becomesKeyOnlyIfNeeded = true
@@ -252,7 +252,7 @@ final class FloatingNotchWindowController: NSWindowController {
 
         if settings.hideInFullScreen, frontmostAppOccupiesEntireScreen {
             NotificationCenter.default.post(
-                name: .islandXCollapse,
+                name: .isloCollapse,
                 object: nil
             )
             window.orderOut(nil)

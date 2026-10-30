@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A10000000000000000000001 /* IslandXApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* IslandXApp.swift */; };
+		A10000000000000000000001 /* IsloApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* IsloApp.swift */; };
 		A10000000000000000000002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* AppDelegate.swift */; };
 		A10000000000000000000003 /* WindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* WindowController.swift */; };
 		A10000000000000000000004 /* MediaManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* MediaManager.swift */; };
@@ -23,14 +23,14 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		A20000000000000000000001 /* IslandXApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandXApp.swift; sourceTree = "<group>"; };
+		A20000000000000000000001 /* IsloApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IsloApp.swift; sourceTree = "<group>"; };
 		A20000000000000000000002 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		A20000000000000000000003 /* WindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowController.swift; sourceTree = "<group>"; };
 		A20000000000000000000004 /* MediaManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaManager.swift; sourceTree = "<group>"; };
 		A20000000000000000000005 /* DynamicNotchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DynamicNotchView.swift; sourceTree = "<group>"; };
 		A20000000000000000000006 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		A20000000000000000000007 /* IslandX.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = IslandX.entitlements; sourceTree = "<group>"; };
-		A20000000000000000000008 /* IslandX.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = IslandX.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000000000000000000007 /* islo.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = islo.entitlements; sourceTree = "<group>"; };
+		A20000000000000000000008 /* islo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = islo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A20000000000000000000009 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A20000000000000000000010 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
 		A20000000000000000000011 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -55,16 +55,16 @@
 		A40000000000000000000001 = {
 			isa = PBXGroup;
 			children = (
-				A40000000000000000000002 /* IslandX */,
+				A40000000000000000000002 /* islo */,
 				A40000000000000000000003 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		A40000000000000000000002 /* IslandX */ = {
+		A40000000000000000000002 /* islo */ = {
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000009 /* Assets.xcassets */,
-				A20000000000000000000001 /* IslandXApp.swift */,
+				A20000000000000000000001 /* IsloApp.swift */,
 				A20000000000000000000002 /* AppDelegate.swift */,
 				A20000000000000000000010 /* AppSettings.swift */,
 				A20000000000000000000011 /* SettingsView.swift */,
@@ -76,15 +76,15 @@
 				A20000000000000000000004 /* MediaManager.swift */,
 				A20000000000000000000005 /* DynamicNotchView.swift */,
 				A20000000000000000000006 /* Info.plist */,
-				A20000000000000000000007 /* IslandX.entitlements */,
+				A20000000000000000000007 /* islo.entitlements */,
 			);
-			path = IslandX;
+			path = islo;
 			sourceTree = "<group>";
 		};
 		A40000000000000000000003 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A20000000000000000000008 /* IslandX.app */,
+				A20000000000000000000008 /* islo.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -92,9 +92,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		A50000000000000000000001 /* IslandX */ = {
+		A50000000000000000000001 /* islo */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = A90000000000000000000002 /* Build configuration list for PBXNativeTarget "IslandX" */;
+			buildConfigurationList = A90000000000000000000002 /* Build configuration list for PBXNativeTarget "islo" */;
 			buildPhases = (
 				A60000000000000000000001 /* Sources */,
 				A30000000000000000000001 /* Frameworks */,
@@ -104,12 +104,12 @@
 			);
 			dependencies = (
 			);
-			name = IslandX;
+			name = islo;
 			packageProductDependencies = (
 				B40000000000000000000001 /* Sparkle */,
 			);
-			productName = IslandX;
-			productReference = A20000000000000000000008 /* IslandX.app */;
+			productName = islo;
+			productReference = A20000000000000000000008 /* islo.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -127,7 +127,7 @@
 					};
 				};
 			};
-			buildConfigurationList = A90000000000000000000001 /* Build configuration list for PBXProject "IslandX" */;
+			buildConfigurationList = A90000000000000000000001 /* Build configuration list for PBXProject "islo" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -143,7 +143,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				A50000000000000000000001 /* IslandX */,
+				A50000000000000000000001 /* islo */,
 			);
 		};
 /* End PBXProject section */
@@ -164,7 +164,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A10000000000000000000001 /* IslandXApp.swift in Sources */,
+				A10000000000000000000001 /* IsloApp.swift in Sources */,
 				A10000000000000000000002 /* AppDelegate.swift in Sources */,
 				A10000000000000000000003 /* WindowController.swift in Sources */,
 				A10000000000000000000004 /* MediaManager.swift in Sources */,
@@ -295,14 +295,14 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = IslandX/IslandX.entitlements;
+				CODE_SIGN_ENTITLEMENTS = islo/islo.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 14;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = IslandX/Info.plist;
+				INFOPLIST_FILE = islo/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -321,14 +321,14 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = IslandX/IslandX.entitlements;
+				CODE_SIGN_ENTITLEMENTS = islo/islo.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 14;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = IslandX/Info.plist;
+				INFOPLIST_FILE = islo/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -346,7 +346,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		A90000000000000000000001 /* Build configuration list for PBXProject "IslandX" */ = {
+		A90000000000000000000001 /* Build configuration list for PBXProject "islo" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				AA0000000000000000000001 /* Debug */,
@@ -355,7 +355,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		A90000000000000000000002 /* Build configuration list for PBXNativeTarget "IslandX" */ = {
+		A90000000000000000000002 /* Build configuration list for PBXNativeTarget "islo" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				AA0000000000000000000003 /* Debug */,

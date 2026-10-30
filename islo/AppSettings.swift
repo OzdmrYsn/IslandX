@@ -345,7 +345,7 @@ final class AppSettings: ObservableObject {
         ) {
             activationMode = savedMode
         } else {
-            // Preserve the behavior selected in IslandX 1.5.
+            // Preserve the behavior selected in islo 1.5.
             let legacyHoverEnabled = defaults.object(
                 forKey: Key.expandOnHover
             ) == nil || defaults.bool(forKey: Key.expandOnHover)

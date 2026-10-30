@@ -2,15 +2,15 @@
 import PackageDescription
 
 // This package is a lightweight command-line build harness for CI/type-checking.
-// Open IslandX.xcodeproj to build the actual .app bundle with Info.plist and
+// Open islo.xcodeproj to build the actual .app bundle with Info.plist and
 // Apple Events entitlements.
 let package = Package(
-    name: "IslandX",
+    name: "islo",
     platforms: [
         .macOS(.v13)
     ],
     products: [
-        .executable(name: "IslandX", targets: ["IslandX"])
+        .executable(name: "islo", targets: ["islo"])
     ],
     dependencies: [
         .package(
@@ -20,15 +20,15 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "IslandX",
+            name: "islo",
             dependencies: [
                 .product(name: "Sparkle", package: "Sparkle")
             ],
-            path: "IslandX",
+            path: "islo",
             exclude: [
                 "Assets.xcassets",
                 "Info.plist",
-                "IslandX.entitlements"
+                "islo.entitlements"
             ]
         )
     ],

@@ -15,7 +15,7 @@ if [[ ! -d "$app_path" ]]; then
     exit 66
 fi
 
-staging_dir=$(mktemp -d /tmp/IslandXDMG.XXXXXX)
+staging_dir=$(mktemp -d /tmp/isloDMG.XXXXXX)
 trap 'rm -rf "$staging_dir"' EXIT
 
 /usr/bin/ditto "$app_path" "$staging_dir/islo.app"

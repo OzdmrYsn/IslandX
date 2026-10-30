@@ -1,6 +1,6 @@
 # islo.
 
-[Türkçe](#türkçe) · [English](#english) · [Website](https://ozdmrysn.github.io/IslandX/) · [Releases](https://github.com/OzdmrYsn/IslandX/releases)
+[Türkçe](#türkçe) · [English](#english) · [Website](https://ozdmrysn.github.io/islo/) · [Releases](https://github.com/OzdmrYsn/islo/releases)
 
 islo. brings Music, focus tools and quick utilities to the top of macOS. It blends into the camera notch on compatible MacBooks and becomes a compact floating island on other displays.
 
@@ -30,7 +30,7 @@ islo., medya kontrollerini ve günlük araçları MacBook'un kamera çentiğiyle
 
 ### Kurulum
 
-1. [islo. DMG dosyasını](https://github.com/OzdmrYsn/IslandX/releases/latest/download/islo.dmg) indirin ve açın.
+1. [islo. DMG dosyasını](https://github.com/OzdmrYsn/islo/releases/latest/download/islo.dmg) indirin ve açın.
 2. `islo.app` uygulamasını aynı penceredeki **Applications / Uygulamalar** kısayoluna sürükleyin.
 3. İlk açılışta uygulamaya Control-tıklayıp **Aç** seçeneğini kullanın.
 4. Music veya Spotify kontrolü için macOS'un istediği **Automation** iznine onay verin.
@@ -39,8 +39,8 @@ Apple Developer ID ile notarizasyon henüz tamamlanmadığı için ilk açılı�
 
 ### Kaynaktan çalıştırma
 
-1. `IslandX.xcodeproj` dosyasını Xcode ile açın.
-2. IslandX target'ında **Signing & Capabilities** bölümünden kendi Team'inizi seçin.
+1. `islo.xcodeproj` dosyasını Xcode ile açın.
+2. islo target'ında **Signing & Capabilities** bölümünden kendi Team'inizi seçin.
 3. Uygulamayı çalıştırıp Music veya Spotify'da bir parça başlatın.
 
 ## English
@@ -67,7 +67,7 @@ islo. is a SwiftUI + AppKit app that blends media controls and everyday utilitie
 
 ### Installation
 
-1. Download and open the latest [islo. DMG](https://github.com/OzdmrYsn/IslandX/releases/latest/download/islo.dmg).
+1. Download and open the latest [islo. DMG](https://github.com/OzdmrYsn/islo/releases/latest/download/islo.dmg).
 2. Drag `islo.app` onto the **Applications** shortcut in the same window.
 3. On first launch, Control-click the app and choose **Open**.
 4. Approve the macOS **Automation** request to control Music or Spotify.
@@ -76,8 +76,8 @@ The app is not yet notarized with an Apple Developer ID, so macOS may show a sec
 
 ### Run from source
 
-1. Open `IslandX.xcodeproj` in Xcode.
-2. Select your own Team under the IslandX target's **Signing & Capabilities** settings.
+1. Open `islo.xcodeproj` in Xcode.
+2. Select your own Team under the islo target's **Signing & Capabilities** settings.
 3. Run the app and start a track in Music or Spotify.
 
 ## Architecture

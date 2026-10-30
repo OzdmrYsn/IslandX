@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct IslandXApp: App {
+struct IsloApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self)
     private var appDelegate
 
@@ -11,7 +11,7 @@ struct IslandXApp: App {
         Settings {
             SettingsView(settings: settings) {
                 NotificationCenter.default.post(
-                    name: .islandXShowOnboarding,
+                    name: .isloShowOnboarding,
                     object: nil
                 )
             }
@@ -20,19 +20,19 @@ struct IslandXApp: App {
 }
 
 extension Notification.Name {
-    static let islandXShowOnboarding = Notification.Name(
-        "IslandX.showOnboarding"
+    static let isloShowOnboarding = Notification.Name(
+        "islo.showOnboarding"
     )
 
-    static let islandXShowSettings = Notification.Name(
-        "IslandX.showSettings"
+    static let isloShowSettings = Notification.Name(
+        "islo.showSettings"
     )
 
-    static let islandXExpand = Notification.Name(
-        "IslandX.expand"
+    static let isloExpand = Notification.Name(
+        "islo.expand"
     )
 
-    static let islandXCollapse = Notification.Name(
-        "IslandX.collapse"
+    static let isloCollapse = Notification.Name(
+        "islo.collapse"
     )
 }

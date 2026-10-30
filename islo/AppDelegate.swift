@@ -103,13 +103,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(showSettingsFromNotification),
-            name: .islandXShowSettings,
+            name: .isloShowSettings,
             object: nil
         )
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(showOnboardingFromNotification),
-            name: .islandXShowOnboarding,
+            name: .isloShowOnboarding,
             object: nil
         )
     }
@@ -292,7 +292,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc
     private func showIsland() {
         notchWindowController?.showWindow(nil)
-        NotificationCenter.default.post(name: .islandXExpand, object: nil)
+        NotificationCenter.default.post(name: .isloExpand, object: nil)
     }
 
     @objc

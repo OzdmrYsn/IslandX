@@ -2,7 +2,7 @@ import Combine
 import Sparkle
 
 /// Owns Sparkle's updater for the lifetime of the application and exposes only
-/// the user-facing controls IslandX needs.
+/// the user-facing controls islo needs.
 @MainActor
 final class UpdateManager: ObservableObject {
     static let shared = UpdateManager()

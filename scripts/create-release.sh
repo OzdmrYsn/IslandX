@@ -4,13 +4,13 @@ set -euo pipefail
 project_root="${0:A:h:h}"
 cd "$project_root"
 
-repository="${ISLO_GITHUB_REPOSITORY:-${ISLANDX_GITHUB_REPOSITORY:-OzdmrYsn/IslandX}}"
-info_plist="$project_root/IslandX/Info.plist"
+repository="${ISLO_GITHUB_REPOSITORY:-OzdmrYsn/islo}"
+info_plist="$project_root/islo/Info.plist"
 version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$info_plist")
 build=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$info_plist")
 package_cache="$project_root/.sparkle-packages"
-derived_data=$(mktemp -d /tmp/IslandXRelease.XXXXXX)
-appcast_input=$(mktemp -d /tmp/IslandXAppcast.XXXXXX)
+derived_data=$(mktemp -d /tmp/isloRelease.XXXXXX)
+appcast_input=$(mktemp -d /tmp/IsloAppcast.XXXXXX)
 trap 'rm -rf "$derived_data" "$appcast_input"' EXIT
 archive_name="islo-$version.zip"
 archive_path="$project_root/dist/$archive_name"
@@ -20,13 +20,13 @@ mkdir -p "$project_root/dist"
 
 xcodebuild \
     -resolvePackageDependencies \
-    -project IslandX.xcodeproj \
-    -scheme IslandX \
+    -project islo.xcodeproj \
+    -scheme islo \
     -clonedSourcePackagesDirPath "$package_cache"
 
 xcodebuild \
-    -project IslandX.xcodeproj \
-    -scheme IslandX \
+    -project islo.xcodeproj \
+    -scheme islo \
     -configuration Release \
     -derivedDataPath "$derived_data" \
     -clonedSourcePackagesDirPath "$package_cache" \

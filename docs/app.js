@@ -27,7 +27,7 @@ languageButtons.forEach((button) => {
   button.addEventListener('click', () => setLanguage(button.dataset.language));
 });
 
-const savedLanguage = localStorage.getItem('islo-language') || localStorage.getItem('islandx-language');
+const savedLanguage = localStorage.getItem('islo-language');
 const browserLanguage = navigator.language.toLowerCase().startsWith('tr') ? 'tr' : 'en';
 setLanguage(savedLanguage || browserLanguage);
 

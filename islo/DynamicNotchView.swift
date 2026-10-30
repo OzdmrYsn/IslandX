@@ -287,7 +287,7 @@ struct DynamicNotchView: View {
             onPreferredSizeChange(preferredSize, !reduceMotion)
         }
         .onReceive(
-            NotificationCenter.default.publisher(for: .islandXExpand)
+            NotificationCenter.default.publisher(for: .isloExpand)
         ) { _ in
             hoverTask?.cancel()
             trackChangeTask?.cancel()
@@ -316,7 +316,7 @@ struct DynamicNotchView: View {
             if !enabled { keepAwakeManager.setActive(false) }
         }
         .onReceive(
-            NotificationCenter.default.publisher(for: .islandXCollapse)
+            NotificationCenter.default.publisher(for: .isloCollapse)
         ) { _ in
             hoverTask?.cancel()
             trackChangeTask?.cancel()
@@ -391,7 +391,7 @@ struct DynamicNotchView: View {
 
             Button(localized("Ayarlar…", "Settings…")) {
                 NotificationCenter.default.post(
-                    name: .islandXShowSettings,
+                    name: .isloShowSettings,
                     object: nil
                 )
             }
@@ -592,7 +592,7 @@ struct DynamicNotchView: View {
                 label: localized("Ayarlar", "Settings")
             ) {
                 NotificationCenter.default.post(
-                    name: .islandXShowSettings,
+                    name: .isloShowSettings,
                     object: nil
                 )
             }
@@ -1237,7 +1237,7 @@ struct DynamicNotchView: View {
                     label: localized("Ayarlar", "Settings")
                 ) {
                     NotificationCenter.default.post(
-                        name: .islandXShowSettings,
+                        name: .isloShowSettings,
                         object: nil
                     )
                 }
@@ -1851,7 +1851,7 @@ struct DynamicNotchView: View {
 
     private var isPointerInsideFloatingWindow: Bool {
         guard let window = NSApp.windows.first(where: {
-            $0.identifier?.rawValue == "IslandXFloatingNotch"
+            $0.identifier?.rawValue == "isloFloatingNotch"
         }), let screen = window.screen ?? NSScreen.main else {
             return isPointerInside
         }
@@ -2049,7 +2049,7 @@ struct DynamicNotchView: View {
 /// A single continuously animatable silhouette keeps its top edge attached to
 /// the physical camera housing while its shoulders, width, and lower corners
 /// expand. This avoids visually swapping between unrelated compact/expanded
-/// paths and makes the camera housing itself appear to become IslandX.
+/// paths and makes the camera housing itself appear to become islo.
 private struct AdaptiveNotchShape: Shape {
     let layout: NotchLayout
     var expansionProgress: CGFloat
