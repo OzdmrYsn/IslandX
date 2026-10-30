@@ -342,6 +342,7 @@ final class AppSettings: ObservableObject {
         static let calendarEnabled = "dashboard.calendar.enabled"
         static let calendarAlertsEnabled = "dashboard.calendar.alerts"
         static let devicesHUDEnabled = "dashboard.devices.enabled"
+        static let privacyIndicatorEnabled = "dashboard.privacy.enabled"
         static let dashboardKeepAwakeEnabled = "dashboard.keepAwake.enabled"
         static let dashboardFileShelfEnabled = "dashboard.fileShelf.enabled"
         static let dashboardNotificationsEnabled = "dashboard.notifications.enabled"
@@ -431,6 +432,11 @@ final class AppSettings: ObservableObject {
     /// Charger plugged in or out, low battery, and headphone batteries.
     @Published var devicesHUDEnabled: Bool {
         didSet { defaults.set(devicesHUDEnabled, forKey: Key.devicesHUDEnabled) }
+    }
+
+    /// A dot and the app's name while the camera or microphone is in use.
+    @Published var privacyIndicatorEnabled: Bool {
+        didSet { defaults.set(privacyIndicatorEnabled, forKey: Key.privacyIndicatorEnabled) }
     }
 
     /// Shows a running countdown in the closed notch's wings.
@@ -550,6 +556,7 @@ final class AppSettings: ObservableObject {
         calendarEnabled = Self.bool(forKey: Key.calendarEnabled, defaults: defaults, fallback: true)
         calendarAlertsEnabled = Self.bool(forKey: Key.calendarAlertsEnabled, defaults: defaults, fallback: true)
         devicesHUDEnabled = Self.bool(forKey: Key.devicesHUDEnabled, defaults: defaults, fallback: true)
+        privacyIndicatorEnabled = Self.bool(forKey: Key.privacyIndicatorEnabled, defaults: defaults, fallback: true)
         dashboardKeepAwakeEnabled = Self.bool(
             forKey: Key.dashboardKeepAwakeEnabled,
             defaults: defaults,
@@ -630,6 +637,7 @@ final class AppSettings: ObservableObject {
         calendarEnabled = true
         calendarAlertsEnabled = true
         devicesHUDEnabled = true
+        privacyIndicatorEnabled = true
         dashboardKeepAwakeEnabled = true
         dashboardFileShelfEnabled = true
         dashboardNotificationsEnabled = true

@@ -1,6 +1,8 @@
 import AppKit
 import Combine
 import CoreAudio
+import CoreMediaIO
+import Darwin
 import EventKit
 import IOKit.ps
 
@@ -532,5 +534,193 @@ final class AudioDeviceManager: ObservableObject {
         AudioObjectGetPropertyData(id, &transportAddress, 0, nil, &size, &transport)
 
         return AudioOutputDevice(id: id, name: deviceName, transportType: transport)
+    }
+}
+
+// MARK: - Camera and microphone
+
+struct PrivacyUsage: Equatable {
+    var microphone = false
+    var camera = false
+    /// The app using the microphone, when macOS says which one.
+    var appName: String?
+
+    var isActive: Bool { microphone || camera }
+}
+
+/// Polls whether any app uses the camera or microphone. Reading these
+/// states needs no permission.
+@MainActor
+final class PrivacyMonitor: ObservableObject {
+    static let shared = PrivacyMonitor()
+
+    @Published private(set) var usage = PrivacyUsage()
+    /// Bumped when something starts using the camera or microphone.
+    @Published private(set) var startRevision = 0
+
+    private var timer: Timer?
+    private var isPolling = false
+
+    private init() {}
+
+    func setEnabled(_ enabled: Bool) {
+        if enabled {
+            guard timer == nil else { return }
+            poll()
+            timer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
+                Task { @MainActor in self?.poll() }
+            }
+        } else {
+            timer?.invalidate()
+            timer = nil
+            usage = PrivacyUsage()
+        }
+    }
+
+    #if DEBUG
+    /// Debug builds: pretend an app uses the camera/microphone (nil stops).
+    func debugSimulate(_ simulated: PrivacyUsage?) {
+        timer?.invalidate()
+        timer = nil
+        if let simulated {
+            usage = simulated
+            startRevision &+= 1
+        } else {
+            usage = PrivacyUsage()
+            setEnabled(true)
+        }
+    }
+    #endif
+
+    private func poll() {
+        guard !isPolling else { return }
+        isPolling = true
+        DispatchQueue.global(qos: .utility).async {
+            let microphoneApp = Self.microphoneApp()
+            let microphone = microphoneApp != nil || Self.defaultInputIsRunning()
+            let camera = Self.cameraIsRunning()
+            let appName = microphoneApp.flatMap { $0.isEmpty ? nil : $0 }
+            DispatchQueue.main.async {
+                let monitor = PrivacyMonitor.shared
+                monitor.isPolling = false
+                guard monitor.timer != nil else { return }
+                let new = PrivacyUsage(microphone: microphone, camera: camera, appName: appName)
+                let old = monitor.usage
+                guard new != old else { return }
+                monitor.usage = new
+                let started = (new.microphone && !old.microphone) || (new.camera && !old.camera)
+                if started { monitor.startRevision &+= 1 }
+            }
+        }
+    }
+
+    // MARK: Readers
+
+    /// The first app with a running input stream (macOS 14+), or nil.
+    nonisolated private static func microphoneApp() -> String? {
+        guard #available(macOS 14.0, *) else { return nil }
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyProcessObjectList,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var size: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size) == noErr else {
+            return nil
+        }
+        var processes = [AudioObjectID](repeating: 0, count: Int(size) / MemoryLayout<AudioObjectID>.size)
+        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &processes) == noErr else {
+            return nil
+        }
+        for process in processes {
+            guard uint32Property(process, kAudioProcessPropertyIsRunningInput) != 0 else { continue }
+            var pidAddress = AudioObjectPropertyAddress(
+                mSelector: kAudioProcessPropertyPID,
+                mScope: kAudioObjectPropertyScopeGlobal,
+                mElement: kAudioObjectPropertyElementMain
+            )
+            var pid: pid_t = 0
+            var pidSize = UInt32(MemoryLayout<pid_t>.size)
+            AudioObjectGetPropertyData(process, &pidAddress, 0, nil, &pidSize, &pid)
+            guard pid != ProcessInfo.processInfo.processIdentifier else { continue }
+            // System services (Siri, dictation) have no app bundle and are
+            // skipped; macOS doesn't light its indicator for them either.
+            if let name = appName(for: pid) { return name }
+        }
+        return nil
+    }
+
+    /// Fallback for macOS 13, which can't say which process records.
+    nonisolated private static func defaultInputIsRunning() -> Bool {
+        guard #unavailable(macOS 14.0) else { return false }
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var device = AudioDeviceID(0)
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &device) == noErr,
+              device != 0 else { return false }
+        return uint32Property(device, kAudioDevicePropertyDeviceIsRunningSomewhere) != 0
+    }
+
+    nonisolated private static func cameraIsRunning() -> Bool {
+        var address = CMIOObjectPropertyAddress(
+            mSelector: CMIOObjectPropertySelector(kCMIOHardwarePropertyDevices),
+            mScope: CMIOObjectPropertyScope(kCMIOObjectPropertyScopeGlobal),
+            mElement: CMIOObjectPropertyElement(kCMIOObjectPropertyElementMain)
+        )
+        var size: UInt32 = 0
+        guard CMIOObjectGetPropertyDataSize(CMIOObjectID(kCMIOObjectSystemObject), &address, 0, nil, &size) == noErr else {
+            return false
+        }
+        var devices = [CMIOObjectID](repeating: 0, count: Int(size) / MemoryLayout<CMIOObjectID>.size)
+        var used: UInt32 = 0
+        guard CMIOObjectGetPropertyData(CMIOObjectID(kCMIOObjectSystemObject), &address, 0, nil, size, &used, &devices) == noErr else {
+            return false
+        }
+        for device in devices {
+            var runningAddress = CMIOObjectPropertyAddress(
+                mSelector: CMIOObjectPropertySelector(kCMIODevicePropertyDeviceIsRunningSomewhere),
+                mScope: CMIOObjectPropertyScope(kCMIOObjectPropertyScopeGlobal),
+                mElement: CMIOObjectPropertyElement(kCMIOObjectPropertyElementMain)
+            )
+            var running: UInt32 = 0
+            var runningSize: UInt32 = 0
+            if CMIOObjectGetPropertyData(device, &runningAddress, 0, nil, UInt32(MemoryLayout<UInt32>.size), &runningSize, &running) == noErr,
+               running != 0 {
+                return true
+            }
+        }
+        return false
+    }
+
+    nonisolated private static func uint32Property(_ object: AudioObjectID, _ selector: AudioObjectPropertySelector) -> UInt32 {
+        var address = AudioObjectPropertyAddress(
+            mSelector: selector,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var value: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        guard AudioObjectGetPropertyData(object, &address, 0, nil, &size, &value) == noErr else { return 0 }
+        return value
+    }
+
+    /// The outermost app bundle around a process, so a browser's helper
+    /// process is reported as the browser.
+    nonisolated private static func appName(for pid: pid_t) -> String? {
+        var buffer = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+        guard proc_pidpath(pid, &buffer, UInt32(buffer.count)) > 0 else { return nil }
+        let path = String(cString: buffer)
+        let components = path.split(separator: "/")
+        guard let index = components.firstIndex(where: { $0.hasSuffix(".app") }) else { return nil }
+        let bundlePath = "/" + components[...index].joined(separator: "/")
+        let bundle = Bundle(path: bundlePath)
+        let name = bundle?.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
+            ?? bundle?.object(forInfoDictionaryKey: "CFBundleName") as? String
+            ?? String(components[index].dropLast(4))
+        return name
     }
 }

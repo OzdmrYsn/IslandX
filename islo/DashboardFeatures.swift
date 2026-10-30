@@ -26,6 +26,7 @@ enum CommandEchoKind: Equatable {
     case upcomingEvent(CalendarEventInfo)
     case power(PowerEvent)
     case headphones(HeadphoneBattery)
+    case privacy(PrivacyUsage)
     case volume(Double)
     case brightness(Double)
     case copied
@@ -56,6 +57,7 @@ enum CommandEchoKind: Equatable {
             case .low: "battery.25"
             }
         case .headphones(let battery): battery.symbolName
+        case .privacy(let usage): usage.camera ? "video.fill" : "mic.fill"
         case .timerFinished(let finish):
             switch finish {
             case .timer: "bell.fill"
@@ -136,6 +138,10 @@ final class CommandEchoManager: ObservableObject {
 
     func showHeadphones(_ battery: HeadphoneBattery) {
         publish(.headphones(battery))
+    }
+
+    func showPrivacy(_ usage: PrivacyUsage) {
+        publish(.privacy(usage))
     }
 
     /// For key presses islo. handled itself. Also primes the volume poller so

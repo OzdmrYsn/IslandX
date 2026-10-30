@@ -263,6 +263,8 @@ struct SettingsView: View {
             }
             settingsCard(title: text("Cihazlar", "Devices")) {
                 toggleRow(symbol: "battery.100percent.bolt", title: text("Şarj ve kulaklık pili", "Charging and headphone battery"), subtitle: text("Şarj takılınca ya da pil azalınca çentik haber verir; Bluetooth kulaklık (AirPods vb.) bağlanınca pil seviyelerini gösterir.", "The notch tells you when the charger is plugged in or the battery runs low, and shows Bluetooth headphones' (AirPods etc.) battery when they connect."), isOn: $settings.devicesHUDEnabled)
+                rowDivider
+                toggleRow(symbol: "video.badge.ellipsis", title: text("Kamera ve mikrofon göstergesi", "Camera and microphone indicator"), subtitle: text("Bir uygulama kamerayı ya da mikrofonu kullanırken çentikte renkli bir nokta ve uygulamanın adı görünür.", "While an app uses the camera or microphone, the notch shows a coloured dot and the app's name."), isOn: $settings.privacyIndicatorEnabled)
             }
             settingsCard(title: text("Takvim", "Calendar")) {
                 toggleRow(symbol: "calendar", title: text("Takvim etkinlikleri", "Calendar events"), subtitle: text("Ana sayfada sıradaki etkinlikleri, video görüşmelerinde Katıl düğmesini gösterir. Takvim izni gerekir.", "Shows your next events on Home, with a Join button for video calls. Needs Calendar access."), isOn: $settings.calendarEnabled)

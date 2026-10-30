@@ -124,6 +124,7 @@ struct DynamicNotchView: View {
     @ObservedObject private var calendarManager = CalendarManager.shared
     @ObservedObject private var powerMonitor = PowerMonitor.shared
     @ObservedObject private var audioDevices = AudioDeviceManager.shared
+    @ObservedObject private var privacyMonitor = PrivacyMonitor.shared
 
     private let layout: NotchLayout
     private let onPreferredSizeChange: (CGSize, Bool) -> Void
@@ -382,6 +383,12 @@ struct DynamicNotchView: View {
         .onChange(of: isTimerLive) { _ in
             refreshIdleSurface()
         }
+        .onChange(of: isPrivacyLive) { _ in
+            refreshIdleSurface()
+        }
+        .onReceive(privacyMonitor.$startRevision.dropFirst()) { _ in
+            commandEchoManager.showPrivacy(privacyMonitor.usage)
+        }
         .onReceive(focusTimerManager.$finishRevision.dropFirst()) { _ in
             commandEchoManager.showTimerFinished(focusTimerManager.lastFinish)
         }
@@ -562,6 +569,11 @@ struct DynamicNotchView: View {
         case none
         case music
         case timer
+        case privacy
+    }
+
+    private var isPrivacyLive: Bool {
+        settings.privacyIndicatorEnabled && privacyMonitor.usage.isActive
     }
 
     private var isTimerLive: Bool {
@@ -573,6 +585,7 @@ struct DynamicNotchView: View {
     private var idleActivity: IdleActivity {
         if isTimerLive { return .timer }
         if showsIdleWings { return .music }
+        if isPrivacyLive { return .privacy }
         return .none
     }
 
@@ -581,14 +594,34 @@ struct DynamicNotchView: View {
         switch idleActivity {
         case .timer:
             timerMiniRing
+        case .privacy:
+            PrivacyDots(usage: privacyMonitor.usage, size: 8)
         case .music, .none:
             artwork(size: 27, cornerRadius: 7)
         }
     }
 
-    @ViewBuilder
+    /// The trailing wing, with a small camera/microphone dot in its corner
+    /// while something else fills the wings.
     private var compactTrailingWing: some View {
+        compactTrailingContent
+            .overlay(alignment: .topTrailing) {
+                if isPrivacyLive, idleActivity != .privacy {
+                    PrivacyDots(usage: privacyMonitor.usage, size: 5)
+                        .offset(x: -2, y: 4)
+                }
+            }
+    }
+
+    @ViewBuilder
+    private var compactTrailingContent: some View {
         switch idleActivity {
+        case .privacy:
+            Text(privacyMonitor.usage.appName ?? privacyKindText(privacyMonitor.usage))
+                .font(.system(size: 9.5, weight: .semibold))
+                .foregroundStyle(Color.white.opacity(0.85))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         case .timer:
             Text(focusTimerManager.formattedTime)
                 .font(.system(size: 12, weight: .semibold, design: .rounded).monospacedDigit())
@@ -2362,6 +2395,18 @@ struct DynamicNotchView: View {
         }
     }
 
+    private func privacyKindText(_ usage: PrivacyUsage) -> String {
+        usage.camera ? localized("Kamera", "Camera") : localized("Mikrofon", "Microphone")
+    }
+
+    private func privacyDetailText(_ usage: PrivacyUsage) -> String {
+        switch (usage.camera, usage.microphone) {
+        case (true, true): localized("Kamera ve mikrofon açık", "Camera and microphone on")
+        case (true, false): localized("Kamera açık", "Camera on")
+        default: localized("Mikrofon açık", "Microphone on")
+        }
+    }
+
     private func percentText(_ value: Int) -> String {
         settings.language == .turkish ? "%\(value)" : "\(value)%"
     }
@@ -2565,6 +2610,8 @@ struct DynamicNotchView: View {
             if case .timerFinished = commandEchoManager.event {
                 RingingSymbol(symbol: commandEchoManager.event.symbolName, tint: accent)
                     .id(commandEchoManager.revision)
+            } else if case .privacy(let usage) = commandEchoManager.event {
+                PrivacyDots(usage: usage, size: 9)
             } else if case .power(let event) = commandEchoManager.event {
                 switch event {
                 case .pluggedIn(let level, let charging):
@@ -2616,7 +2663,7 @@ struct DynamicNotchView: View {
             case .pluggedIn(let level, _), .unplugged(let level), .low(let level): Double(level) / 100
             }
         case .copied, .pasted, .screenshot, .capsLock, .mediaSkip, .trackChanged, .notification,
-             .timerFinished, .upcomingEvent, .headphones: nil
+             .timerFinished, .upcomingEvent, .headphones, .privacy: nil
         }
     }
 
@@ -2635,6 +2682,7 @@ struct DynamicNotchView: View {
         case .notification(let item): item.appName
         case .upcomingEvent(let event): event.title
         case .headphones(let battery): battery.name
+        case .privacy(let usage): usage.appName ?? privacyKindText(usage)
         case .power(let event):
             switch event {
             case .pluggedIn(_, let charging): charging ? localized("Şarj oluyor", "Charging") : localized("Güç bağlandı", "Power connected")
@@ -2661,6 +2709,7 @@ struct DynamicNotchView: View {
         case .notification(let item): item.headline
         case .upcomingEvent(let event): eventTimeText(event, now: Date())
         case .headphones: localized("Bağlandı", "Connected")
+        case .privacy(let usage): privacyDetailText(usage)
         case .power: ""
         case .timerFinished(let finish):
             switch finish {
@@ -2686,6 +2735,7 @@ struct DynamicNotchView: View {
         case .timerFinished: isAllowed = true
         case .upcomingEvent: isAllowed = settings.calendarEnabled && settings.calendarAlertsEnabled
         case .power, .headphones: isAllowed = settings.devicesHUDEnabled
+        case .privacy: isAllowed = settings.privacyIndicatorEnabled
         default: isAllowed = settings.dashboardCommandEchoEnabled
         }
         guard isAllowed, presentation == .idle else { return }
@@ -2709,6 +2759,8 @@ struct DynamicNotchView: View {
                 duration = .seconds(4.5)
             } else if case .power = commandEchoManager.event {
                 duration = .seconds(3)
+            } else if case .privacy = commandEchoManager.event {
+                duration = .seconds(3.5)
             } else if case .screenshot = commandEchoManager.event {
                 duration = .seconds(3.2)
             } else if case .trackChanged = commandEchoManager.event {
@@ -3354,6 +3406,7 @@ struct DynamicNotchView: View {
         case .upcomingEvent: extensionWidth = 400
         case .headphones: extensionWidth = 430
         case .power: extensionWidth = 330
+        case .privacy: extensionWidth = 360
         case .mediaSkip: extensionWidth = 260
         default: extensionWidth = 300
         }
@@ -3498,6 +3551,10 @@ struct DynamicNotchView: View {
     private var compactAccessibilityText: String {
         if idleActivity == .timer {
             return localized("Zamanlayıcı, kalan \(focusTimerManager.formattedTime)", "Timer, \(focusTimerManager.formattedTime) left")
+        }
+        if idleActivity == .privacy {
+            let usage = privacyMonitor.usage
+            return [usage.appName, privacyDetailText(usage)].compactMap { $0 }.joined(separator: ", ")
         }
         guard mediaManager.hasActiveTrack else {
             return "Media controls. Nothing is currently playing."
@@ -3727,6 +3784,27 @@ private struct BatteryGlyph: View {
             }
         }
         .accessibilityHidden(true)
+    }
+}
+
+/// Green for the camera, orange for the microphone, as macOS uses them.
+private struct PrivacyDots: View {
+    let usage: PrivacyUsage
+    var size: CGFloat = 7
+
+    var body: some View {
+        HStack(spacing: size * 0.45) {
+            if usage.camera { dot(.green) }
+            if usage.microphone { dot(.orange) }
+        }
+        .accessibilityHidden(true)
+    }
+
+    private func dot(_ color: Color) -> some View {
+        Circle()
+            .fill(color)
+            .frame(width: size, height: size)
+            .shadow(color: color.opacity(0.8), radius: size * 0.4)
     }
 }
 

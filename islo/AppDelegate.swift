@@ -329,6 +329,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             .sink { enabled in CalendarManager.shared.setEnabled(enabled) }
             .store(in: &cancellables)
 
+        settings.$privacyIndicatorEnabled
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { enabled in PrivacyMonitor.shared.setEnabled(enabled) }
+            .store(in: &cancellables)
+
         settings.$calendarAlertsEnabled
             .removeDuplicates()
             .receive(on: RunLoop.main)
@@ -498,6 +504,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 name: "AirPods Pro", symbolName: "airpodspro",
                 left: 82, right: 78, caseLevel: 45, main: nil
             ))
+        case "privacy":
+            PrivacyMonitor.shared.debugSimulate(PrivacyUsage(microphone: true, camera: true, appName: "Zoom"))
+        case "privacy-off":
+            PrivacyMonitor.shared.debugSimulate(nil)
         case "event":
             commandEchoManager.showUpcomingEvent(CalendarEventInfo(
                 id: "debug", title: "Tasarım toplantısı",
