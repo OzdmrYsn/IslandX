@@ -100,7 +100,13 @@ To prepare a new release:
 3. Upload `dist/islo-VERSION.zip` and `dist/islo.dmg` to a GitHub Release tagged `vVERSION`.
 4. Commit and publish the regenerated `appcast.xml` after the ZIP is available.
 
-Developer ID signing and notarization are recommended for polished public distribution. The current ad-hoc signature is intended for development and early GitHub releases.
+### Code signing
+
+`scripts/create-release.sh` signs the app (and the Sparkle parts inside it) through `scripts/sign-app.sh` with the self-signed **islo Code Signing** certificate from the developer's login Keychain (override with `ISLO_SIGNING_IDENTITY`). Because every release carries the same certificate, macOS keeps permissions such as Accessibility across Sparkle updates; with an ad-hoc signature they reset on every update. If the identity is missing, the script falls back to ad-hoc signing and prints a warning.
+
+Keep a password-protected `.p12` backup of this identity outside the repository and never commit it: a release signed with a different certificate makes users grant permissions again.
+
+The certificate is not an Apple Developer ID, so Gatekeeper still shows the first-launch warning. Developer ID signing and notarization are recommended for polished public distribution.
 
 ---
 

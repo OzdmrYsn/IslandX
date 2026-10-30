@@ -36,7 +36,8 @@ xcodebuild \
     build
 
 release_app="$derived_data/Build/Products/Release/islo.app"
-/usr/bin/codesign --verify --deep --strict "$release_app"
+# Stable signature so macOS keeps permissions (Accessibility etc.) across updates.
+"$project_root/scripts/sign-app.sh" "$release_app"
 
 if [[ -e "$archive_path" ]]; then
     backup_path="$project_root/dist/$archive_name.previous"
