@@ -47,7 +47,6 @@ final class CommandEchoManager: ObservableObject {
     @Published private(set) var revision = 0
 
     private var timer: Timer?
-    private var lastBrightness: Double?
     private var lastVolume: Double?
     private var lastPasteboardChangeCount = NSPasteboard.general.changeCount
     private var lastCapsLockState = NSEvent.modifierFlags.contains(.capsLock)
@@ -57,7 +56,6 @@ final class CommandEchoManager: ObservableObject {
 
     func startMonitoring() {
         guard timer == nil else { return }
-        lastBrightness = Self.readBrightness()
         lastVolume = Self.readSystemVolume()
         lastPasteboardChangeCount = NSPasteboard.general.changeCount
         lastCapsLockState = NSEvent.modifierFlags.contains(.capsLock)
@@ -99,16 +97,25 @@ final class CommandEchoManager: ObservableObject {
         publish(.notification(notification))
     }
 
-    /// For key presses islo. handled itself. Also primes the pollers so the
-    /// same change isn't announced a second time.
+    /// For key presses islo. handled itself. Also primes the volume poller so
+    /// the same change isn't announced a second time.
     func showHandledVolume(_ value: Double) {
         lastVolume = Self.readSystemVolume()
         publish(.volume(min(max(value, 0), 1)))
     }
 
     func showHandledBrightness(_ value: Double) {
-        lastBrightness = Self.readBrightness()
         publish(.brightness(min(max(value, 0), 1)))
+    }
+
+    /// Without Accessibility, macOS handles the brightness keys itself; read
+    /// the value once it has applied the step. Brightness isn't polled, so
+    /// auto-brightness changes never show up in the notch.
+    private func announceBrightnessAfterKeyPress() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [weak self] in
+            guard let brightness = Self.readBrightness() else { return }
+            self?.publish(.brightness(brightness))
+        }
     }
 
     private func startInputMonitoring() {
@@ -126,6 +133,13 @@ final class CommandEchoManager: ObservableObject {
             let keyCode = Int((data & 0xFFFF0000) >> 16)
             let keyFlags = Int(data & 0x0000FFFF)
             guard keyFlags & 0xFF00 == 0x0A00 else { return }
+            // Global monitors see these keys without Accessibility. When
+            // islo.'s own key handler is active it consumes them first.
+            if keyCode == HUDKey.brightnessUp.rawValue ||
+                keyCode == HUDKey.brightnessDown.rawValue {
+                Task { @MainActor in self?.announceBrightnessAfterKeyPress() }
+                return
+            }
             let direction: MediaSkipDirection?
             switch keyCode {
             case 17: direction = .next
@@ -156,15 +170,6 @@ final class CommandEchoManager: ObservableObject {
             lastCapsLockState = capsLockState
             publish(.capsLock(capsLockState))
         }
-
-        if let brightness = Self.readBrightness() {
-            if let previous = lastBrightness,
-               abs(brightness - previous) >= 0.015 {
-                publish(.brightness(brightness))
-            }
-            lastBrightness = brightness
-        }
-
     }
 
     private func startScreenshotMonitoring() {
@@ -194,6 +199,12 @@ final class CommandEchoManager: ObservableObject {
     }
 
     private static func readBrightness() -> Double? {
+        // On Apple Silicon only DisplayServices reports the live value; the
+        // AppleARMBacklight registry entry keeps its boot-time value.
+        if let brightness = BuiltInDisplayBrightness.brightness() {
+            return brightness
+        }
+
         let service = IOServiceGetMatchingService(
             kIOMainPortDefault,
             IOServiceMatching("IODisplayConnect")
@@ -212,30 +223,7 @@ final class CommandEchoManager: ObservableObject {
                 return min(max(Double(brightness), 0), 1)
             }
         }
-
-        // Apple Silicon's internal display exposes its public brightness
-        // parameters through AppleARMBacklight instead of IODisplayConnect.
-        let backlight = IOServiceGetMatchingService(
-            kIOMainPortDefault,
-            IOServiceMatching("AppleARMBacklight")
-        )
-        guard backlight != 0 else { return nil }
-        defer { IOObjectRelease(backlight) }
-
-        guard let parameters = IORegistryEntryCreateCFProperty(
-            backlight,
-            "IODisplayParameters" as CFString,
-            kCFAllocatorDefault,
-            0
-        )?.takeRetainedValue() as? [String: Any],
-        let brightness = parameters["brightness"] as? [String: Any],
-        let value = brightness["value"] as? NSNumber,
-        let maximum = brightness["max"] as? NSNumber,
-        maximum.doubleValue > 0 else {
-            return nil
-        }
-
-        return min(max(value.doubleValue / maximum.doubleValue, 0), 1)
+        return nil
     }
 
     private static func readSystemVolume() -> Double? {
