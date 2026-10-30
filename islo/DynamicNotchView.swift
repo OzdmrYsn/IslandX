@@ -122,6 +122,8 @@ struct DynamicNotchView: View {
     @ObservedObject private var clipboardHistoryManager: ClipboardHistoryManager
     @ObservedObject private var notificationMonitor: NotificationMonitor
     @ObservedObject private var calendarManager = CalendarManager.shared
+    @ObservedObject private var powerMonitor = PowerMonitor.shared
+    @ObservedObject private var audioDevices = AudioDeviceManager.shared
 
     private let layout: NotchLayout
     private let onPreferredSizeChange: (CGSize, Bool) -> Void
@@ -382,6 +384,13 @@ struct DynamicNotchView: View {
         }
         .onReceive(focusTimerManager.$finishRevision.dropFirst()) { _ in
             commandEchoManager.showTimerFinished(focusTimerManager.lastFinish)
+        }
+        .onReceive(powerMonitor.$eventRevision.dropFirst()) { _ in
+            commandEchoManager.showPower(powerMonitor.lastEvent)
+        }
+        .onReceive(audioDevices.$headphoneRevision.dropFirst()) { _ in
+            guard let battery = audioDevices.lastHeadphones else { return }
+            commandEchoManager.showHeadphones(battery)
         }
         .onReceive(calendarManager.$alertRevision.dropFirst()) { _ in
             guard let event = calendarManager.alertEvent else { return }
@@ -2230,6 +2239,8 @@ struct DynamicNotchView: View {
                     .onTapGesture { openDashboard(at: .timer) }
             } else if case .upcomingEvent(let event) = commandEchoManager.event {
                 eventHUD(event)
+            } else if case .headphones(let battery) = commandEchoManager.event {
+                headphoneHUD(battery)
             } else {
                 systemEchoHUD
             }
@@ -2291,6 +2302,68 @@ struct DynamicNotchView: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
+    }
+
+    /// Headphones just became the output: their name on the left, battery
+    /// levels (left, right and case for AirPods) on the right.
+    private func headphoneHUD(_ battery: HeadphoneBattery) -> some View {
+        HStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: battery.symbolName)
+                    .font(.system(size: 14, weight: .semibold))
+                    .id(commandEchoManager.revision)
+                    .transition(.scale(scale: 0.6).combined(with: .opacity))
+                Text(battery.name)
+                    .font(.system(size: 11, weight: .semibold))
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: layout.hasCameraHousing ? commandEchoWingWidth : .infinity, alignment: .leading)
+
+            if layout.hasCameraHousing {
+                Color.clear
+                    .frame(width: layout.cameraHousingWidth)
+                    .accessibilityHidden(true)
+            }
+
+            HStack(spacing: 10) {
+                Spacer(minLength: 0)
+                if battery.hasLevels {
+                    if let left = battery.left { headphoneLevel(localized("Sol", "L"), left) }
+                    if let right = battery.right { headphoneLevel(localized("Sağ", "R"), right) }
+                    if let caseLevel = battery.caseLevel { headphoneLevel(localized("Kutu", "Case"), caseLevel) }
+                    if let main = battery.main, battery.left == nil, battery.right == nil {
+                        headphoneLevel(nil, main)
+                    }
+                } else {
+                    Text(localized("Bağlandı", "Connected"))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+            }
+            .frame(maxWidth: layout.hasCameraHousing ? commandEchoWingWidth : .infinity, alignment: .trailing)
+        }
+        .padding(.horizontal, 18)
+        .frame(height: layout.hasCameraHousing ? layout.notchBandHeight : 40)
+        .foregroundStyle(.white)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func headphoneLevel(_ label: String?, _ level: Int) -> some View {
+        HStack(spacing: 3) {
+            if let label {
+                Text(label)
+                    .font(.system(size: 8.5, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.5))
+            }
+            Text(percentText(level))
+                .font(.system(size: 10.5, weight: .semibold).monospacedDigit())
+                .foregroundStyle(level <= 20 ? Color.red : Color.white)
+        }
+    }
+
+    private func percentText(_ value: Int) -> String {
+        settings.language == .turkish ? "%\(value)" : "\(value)%"
     }
 
     private func openDashboard(at section: DashboardSection) {
@@ -2492,6 +2565,13 @@ struct DynamicNotchView: View {
             if case .timerFinished = commandEchoManager.event {
                 RingingSymbol(symbol: commandEchoManager.event.symbolName, tint: accent)
                     .id(commandEchoManager.revision)
+            } else if case .power(let event) = commandEchoManager.event {
+                switch event {
+                case .pluggedIn(let level, let charging):
+                    BatteryGlyph(level: level, isCharging: charging).id(commandEchoManager.revision)
+                case .unplugged(let level), .low(let level):
+                    BatteryGlyph(level: level, isCharging: false).id(commandEchoManager.revision)
+                }
             } else {
                 Image(systemName: commandEchoManager.event.symbolName)
                     .font(.system(size: 14, weight: .bold))
@@ -2500,7 +2580,7 @@ struct DynamicNotchView: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.72)))
             }
 
-            if commandEchoValue == nil {
+            if commandEchoValue == nil || isPowerEcho {
                 Text(commandEchoTitle)
                     .font(.system(size: 11, weight: .semibold))
                     .lineLimit(1)
@@ -2523,10 +2603,20 @@ struct DynamicNotchView: View {
         }
     }
 
+    private var isPowerEcho: Bool {
+        if case .power = commandEchoManager.event { return true }
+        return false
+    }
+
     private var commandEchoValue: Double? {
         switch commandEchoManager.event {
         case .volume(let value), .brightness(let value): value
-        case .copied, .pasted, .screenshot, .capsLock, .mediaSkip, .trackChanged, .notification, .timerFinished, .upcomingEvent: nil
+        case .power(let event):
+            switch event {
+            case .pluggedIn(let level, _), .unplugged(let level), .low(let level): Double(level) / 100
+            }
+        case .copied, .pasted, .screenshot, .capsLock, .mediaSkip, .trackChanged, .notification,
+             .timerFinished, .upcomingEvent, .headphones: nil
         }
     }
 
@@ -2544,6 +2634,13 @@ struct DynamicNotchView: View {
         case .trackChanged(let title, _): title
         case .notification(let item): item.appName
         case .upcomingEvent(let event): event.title
+        case .headphones(let battery): battery.name
+        case .power(let event):
+            switch event {
+            case .pluggedIn(_, let charging): charging ? localized("Şarj oluyor", "Charging") : localized("Güç bağlandı", "Power connected")
+            case .unplugged: localized("Pil gücünde", "On battery")
+            case .low: localized("Pil zayıf", "Battery low")
+            }
         case .timerFinished(let finish):
             switch finish {
             case .timer: localized("Süre doldu", "Time's up")
@@ -2563,6 +2660,8 @@ struct DynamicNotchView: View {
         case .trackChanged: artistTitle
         case .notification(let item): item.headline
         case .upcomingEvent(let event): eventTimeText(event, now: Date())
+        case .headphones: localized("Bağlandı", "Connected")
+        case .power: ""
         case .timerFinished(let finish):
             switch finish {
             case .timer: localized("Zamanlayıcı bitti", "Timer finished")
@@ -2586,6 +2685,7 @@ struct DynamicNotchView: View {
         // The user set this countdown; always say when it ends.
         case .timerFinished: isAllowed = true
         case .upcomingEvent: isAllowed = settings.calendarEnabled && settings.calendarAlertsEnabled
+        case .power, .headphones: isAllowed = settings.devicesHUDEnabled
         default: isAllowed = settings.dashboardCommandEchoEnabled
         }
         guard isAllowed, presentation == .idle else { return }
@@ -2605,6 +2705,10 @@ struct DynamicNotchView: View {
                 duration = .seconds(5)
             } else if case .upcomingEvent = commandEchoManager.event {
                 duration = .seconds(10)
+            } else if case .headphones = commandEchoManager.event {
+                duration = .seconds(4.5)
+            } else if case .power = commandEchoManager.event {
+                duration = .seconds(3)
             } else if case .screenshot = commandEchoManager.event {
                 duration = .seconds(3.2)
             } else if case .trackChanged = commandEchoManager.event {
@@ -3248,6 +3352,8 @@ struct DynamicNotchView: View {
         case .trackChanged: extensionWidth = 380
         case .timerFinished: extensionWidth = 330
         case .upcomingEvent: extensionWidth = 400
+        case .headphones: extensionWidth = 430
+        case .power: extensionWidth = 330
         case .mediaSkip: extensionWidth = 260
         default: extensionWidth = 300
         }
@@ -3575,6 +3681,52 @@ private struct NotchSlider: View {
             onChange(min(max(value + step, 0), 1))
             onEditingChanged(false)
         }
+    }
+}
+
+/// A battery outline that fills to its level when it appears; charging
+/// fills it green with a pulsing bolt.
+private struct BatteryGlyph: View {
+    let level: Int
+    let isCharging: Bool
+    @State private var shownLevel: Double = 0
+    @State private var pulse = false
+
+    var body: some View {
+        let fill: Color = isCharging ? .green : (level <= 20 ? .red : .white)
+        HStack(spacing: 1.5) {
+            ZStack(alignment: .leading) {
+                RoundedRectangle(cornerRadius: 3.5, style: .continuous)
+                    .stroke(Color.white.opacity(0.55), lineWidth: 1.2)
+                RoundedRectangle(cornerRadius: 1.8, style: .continuous)
+                    .fill(fill)
+                    .frame(width: max(2, 22 * shownLevel))
+                    .padding(2.2)
+                if isCharging {
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: 8, weight: .heavy))
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.5), radius: 1)
+                        .scaleEffect(pulse ? 1.18 : 0.88)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .frame(width: 27, height: 13)
+            Capsule()
+                .fill(Color.white.opacity(0.55))
+                .frame(width: 2, height: 5)
+        }
+        .onAppear {
+            withAnimation(.spring(response: 0.9, dampingFraction: 0.85).delay(0.1)) {
+                shownLevel = Double(level) / 100
+            }
+            if isCharging {
+                withAnimation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true)) {
+                    pulse = true
+                }
+            }
+        }
+        .accessibilityHidden(true)
     }
 }
 

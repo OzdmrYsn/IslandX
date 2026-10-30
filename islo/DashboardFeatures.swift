@@ -24,6 +24,8 @@ enum TimerFinish: Equatable {
 enum CommandEchoKind: Equatable {
     case timerFinished(TimerFinish)
     case upcomingEvent(CalendarEventInfo)
+    case power(PowerEvent)
+    case headphones(HeadphoneBattery)
     case volume(Double)
     case brightness(Double)
     case copied
@@ -47,6 +49,13 @@ enum CommandEchoKind: Equatable {
         case .trackChanged(_, let direction): direction?.symbolName ?? "music.note"
         case .notification: "bell.fill"
         case .upcomingEvent: "calendar"
+        case .power(let event):
+            switch event {
+            case .pluggedIn: "bolt.fill"
+            case .unplugged: "battery.75"
+            case .low: "battery.25"
+            }
+        case .headphones(let battery): battery.symbolName
         case .timerFinished(let finish):
             switch finish {
             case .timer: "bell.fill"
@@ -119,6 +128,14 @@ final class CommandEchoManager: ObservableObject {
 
     func showUpcomingEvent(_ event: CalendarEventInfo) {
         publish(.upcomingEvent(event))
+    }
+
+    func showPower(_ event: PowerEvent) {
+        publish(.power(event))
+    }
+
+    func showHeadphones(_ battery: HeadphoneBattery) {
+        publish(.headphones(battery))
     }
 
     /// For key presses islo. handled itself. Also primes the volume poller so

@@ -60,6 +60,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         windowController.showWindow(nil)
         mediaManager.startMonitoring()
         commandEchoManager.startMonitoring()
+        PowerMonitor.shared.start()
+        AudioDeviceManager.shared.start()
+        #if DEBUG
+        installDebugHooks()
+        #endif
         clipboardHistoryManager.startMonitoring()
         fileShelfManager.startDragMonitoring()
 
@@ -466,4 +471,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func quitApplication() {
         NSApp.terminate(nil)
     }
+
+    #if DEBUG
+    /// Debug builds only: a `com.ozdmrysn.islo.debug` distributed
+    /// notification fakes events that are hard to cause by hand (a charger,
+    /// headphones, a meeting), so their notch HUDs can be checked.
+    private func installDebugHooks() {
+        DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name("com.ozdmrysn.islo.debug"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let command = notification.object as? String else { return }
+            Task { @MainActor in self?.runDebugCommand(command) }
+        }
+    }
+
+    private func runDebugCommand(_ command: String) {
+        switch command {
+        case "charging":
+            commandEchoManager.showPower(.pluggedIn(level: 64, isCharging: true))
+        case "low":
+            commandEchoManager.showPower(.low(level: 9))
+        case "airpods":
+            commandEchoManager.showHeadphones(HeadphoneBattery(
+                name: "AirPods Pro", symbolName: "airpodspro",
+                left: 82, right: 78, caseLevel: 45, main: nil
+            ))
+        case "event":
+            commandEchoManager.showUpcomingEvent(CalendarEventInfo(
+                id: "debug", title: "Tasarım toplantısı",
+                start: Date().addingTimeInterval(300), end: Date().addingTimeInterval(2_100),
+                isAllDay: false, joinURL: URL(string: "https://meet.google.com/abc-defg-hij"),
+                color: .systemPurple
+            ))
+        default:
+            break
+        }
+    }
+    #endif
 }

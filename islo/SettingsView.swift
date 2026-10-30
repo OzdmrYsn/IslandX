@@ -261,6 +261,9 @@ struct SettingsView: View {
                 rowDivider
                 toggleRow(symbol: "tray.full.fill", title: text("Dosya Rafı + AirDrop", "File Shelf + AirDrop"), subtitle: text("Dosyaları çentiğe bırakın, taşıyın veya AirDrop ile gönderin.", "Drop files on the notch, move them, or send them with AirDrop."), isOn: $settings.dashboardFileShelfEnabled)
             }
+            settingsCard(title: text("Cihazlar", "Devices")) {
+                toggleRow(symbol: "battery.100percent.bolt", title: text("Şarj ve kulaklık pili", "Charging and headphone battery"), subtitle: text("Şarj takılınca ya da pil azalınca çentik haber verir; Bluetooth kulaklık (AirPods vb.) bağlanınca pil seviyelerini gösterir.", "The notch tells you when the charger is plugged in or the battery runs low, and shows Bluetooth headphones' (AirPods etc.) battery when they connect."), isOn: $settings.devicesHUDEnabled)
+            }
             settingsCard(title: text("Takvim", "Calendar")) {
                 toggleRow(symbol: "calendar", title: text("Takvim etkinlikleri", "Calendar events"), subtitle: text("Ana sayfada sıradaki etkinlikleri, video görüşmelerinde Katıl düğmesini gösterir. Takvim izni gerekir.", "Shows your next events on Home, with a Join button for video calls. Needs Calendar access."), isOn: $settings.calendarEnabled)
                 if settings.calendarEnabled {
