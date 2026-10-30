@@ -35,4 +35,8 @@ extension Notification.Name {
     static let isloCollapse = Notification.Name(
         "islo.collapse"
     )
+
+    static let isloToggle = Notification.Name(
+        "islo.toggle"
+    )
 }

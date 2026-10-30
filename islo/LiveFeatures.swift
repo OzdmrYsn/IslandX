@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import Combine
 import CoreAudio
 import CoreMediaIO
@@ -1091,5 +1092,136 @@ final class WeatherManager: ObservableObject {
         case 95, 96, 99: turkish ? "Gök gürültülü" : "Thunderstorm"
         default: turkish ? "Bulutlu" : "Cloudy"
         }
+    }
+}
+
+// MARK: - Global shortcut
+
+/// A key plus Carbon modifier flags, e.g. ⌥Space.
+struct HotKey: Codable, Equatable {
+    var keyCode: UInt32
+    var modifiers: UInt32
+
+    static let defaultToggle = HotKey(keyCode: UInt32(kVK_Space), modifiers: UInt32(optionKey))
+
+    var displayString: String {
+        var text = ""
+        if modifiers & UInt32(controlKey) != 0 { text += "⌃" }
+        if modifiers & UInt32(optionKey) != 0 { text += "⌥" }
+        if modifiers & UInt32(shiftKey) != 0 { text += "⇧" }
+        if modifiers & UInt32(cmdKey) != 0 { text += "⌘" }
+        return text + Self.keyName(keyCode)
+    }
+
+    static func carbonModifiers(from flags: NSEvent.ModifierFlags) -> UInt32 {
+        var result: UInt32 = 0
+        if flags.contains(.control) { result |= UInt32(controlKey) }
+        if flags.contains(.option) { result |= UInt32(optionKey) }
+        if flags.contains(.shift) { result |= UInt32(shiftKey) }
+        if flags.contains(.command) { result |= UInt32(cmdKey) }
+        return result
+    }
+
+    static let functionKeys: Set<Int> = [
+        kVK_F1, kVK_F2, kVK_F3, kVK_F4, kVK_F5, kVK_F6, kVK_F7, kVK_F8, kVK_F9, kVK_F10,
+        kVK_F11, kVK_F12, kVK_F13, kVK_F14, kVK_F15, kVK_F16, kVK_F17, kVK_F18, kVK_F19, kVK_F20
+    ]
+
+    static func keyName(_ keyCode: UInt32) -> String {
+        let code = Int(keyCode)
+        let named: [Int: String] = [
+            kVK_Space: "Space", kVK_Return: "↩", kVK_Tab: "⇥", kVK_Delete: "⌫",
+            kVK_ForwardDelete: "⌦", kVK_Escape: "⎋", kVK_LeftArrow: "←", kVK_RightArrow: "→",
+            kVK_UpArrow: "↑", kVK_DownArrow: "↓", kVK_Home: "↖", kVK_End: "↘",
+            kVK_PageUp: "⇞", kVK_PageDown: "⇟"
+        ]
+        if let name = named[code] { return name }
+        if let index = [kVK_F1, kVK_F2, kVK_F3, kVK_F4, kVK_F5, kVK_F6, kVK_F7, kVK_F8, kVK_F9, kVK_F10,
+                        kVK_F11, kVK_F12, kVK_F13, kVK_F14, kVK_F15, kVK_F16, kVK_F17, kVK_F18, kVK_F19, kVK_F20]
+            .firstIndex(of: code) {
+            return "F\(index + 1)"
+        }
+        return character(for: keyCode)?.uppercased() ?? "#\(keyCode)"
+    }
+
+    /// The character the key types on the current keyboard layout.
+    private static func character(for keyCode: UInt32) -> String? {
+        guard let source = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue(),
+              let pointer = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData) else { return nil }
+        let data = Unmanaged<CFData>.fromOpaque(pointer).takeUnretainedValue() as Data
+        return data.withUnsafeBytes { buffer -> String? in
+            guard let layout = buffer.baseAddress?.assumingMemoryBound(to: UCKeyboardLayout.self) else { return nil }
+            var deadKeys: UInt32 = 0
+            var length = 0
+            var characters = [UniChar](repeating: 0, count: 4)
+            let status = UCKeyTranslate(
+                layout, UInt16(keyCode), UInt16(kUCKeyActionDisplay), 0, UInt32(LMGetKbdType()),
+                OptionBits(kUCKeyTranslateNoDeadKeysBit), &deadKeys, characters.count, &length, &characters
+            )
+            guard status == noErr, length > 0 else { return nil }
+            return String(utf16CodeUnits: characters, count: length)
+        }
+    }
+}
+
+/// One system-wide shortcut through Carbon's hot keys, which need no
+/// Accessibility permission.
+@MainActor
+final class HotKeyManager {
+    static let shared = HotKeyManager()
+
+    var onPress: (() -> Void)?
+
+    private var hotKeyRef: EventHotKeyRef?
+    private var handlerRef: EventHandlerRef?
+    private var currentKey: HotKey?
+
+    private init() {}
+
+    /// Registers `hotKey` (nil clears it); false if another app holds it.
+    @discardableResult
+    func register(_ hotKey: HotKey?) -> Bool {
+        unregisterCurrent()
+        currentKey = hotKey
+        guard let hotKey else { return true }
+        return registerCurrent(hotKey)
+    }
+
+    /// While the shortcut is being re-recorded, pressing the old one must
+    /// reach the recorder instead of toggling the notch.
+    func suspend() {
+        unregisterCurrent()
+    }
+
+    func resume() {
+        guard hotKeyRef == nil, let currentKey else { return }
+        _ = registerCurrent(currentKey)
+    }
+
+    private func registerCurrent(_ hotKey: HotKey) -> Bool {
+        installHandlerIfNeeded()
+        var ref: EventHotKeyRef?
+        let identifier = EventHotKeyID(signature: OSType(0x69_73_6C_6F), id: 1) // 'islo'
+        let status = RegisterEventHotKey(
+            hotKey.keyCode, hotKey.modifiers, identifier,
+            GetApplicationEventTarget(), 0, &ref
+        )
+        guard status == noErr, let ref else { return false }
+        hotKeyRef = ref
+        return true
+    }
+
+    private func unregisterCurrent() {
+        if let hotKeyRef { UnregisterEventHotKey(hotKeyRef) }
+        hotKeyRef = nil
+    }
+
+    private func installHandlerIfNeeded() {
+        guard handlerRef == nil else { return }
+        var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+        InstallEventHandler(GetApplicationEventTarget(), { _, _, _ in
+            Task { @MainActor in HotKeyManager.shared.onPress?() }
+            return noErr
+        }, 1, &spec, nil, &handlerRef)
     }
 }

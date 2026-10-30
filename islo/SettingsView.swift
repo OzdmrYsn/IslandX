@@ -1,3 +1,4 @@
+import Carbon.HIToolbox
 import Combine
 import SwiftUI
 
@@ -244,6 +245,25 @@ struct SettingsView: View {
                 toggleRow(symbol: "rectangle.slash", title: text("Tam ekranda gizle", "Hide in full screen"), subtitle: text("Oyun ve sunumların üzerinde görünmez.", "Stays out of the way during games and presentations."), isOn: $settings.hideInFullScreen)
                 rowDivider
                 sliderRow(symbol: "arrow.down.right.and.arrow.up.left", title: text("Kapanma gecikmesi", "Collapse delay"), value: $settings.collapseDelay, range: 0.15...1.2, step: 0.05, valueText: String(format: "%.2f s", settings.collapseDelay))
+            }
+            settingsCard(title: text("Kısayol tuşu", "Keyboard shortcut")) {
+                toggleRow(symbol: "command", title: text("Kısayolla aç/kapat", "Open and close with a shortcut"), subtitle: text("Hangi uygulamadaysanız, bu tuşlara basınca çentik açılır; tekrar basınca kapanır.", "Press it in any app to open the notch; press again to close it."), isOn: $settings.hotKeyEnabled)
+                if settings.hotKeyEnabled {
+                    rowDivider
+                    settingsRow(symbol: "keyboard", title: text("Kısayol", "Shortcut"), subtitle: settings.isHotKeyTaken
+                        ? text("Bu kısayolu başka bir uygulama kullanıyor; başka bir tane seçin.", "Another app uses this shortcut; pick a different one.")
+                        : text("Değiştirmek için tıklayıp yeni tuşlara basın (en az bir ⌘ ⌥ ⌃ ⇧ ile). Esc vazgeçer.", "Click, then press the new keys (with at least one of ⌘ ⌥ ⌃ ⇧). Esc cancels.")) {
+                        HStack(spacing: 8) {
+                            if settings.isHotKeyTaken {
+                                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                            }
+                            ShortcutRecorder(hotKey: $settings.toggleHotKey, language: settings.language, accent: accent)
+                            if settings.toggleHotKey != .defaultToggle {
+                                Button(text("Varsayılan", "Default")) { settings.toggleHotKey = .defaultToggle }
+                            }
+                        }
+                    }
+                }
             }
             HStack { Spacer(); Button(text("Etkileşim varsayılanlarını geri yükle", "Restore interaction defaults")) { settings.resetInteractionDefaults() } }
         }
@@ -658,6 +678,59 @@ struct ThemeChoicePicker: View {
 
     private func cardForegroundColor(for theme: AppTheme) -> Color {
         switch theme { case .light: .black; case .dark: .white; case .system, .liquidGlass: .primary }
+    }
+}
+
+/// Click, then press a key combination; it becomes the shortcut.
+private struct ShortcutRecorder: View {
+    @Binding var hotKey: HotKey
+    let language: AppLanguage
+    let accent: Color
+    @State private var isRecording = false
+    @State private var monitor: Any?
+
+    var body: some View {
+        Button(action: { isRecording ? stop() : start() }) {
+            Text(isRecording ? language.value(turkish: "Tuşlara basın…", english: "Press keys…") : hotKey.displayString)
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .foregroundStyle(isRecording ? accent : Color.primary)
+                .frame(minWidth: 110)
+                .padding(.horizontal, 12)
+                .frame(height: 28)
+                .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(isRecording ? accent.opacity(0.14) : Color.primary.opacity(0.06)))
+                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(isRecording ? accent : Color.primary.opacity(0.12), lineWidth: 1))
+                .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .onDisappear(perform: stop)
+        .accessibilityLabel(Text(language.value(turkish: "Kısayol: ", english: "Shortcut: ") + hotKey.displayString))
+    }
+
+    private func start() {
+        isRecording = true
+        HotKeyManager.shared.suspend()
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            if event.keyCode == UInt16(kVK_Escape) {
+                stop()
+                return nil
+            }
+            let modifiers = HotKey.carbonModifiers(from: event.modifierFlags)
+            let isFunctionKey = HotKey.functionKeys.contains(Int(event.keyCode))
+            guard modifiers != 0 || isFunctionKey else {
+                NSSound.beep()
+                return nil
+            }
+            hotKey = HotKey(keyCode: UInt32(event.keyCode), modifiers: modifiers)
+            stop()
+            return nil
+        }
+    }
+
+    private func stop() {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+        isRecording = false
+        HotKeyManager.shared.resume()
     }
 }
 

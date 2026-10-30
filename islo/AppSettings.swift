@@ -345,6 +345,8 @@ final class AppSettings: ObservableObject {
         static let privacyIndicatorEnabled = "dashboard.privacy.enabled"
         static let lyricsEnabled = "dashboard.lyrics.enabled"
         static let weatherEnabled = "dashboard.weather.enabled"
+        static let hotKeyEnabled = "interaction.hotKey.enabled"
+        static let toggleHotKey = "interaction.hotKey"
         static let weatherLocation = "dashboard.weather.location"
         static let dashboardKeepAwakeEnabled = "dashboard.keepAwake.enabled"
         static let dashboardFileShelfEnabled = "dashboard.fileShelf.enabled"
@@ -436,6 +438,22 @@ final class AppSettings: ObservableObject {
     @Published var devicesHUDEnabled: Bool {
         didSet { defaults.set(devicesHUDEnabled, forKey: Key.devicesHUDEnabled) }
     }
+
+    /// A system-wide shortcut that opens and closes the notch.
+    @Published var hotKeyEnabled: Bool {
+        didSet { defaults.set(hotKeyEnabled, forKey: Key.hotKeyEnabled) }
+    }
+
+    @Published var toggleHotKey: HotKey {
+        didSet {
+            if let data = try? JSONEncoder().encode(toggleHotKey) {
+                defaults.set(data, forKey: Key.toggleHotKey)
+            }
+        }
+    }
+
+    /// Set when another app already owns the chosen shortcut.
+    @Published var isHotKeyTaken = false
 
     /// Current weather on Home, from Open-Meteo.
     @Published var weatherEnabled: Bool {
@@ -583,6 +601,9 @@ final class AppSettings: ObservableObject {
         privacyIndicatorEnabled = Self.bool(forKey: Key.privacyIndicatorEnabled, defaults: defaults, fallback: true)
         lyricsEnabled = Self.bool(forKey: Key.lyricsEnabled, defaults: defaults, fallback: true)
         weatherEnabled = Self.bool(forKey: Key.weatherEnabled, defaults: defaults, fallback: true)
+        hotKeyEnabled = Self.bool(forKey: Key.hotKeyEnabled, defaults: defaults, fallback: true)
+        toggleHotKey = defaults.data(forKey: Key.toggleHotKey)
+            .flatMap { try? JSONDecoder().decode(HotKey.self, from: $0) } ?? .defaultToggle
         weatherLocation = defaults.data(forKey: Key.weatherLocation)
             .flatMap { try? JSONDecoder().decode(WeatherLocation.self, from: $0) }
         dashboardKeepAwakeEnabled = Self.bool(

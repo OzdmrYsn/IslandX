@@ -335,6 +335,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             .sink { enabled in PrivacyMonitor.shared.setEnabled(enabled) }
             .store(in: &cancellables)
 
+        HotKeyManager.shared.onPress = {
+            NotificationCenter.default.post(name: .isloToggle, object: nil)
+        }
+        settings.$hotKeyEnabled
+            .combineLatest(settings.$toggleHotKey)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] enabled, hotKey in
+                let registered = HotKeyManager.shared.register(enabled ? hotKey : nil)
+                self?.settings.isHotKeyTaken = !registered
+            }
+            .store(in: &cancellables)
+
         settings.$weatherEnabled
             .combineLatest(settings.$weatherLocation)
             .receive(on: RunLoop.main)

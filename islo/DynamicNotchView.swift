@@ -443,6 +443,20 @@ struct DynamicNotchView: View {
             if !enabled { keepAwakeManager.setActive(false) }
         }
         .onReceive(
+            NotificationCenter.default.publisher(for: .isloToggle)
+        ) { _ in
+            hoverTask?.cancel()
+            trackChangeTask?.cancel()
+            isTemporaryTrackPreview = false
+            if presentation == .expanded {
+                isPinned = false
+                setPresentation(.idle)
+            } else {
+                isPinned = true
+                setPresentation(.expanded)
+            }
+        }
+        .onReceive(
             NotificationCenter.default.publisher(for: .isloCollapse)
         ) { _ in
             hoverTask?.cancel()
