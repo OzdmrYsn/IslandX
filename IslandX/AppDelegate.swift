@@ -139,12 +139,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = item.button {
-            let image = NSImage(
-                systemSymbolName: "face.smiling",
-                accessibilityDescription: "islo."
-            )
-            image?.isTemplate = true
-            button.image = image
+            if let iconURL = Bundle.main.url(
+                forResource: "AppIcon",
+                withExtension: "icns"
+            ), let image = NSImage(contentsOf: iconURL) {
+                image.size = NSSize(width: 18, height: 18)
+                image.isTemplate = false
+                image.accessibilityDescription = "islo."
+                button.image = image
+            }
             button.toolTip = "islo."
         }
 
