@@ -14,7 +14,15 @@ enum MediaSkipDirection: Equatable {
     var symbolName: String { self == .previous ? "backward.fill" : "forward.fill" }
 }
 
+/// Which countdown just ran out, so the notch can say what comes next.
+enum TimerFinish: Equatable {
+    case timer
+    case focusDone
+    case breakDone
+}
+
 enum CommandEchoKind: Equatable {
+    case timerFinished(TimerFinish)
     case volume(Double)
     case brightness(Double)
     case copied
@@ -37,6 +45,12 @@ enum CommandEchoKind: Equatable {
         case .mediaSkip(let direction): direction.symbolName
         case .trackChanged(_, let direction): direction?.symbolName ?? "music.note"
         case .notification: "bell.fill"
+        case .timerFinished(let finish):
+            switch finish {
+            case .timer: "bell.fill"
+            case .focusDone: "cup.and.saucer.fill"
+            case .breakDone: "brain.head.profile"
+            }
         }
     }
 }
@@ -95,6 +109,10 @@ final class CommandEchoManager: ObservableObject {
 
     func showNotification(_ notification: CapturedNotification) {
         publish(.notification(notification))
+    }
+
+    func showTimerFinished(_ finish: TimerFinish) {
+        publish(.timerFinished(finish))
     }
 
     /// For key presses islo. handled itself. Also primes the volume poller so
@@ -930,6 +948,10 @@ final class FocusTimerManager: ObservableObject {
         }
     }
 
+    /// Bumped each time a countdown runs out; `lastFinish` says which.
+    @Published private(set) var finishRevision = 0
+    private(set) var lastFinish: TimerFinish = .timer
+
     /// Finished focus time and sessions, counted per calendar day.
     @Published private(set) var todayFocusSeconds = 0
     @Published private(set) var todaySessions = 0
@@ -1074,10 +1096,12 @@ final class FocusTimerManager: ObservableObject {
         if mode == .timer || !isBreak {
             recordFinishedFocus(seconds: totalSeconds, countsAsSession: mode == .pomodoro)
         }
+        lastFinish = mode == .timer ? .timer : (isBreak ? .breakDone : .focusDone)
         if mode == .pomodoro {
             isBreak.toggle()
             remainingSeconds = totalSeconds
         }
+        finishRevision &+= 1
     }
 
     private func recordFinishedFocus(seconds: Int, countsAsSession: Bool) {

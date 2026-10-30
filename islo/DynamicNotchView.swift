@@ -376,6 +376,12 @@ struct DynamicNotchView: View {
         .onReceive(commandEchoManager.$revision.dropFirst()) { _ in
             showCommandEchoIfNeeded()
         }
+        .onChange(of: isTimerLive) { _ in
+            refreshIdleSurface()
+        }
+        .onReceive(focusTimerManager.$finishRevision.dropFirst()) { _ in
+            commandEchoManager.showTimerFinished(focusTimerManager.lastFinish)
+        }
         .onChange(of: settings.dashboardFocusTimerEnabled) { enabled in
             if !enabled, dashboardSection == .timer { dashboardSection = .home }
         }
@@ -487,6 +493,7 @@ struct DynamicNotchView: View {
             hoverTask?.cancel()
             trackChangeTask?.cancel()
             isTemporaryTrackPreview = false
+            if idleActivity == .timer { dashboardSection = .timer }
             isPinned = true
             setPresentation(.expanded)
         } label: {
@@ -511,15 +518,14 @@ struct DynamicNotchView: View {
 
     private var notchedCompactContent: some View {
         HStack(spacing: 0) {
-            artwork(size: 27, cornerRadius: 7)
+            compactLeadingWing
                 .frame(width: layout.compactWingWidth, alignment: .trailing)
 
             Color.clear
                 .frame(width: layout.cameraHousingWidth)
                 .accessibilityHidden(true)
 
-            PlaybackWaveform(isPlaying: mediaManager.isPlaying)
-                .foregroundStyle(playbackIndicatorColor)
+            compactTrailingWing
                 .frame(width: layout.compactWingWidth, alignment: .leading)
                 .accessibilityHidden(true)
         }
@@ -527,15 +533,81 @@ struct DynamicNotchView: View {
 
     private var standardCompactContent: some View {
         HStack(spacing: 8) {
-            artwork(size: 27, cornerRadius: 7)
+            compactLeadingWing
 
             Spacer(minLength: 30)
 
-            PlaybackWaveform(isPlaying: mediaManager.isPlaying)
-                .foregroundStyle(playbackIndicatorColor)
+            compactTrailingWing
                 .accessibilityHidden(true)
         }
         .padding(.horizontal, 8)
+    }
+
+    /// What the closed notch's wings show, most urgent first.
+    private enum IdleActivity {
+        case none
+        case music
+        case timer
+    }
+
+    private var isTimerLive: Bool {
+        settings.dashboardFocusTimerEnabled
+            && settings.liveTimerInNotch
+            && focusTimerManager.isRunning
+    }
+
+    private var idleActivity: IdleActivity {
+        if isTimerLive { return .timer }
+        if showsIdleWings { return .music }
+        return .none
+    }
+
+    @ViewBuilder
+    private var compactLeadingWing: some View {
+        switch idleActivity {
+        case .timer:
+            timerMiniRing
+        case .music, .none:
+            artwork(size: 27, cornerRadius: 7)
+        }
+    }
+
+    @ViewBuilder
+    private var compactTrailingWing: some View {
+        switch idleActivity {
+        case .timer:
+            Text(focusTimerManager.formattedTime)
+                .font(.system(size: 12, weight: .semibold, design: .rounded).monospacedDigit())
+                .foregroundStyle(Color.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .contentTransition(.numericText(countsDown: true))
+                .animation(.easeOut(duration: 0.2), value: focusTimerManager.remainingSeconds)
+        case .music, .none:
+            PlaybackWaveform(isPlaying: mediaManager.isPlaying)
+                .foregroundStyle(playbackIndicatorColor)
+        }
+    }
+
+    /// The time left as a small ring, with the phase as its icon.
+    private var timerMiniRing: some View {
+        let remaining = 1 - focusTimerManager.progress
+        let tint = focusTimerManager.isBreak ? Color.mint : accent
+        return ZStack {
+            Circle()
+                .stroke(Color.white.opacity(0.16), lineWidth: 2.5)
+            Circle()
+                .trim(from: 0, to: max(remaining, 0.01))
+                .stroke(tint, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .animation(.linear(duration: 0.25), value: remaining)
+            Image(systemName: focusTimerManager.mode == .timer
+                  ? "timer"
+                  : (focusTimerManager.isBreak ? "cup.and.saucer.fill" : "brain.head.profile"))
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(tint)
+        }
+        .frame(width: 20, height: 20)
     }
 
     private var playbackIndicatorColor: Color {
@@ -2058,10 +2130,22 @@ struct DynamicNotchView: View {
         Group {
             if case .notification(let item) = commandEchoManager.event {
                 notificationHUD(item)
+            } else if case .timerFinished = commandEchoManager.event {
+                systemEchoHUD
+                    .contentShape(Rectangle())
+                    .onTapGesture { openDashboard(at: .timer) }
             } else {
                 systemEchoHUD
             }
         }
+    }
+
+    private func openDashboard(at section: DashboardSection) {
+        commandEchoTask?.cancel()
+        isCommandEchoVisible = false
+        dashboardSection = section
+        isPinned = true
+        setPresentation(.expanded)
     }
 
     /// The notch widens to show a new notification. Clicking it opens the
@@ -2252,11 +2336,16 @@ struct DynamicNotchView: View {
 
     private var commandEchoLeading: some View {
         HStack(spacing: 9) {
-            Image(systemName: commandEchoManager.event.symbolName)
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(.white)
-                .id(commandEchoManager.revision)
-                .transition(.opacity.combined(with: .scale(scale: 0.72)))
+            if case .timerFinished = commandEchoManager.event {
+                RingingSymbol(symbol: commandEchoManager.event.symbolName, tint: accent)
+                    .id(commandEchoManager.revision)
+            } else {
+                Image(systemName: commandEchoManager.event.symbolName)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.white)
+                    .id(commandEchoManager.revision)
+                    .transition(.opacity.combined(with: .scale(scale: 0.72)))
+            }
 
             if commandEchoValue == nil {
                 Text(commandEchoTitle)
@@ -2284,7 +2373,7 @@ struct DynamicNotchView: View {
     private var commandEchoValue: Double? {
         switch commandEchoManager.event {
         case .volume(let value), .brightness(let value): value
-        case .copied, .pasted, .screenshot, .capsLock, .mediaSkip, .trackChanged, .notification: nil
+        case .copied, .pasted, .screenshot, .capsLock, .mediaSkip, .trackChanged, .notification, .timerFinished: nil
         }
     }
 
@@ -2301,6 +2390,12 @@ struct DynamicNotchView: View {
             : localized("Önceki parça", "Previous track")
         case .trackChanged(let title, _): title
         case .notification(let item): item.appName
+        case .timerFinished(let finish):
+            switch finish {
+            case .timer: localized("Süre doldu", "Time's up")
+            case .focusDone: localized("Mola zamanı", "Time for a break")
+            case .breakDone: localized("Odak zamanı", "Back to focus")
+            }
         }
     }
 
@@ -2313,6 +2408,12 @@ struct DynamicNotchView: View {
         case .mediaSkip: localized("Parça değiştiriliyor", "Changing track")
         case .trackChanged: artistTitle
         case .notification(let item): item.headline
+        case .timerFinished(let finish):
+            switch finish {
+            case .timer: localized("Zamanlayıcı bitti", "Timer finished")
+            case .focusDone: localized("\(focusTimerManager.breakMinutes) dk mola", "\(focusTimerManager.breakMinutes) min break")
+            case .breakDone: localized("\(focusTimerManager.focusMinutes) dk odak", "\(focusTimerManager.focusMinutes) min focus")
+            }
         case .volume, .brightness: ""
         }
     }
@@ -2324,16 +2425,14 @@ struct DynamicNotchView: View {
     private func showCommandEchoIfNeeded() {
         // The open dashboard already shows volume and playback; swapping it
         // for a HUD would yank it away mid-interaction.
-        let isNotification: Bool
-        if case .notification = commandEchoManager.event {
-            isNotification = true
-        } else {
-            isNotification = false
+        let isAllowed: Bool
+        switch commandEchoManager.event {
+        case .notification: isAllowed = settings.dashboardNotificationsEnabled
+        // The user set this countdown; always say when it ends.
+        case .timerFinished: isAllowed = true
+        default: isAllowed = settings.dashboardCommandEchoEnabled
         }
-        guard isNotification
-                ? settings.dashboardNotificationsEnabled
-                : settings.dashboardCommandEchoEnabled,
-              presentation == .idle else { return }
+        guard isAllowed, presentation == .idle else { return }
         commandEchoTask?.cancel()
         let echoAnimation: Animation = reduceMotion
             ? .easeOut(duration: 0.12)
@@ -2346,6 +2445,8 @@ struct DynamicNotchView: View {
             let duration: Duration
             if case .notification = commandEchoManager.event {
                 duration = .seconds(4.5)
+            } else if case .timerFinished = commandEchoManager.event {
+                duration = .seconds(5)
             } else if case .screenshot = commandEchoManager.event {
                 duration = .seconds(3.2)
             } else if case .trackChanged = commandEchoManager.event {
@@ -2926,6 +3027,17 @@ struct DynamicNotchView: View {
         }
     }
 
+    /// Re-fits the closed notch after what its wings show has changed.
+    private func refreshIdleSurface() {
+        guard presentation == .idle,
+              !isCommandEchoVisible,
+              !isFileDropHUDVisible else { return }
+        let wingsAnimation: Animation = reduceMotion
+            ? .easeOut(duration: 0.12)
+            : .spring(response: 0.3, dampingFraction: 0.82)
+        resizeSurface(to: preferredSize, animation: wingsAnimation)
+    }
+
     private func setIdleWings(_ visible: Bool) {
         guard visible != showsIdleWings else { return }
         // A quicker spring than opening the dashboard: the wings are a small
@@ -2957,7 +3069,7 @@ struct DynamicNotchView: View {
     /// Visible Island means "visible while music plays"; otherwise the notch
     /// rests at the size of the camera housing.
     private var effectiveIdleMode: NotchIdleMode {
-        settings.notchIdleMode == .hiddenMini || !showsIdleWings
+        settings.notchIdleMode == .hiddenMini || idleActivity == .none
             ? .hiddenMini
             : .visibleIsland
     }
@@ -2976,6 +3088,7 @@ struct DynamicNotchView: View {
         let extensionWidth: CGFloat
         switch commandEchoManager.event {
         case .trackChanged: extensionWidth = 380
+        case .timerFinished: extensionWidth = 330
         case .mediaSkip: extensionWidth = 260
         default: extensionWidth = 300
         }
@@ -3118,6 +3231,9 @@ struct DynamicNotchView: View {
     }
 
     private var compactAccessibilityText: String {
+        if idleActivity == .timer {
+            return localized("Zamanlayıcı, kalan \(focusTimerManager.formattedTime)", "Timer, \(focusTimerManager.formattedTime) left")
+        }
         guard mediaManager.hasActiveTrack else {
             return "Media controls. Nothing is currently playing."
         }
@@ -3300,6 +3416,28 @@ private struct NotchSlider: View {
             onChange(min(max(value + step, 0), 1))
             onEditingChanged(false)
         }
+    }
+}
+
+/// An icon that rings a few times when it appears, like an alarm.
+private struct RingingSymbol: View {
+    let symbol: String
+    let tint: Color
+    @State private var angle: Double = 0
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.system(size: 14, weight: .bold))
+            .foregroundStyle(tint)
+            .rotationEffect(.degrees(angle), anchor: .top)
+            .onAppear {
+                withAnimation(.easeInOut(duration: 0.09).repeatCount(9, autoreverses: true)) {
+                    angle = 16
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.85) {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.5)) { angle = 0 }
+                }
+            }
     }
 }
 

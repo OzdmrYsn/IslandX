@@ -251,6 +251,10 @@ struct SettingsView: View {
                 toggleRow(symbol: "waveform.path", title: "Command Echo", subtitle: text("Ses, parlaklık, kopyalama, ekran görüntüsü ve Caps Lock değişikliklerini islo. içinde gösterir.", "Shows volume, brightness, copy, screenshot, and Caps Lock changes inside islo."), isOn: $settings.dashboardCommandEchoEnabled)
                 rowDivider
                 toggleRow(symbol: "timer", title: text("Zamanlayıcı + Pomodoro", "Timer + Pomodoro"), subtitle: text("Odaklanma ve mola sürelerini çentikten yönetin.", "Run focus and break sessions from the notch."), isOn: $settings.dashboardFocusTimerEnabled)
+                if settings.dashboardFocusTimerEnabled {
+                    rowDivider
+                    toggleRow(symbol: "hourglass", title: text("Kapalı çentikte geri sayım", "Countdown in the closed notch"), subtitle: text("Zamanlayıcı çalışırken kalan süre çentiğin yanlarında görünür; bitince çentik haber verir.", "While a timer runs, the time left shows beside the notch, which tells you when it ends."), isOn: $settings.liveTimerInNotch)
+                }
                 rowDivider
                 toggleRow(symbol: "cup.and.saucer.fill", title: text("Uyanık Tut", "Keep Awake"), subtitle: text("İstediğiniz sürece Mac'in uykuya geçmesini engeller.", "Prevents your Mac from sleeping while you need it."), isOn: $settings.dashboardKeepAwakeEnabled)
                 rowDivider

@@ -338,6 +338,7 @@ final class AppSettings: ObservableObject {
         static let hideInFullScreen = "interaction.hideInFullScreen"
         static let dashboardCommandEchoEnabled = "dashboard.commandEcho.enabled"
         static let dashboardFocusTimerEnabled = "dashboard.focusTimer.enabled"
+        static let liveTimerInNotch = "dashboard.liveTimer.enabled"
         static let dashboardKeepAwakeEnabled = "dashboard.keepAwake.enabled"
         static let dashboardFileShelfEnabled = "dashboard.fileShelf.enabled"
         static let dashboardNotificationsEnabled = "dashboard.notifications.enabled"
@@ -412,6 +413,11 @@ final class AppSettings: ObservableObject {
 
     @Published var dashboardFocusTimerEnabled: Bool {
         didSet { defaults.set(dashboardFocusTimerEnabled, forKey: Key.dashboardFocusTimerEnabled) }
+    }
+
+    /// Shows a running countdown in the closed notch's wings.
+    @Published var liveTimerInNotch: Bool {
+        didSet { defaults.set(liveTimerInNotch, forKey: Key.liveTimerInNotch) }
     }
 
     @Published var dashboardKeepAwakeEnabled: Bool {
@@ -518,6 +524,11 @@ final class AppSettings: ObservableObject {
             defaults: defaults,
             fallback: true
         )
+        liveTimerInNotch = Self.bool(
+            forKey: Key.liveTimerInNotch,
+            defaults: defaults,
+            fallback: true
+        )
         dashboardKeepAwakeEnabled = Self.bool(
             forKey: Key.dashboardKeepAwakeEnabled,
             defaults: defaults,
@@ -594,6 +605,7 @@ final class AppSettings: ObservableObject {
     func resetDashboardFeatureDefaults() {
         dashboardCommandEchoEnabled = true
         dashboardFocusTimerEnabled = true
+        liveTimerInNotch = true
         dashboardKeepAwakeEnabled = true
         dashboardFileShelfEnabled = true
         dashboardNotificationsEnabled = true
