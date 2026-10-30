@@ -673,12 +673,11 @@ struct DynamicNotchView: View {
 
     private var dashboardHomeSection: some View {
         HStack(spacing: 14) {
-            dashboardCard {
-                if settings.homeWidgetStyle == .focus && settings.dashboardFocusTimerEnabled {
-                    dashboardFocusPane
-                } else {
-                    dashboardMediaPane
-                }
+            if settings.homeWidgetStyle == .focus && settings.dashboardFocusTimerEnabled {
+                dashboardCard { dashboardFocusPane }
+            } else {
+                dashboardCard { dashboardMediaPane }
+                    .background(mediaArtworkGlow)
             }
 
             dashboardCard { dashboardSidePane }
@@ -1628,44 +1627,97 @@ struct DynamicNotchView: View {
         }
     }
 
+    /// Rows spread over the card's full height, so nothing pools at the top.
     private var dashboardMediaPane: some View {
-        VStack(spacing: 7) {
-            HStack(spacing: 11) {
-                sourceArtwork(size: 48, cornerRadius: 12)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .center, spacing: 14) {
+                sourceArtwork(size: 68, cornerRadius: 15)
+                    .shadow(color: .black.opacity(0.35), radius: 10, y: 4)
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 3) {
+                    playbackStatusLabel
+
                     Text(trackTitle)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(primaryColor)
                         .lineLimit(1)
 
                     Text(artistTitle)
-                        .font(.system(size: 11))
-                        .foregroundStyle(primaryColor.opacity(0.55))
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(primaryColor.opacity(0.58))
                         .lineLimit(1)
-
                 }
 
                 Spacer(minLength: 8)
 
-                sourceTile
+                VStack {
+                    sourceBadge
+                    Spacer(minLength: 0)
+                }
             }
+            .frame(height: 68)
+
+            Spacer(minLength: 8)
 
             progressSection
-                .offset(y: 0)
 
-            HStack(spacing: 10) {
+            Spacer(minLength: 6)
+
+            HStack(spacing: 12) {
                 compactPlaybackControls
-
-                Divider()
-                    .overlay(primaryColor.opacity(0.12))
-                    .frame(height: 22)
-
+                Spacer(minLength: 8)
                 volumeSection
-                    .frame(maxWidth: 128)
+                    .frame(width: 122)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    @ViewBuilder
+    private var playbackStatusLabel: some View {
+        if mediaManager.hasActiveTrack {
+            HStack(spacing: 5) {
+                if mediaManager.isPlaying {
+                    PlaybackWaveform(isPlaying: true)
+                        .scaleEffect(0.55)
+                        .frame(width: 12, height: 10)
+                } else {
+                    Image(systemName: "pause.fill")
+                        .font(.system(size: 7, weight: .bold))
+                }
+
+                Text(
+                    mediaManager.isPlaying
+                        ? localized("ŞİMDİ ÇALIYOR", "NOW PLAYING")
+                        : localized("DURAKLATILDI", "PAUSED")
+                )
+                .font(.system(size: 8.5, weight: .bold))
+                .tracking(1.1)
+            }
+            .foregroundStyle(mediaManager.isPlaying ? accent : primaryColor.opacity(0.45))
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    /// A soft wash of the album art behind the media card.
+    @ViewBuilder
+    private var mediaArtworkGlow: some View {
+        if let image = mediaManager.artwork {
+            // Color.clear takes exactly the card's size; the filled artwork
+            // overflows it and is clipped back to the card.
+            Color.clear
+                .overlay {
+                    Image(nsImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .blur(radius: 36)
+                        .saturation(1.35)
+                        .opacity(0.4)
+                }
+                .clipShape(dashboardCardShape)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
     }
 
     private func dashboardSummaryCard(
@@ -2077,19 +2129,20 @@ struct DynamicNotchView: View {
         return formatter.string(from: date)
     }
 
-    private var sourceTile: some View {
+    private var sourceBadge: some View {
         Button(action: mediaManager.openSourceApplication) {
-            VStack(spacing: 2) {
+            HStack(spacing: 4) {
                 Image(systemName: sourceSymbolName)
-                    .font(.system(size: 15, weight: .semibold))
-
+                    .font(.system(size: 9, weight: .bold))
                 Text(sourceShortName)
-                    .font(.system(size: 7, weight: .semibold))
+                    .font(.system(size: 9.5, weight: .semibold))
                     .lineLimit(1)
             }
             .foregroundStyle(primaryColor.opacity(0.72))
-            .frame(width: 48, height: 48)
-            .background(Circle().fill(primaryColor.opacity(0.08)))
+            .padding(.horizontal, 9)
+            .frame(height: 22)
+            .background(Capsule().fill(primaryColor.opacity(0.09)))
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .disabled(mediaManager.source == .none)
@@ -2126,7 +2179,7 @@ struct DynamicNotchView: View {
     }
 
     private var compactPlaybackControls: some View {
-        HStack(spacing: 3) {
+        HStack(spacing: 4) {
             compactPlaybackModeButton(
                 icon: "shuffle",
                 label: mediaManager.isShuffleEnabled
@@ -2144,10 +2197,11 @@ struct DynamicNotchView: View {
 
             Button(action: mediaManager.togglePlayPause) {
                 Image(systemName: mediaManager.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(panelColor)
-                    .frame(width: 27, height: 27)
+                    .frame(width: 34, height: 34)
                     .background(Circle().fill(primaryColor))
+                    .contentShape(Circle())
             }
             .buttonStyle(.plain)
             .disabled(!mediaManager.hasActiveTrack)
@@ -2182,10 +2236,14 @@ struct DynamicNotchView: View {
     }
 
     private var progressSection: some View {
-        VStack(spacing: 2) {
-            Slider(
-                value: $scrubValue,
-                in: 0...max(mediaManager.duration, 1),
+        VStack(spacing: 3) {
+            NotchSlider(
+                value: normalizedProgress,
+                fill: primaryColor.opacity(0.92),
+                track: primaryColor.opacity(0.14),
+                onChange: { fraction in
+                    scrubValue = fraction * max(mediaManager.duration, 0)
+                },
                 onEditingChanged: { editing in
                     isScrubbing = editing
                     updateInteraction(editing)
@@ -2195,53 +2253,46 @@ struct DynamicNotchView: View {
                     }
                 }
             )
-            .controlSize(.small)
-            .tint(primaryColor)
             .disabled(mediaManager.duration <= 0)
-            .accessibilityLabel(Text("Playback progress"))
-            .accessibilityValue(
-                Text("\(Int(normalizedProgress * 100)) percent")
-            )
+            .accessibilityLabel(Text(localized("Şarkının ilerleyişi", "Playback progress")))
 
             HStack {
                 Text(formatTime(isScrubbing ? scrubValue : playbackTime))
                 Spacer()
                 Text(remainingTimeText)
             }
-            .font(.caption2.monospacedDigit())
-            .foregroundStyle(primaryColor.opacity(0.52))
+            .font(.system(size: 9.5, weight: .medium).monospacedDigit())
+            .foregroundStyle(primaryColor.opacity(0.5))
         }
-        // The timestamp row makes this stack taller than the volume control.
-        // Nudge the whole stack down so both slider tracks share one visual axis.
-        .offset(y: 8)
     }
 
     private var volumeSection: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "speaker.fill")
-                .font(.system(size: 10))
-                .foregroundStyle(primaryColor.opacity(0.55))
+        let volume = min(max(mediaManager.volume, 0), 1)
+
+        return HStack(spacing: 7) {
+            Image(systemName: volumeSymbol(for: volume))
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(primaryColor.opacity(0.6))
+                .frame(width: 18, alignment: .leading)
                 .accessibilityHidden(true)
 
-            Slider(
-                value: Binding(
-                    get: { min(max(mediaManager.volume, 0), 1) },
-                    set: mediaManager.setVolume
-                ),
-                in: 0...1,
+            NotchSlider(
+                value: volume,
+                fill: primaryColor.opacity(0.85),
+                track: primaryColor.opacity(0.14),
+                onChange: mediaManager.setVolume,
                 onEditingChanged: updateInteraction
             )
-            .controlSize(.small)
-            .tint(primaryColor)
-            .accessibilityLabel(Text("System volume"))
-            .accessibilityValue(
-                Text("\(Int(mediaManager.volume * 100)) percent")
-            )
+            .accessibilityLabel(Text(localized("Ses düzeyi", "System volume")))
+        }
+    }
 
-            Image(systemName: "speaker.wave.3.fill")
-                .font(.system(size: 10))
-                .foregroundStyle(primaryColor.opacity(0.55))
-                .accessibilityHidden(true)
+    private func volumeSymbol(for volume: Double) -> String {
+        switch volume {
+        case ..<0.001: "speaker.slash.fill"
+        case ..<0.34: "speaker.wave.1.fill"
+        case ..<0.67: "speaker.wave.2.fill"
+        default: "speaker.wave.3.fill"
         }
     }
 
@@ -2302,10 +2353,10 @@ struct DynamicNotchView: View {
     ) -> some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: 10, weight: .semibold))
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(primaryColor.opacity(0.88))
-                .frame(width: 24, height: 27)
-                .contentShape(Circle())
+                .frame(width: 30, height: 34)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(!mediaManager.hasActiveTrack)
@@ -2322,12 +2373,12 @@ struct DynamicNotchView: View {
     ) -> some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: 9, weight: .semibold))
+                .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(
                     isActive ? accent : primaryColor.opacity(0.62)
                 )
-                .frame(width: 24, height: 27)
-                .contentShape(Circle())
+                .frame(width: 28, height: 34)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(!mediaManager.hasActiveTrack)
@@ -2900,6 +2951,65 @@ private struct AdaptiveNotchShape: Shape {
         progress: CGFloat
     ) -> CGFloat {
         start + (end - start) * progress
+    }
+}
+
+/// A thin capsule slider that matches the notch better than the system
+/// slider's large white knob; it thickens under the pointer.
+private struct NotchSlider: View {
+    var value: Double
+    var fill: Color
+    var track: Color
+    var onChange: (Double) -> Void
+    var onEditingChanged: (Bool) -> Void = { _ in }
+
+    @Environment(\.isEnabled) private var isEnabled
+    @State private var isHovered = false
+    @State private var isDragging = false
+
+    var body: some View {
+        GeometryReader { geometry in
+            let width = max(geometry.size.width, 1)
+            let fraction = min(max(value, 0), 1)
+            let isActive = isEnabled && (isHovered || isDragging)
+
+            ZStack(alignment: .leading) {
+                Capsule().fill(track)
+                Capsule()
+                    .fill(fill)
+                    .frame(width: max(width * fraction, isActive ? 6 : 4))
+            }
+            .frame(height: isActive ? 6 : 4)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { gesture in
+                        if !isDragging {
+                            isDragging = true
+                            onEditingChanged(true)
+                        }
+                        onChange(min(max(gesture.location.x / width, 0), 1))
+                    }
+                    .onEnded { gesture in
+                        onChange(min(max(gesture.location.x / width, 0), 1))
+                        isDragging = false
+                        onEditingChanged(false)
+                    }
+            )
+            .onHover { hovering in isHovered = hovering }
+            .animation(.easeOut(duration: 0.15), value: isActive)
+        }
+        .frame(height: 14)
+        .opacity(isEnabled ? 1 : 0.45)
+        .accessibilityElement()
+        .accessibilityValue(Text("\(Int((min(max(value, 0), 1) * 100).rounded())) %"))
+        .accessibilityAdjustableAction { direction in
+            let step = direction == .increment ? 0.05 : -0.05
+            onEditingChanged(true)
+            onChange(min(max(value + step, 0), 1))
+            onEditingChanged(false)
+        }
     }
 }
 
