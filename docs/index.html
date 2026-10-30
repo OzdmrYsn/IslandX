@@ -2,266 +2,540 @@
 <html lang="tr">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f7f9ff">
-  <meta name="description" content="islo., MacBook çentiğiyle bütünleşen medya kontrolleri ve günlük araçlardır.">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#050507">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="islo. 2.0 — MacBook çentiğini müziğe, bildirimlere, dosyalara ve gününe açılan bir kapıya dönüştürür.">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="islo. — Mac'inizin üstünde, ihtiyacınız olan her şey">
-  <meta property="og:description" content="MacBook çentiğiyle bütünleşen dinamik Music ve Spotify kontrolleri.">
+  <meta property="og:title" content="islo. 2.0 — Çentiğin artık bir işi var">
+  <meta property="og:description" content="Müzik, bildirimler, dosya rafı, pano ve zamanlayıcı — hepsi MacBook çentiğinde.">
   <meta property="og:url" content="https://ozdmrysn.github.io/islo/">
   <meta property="og:image" content="https://ozdmrysn.github.io/islo/assets/islo-icon.png">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="islo.">
-  <meta name="twitter:description" content="Dynamic media controls that feel native to your MacBook notch.">
+  <meta name="twitter:title" content="islo. 2.0">
+  <meta name="twitter:description" content="Your MacBook notch, finally useful.">
   <meta name="twitter:image" content="https://ozdmrysn.github.io/islo/assets/islo-icon.png">
-  <title>islo. — Dynamic notch utilities for macOS</title>
+  <title>islo. — Çentiğin artık bir işi var</title>
   <link rel="icon" href="assets/islo-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="styles.css">
   <script src="app.js" defer></script>
 </head>
 <body>
-  <header class="site-header">
-    <a class="brand" href="#top" aria-label="islo. ana sayfa">
-      <img src="assets/islo-icon.png" alt="" width="38" height="38">
-      <span>islo.</span>
-    </a>
+  <!-- Icon sprite -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-house" viewBox="0 0 24 24"><path d="M3 11.2 12 4l9 7.2V20a1 1 0 0 1-1 1h-5.5v-6h-5v6H4a1 1 0 0 1-1-1z" fill="currentColor"/></symbol>
+      <symbol id="i-bell" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0-6 6v3.6L4.4 15.4A1 1 0 0 0 5.3 17h13.4a1 1 0 0 0 .9-1.6L18 12.6V9a6 6 0 0 0-6-6Zm-2.6 15.5a2.6 2.6 0 0 0 5.2 0z" fill="currentColor"/></symbol>
+      <symbol id="i-calendar" viewBox="0 0 24 24"><path d="M7 2.5v2M17 2.5v2M3.5 9h17M5 4.5h14a1.5 1.5 0 0 1 1.5 1.5v13A1.5 1.5 0 0 1 19 20.5H5A1.5 1.5 0 0 1 3.5 19V6A1.5 1.5 0 0 1 5 4.5Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+      <symbol id="i-timer" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 13V9M10 2.5h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+      <symbol id="i-tray" viewBox="0 0 24 24"><path d="M3 13.5 5.5 5h13L21 13.5V19a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 19Zm0 0h5l1.5 2.5h5L16 13.5h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+      <symbol id="i-clip" viewBox="0 0 24 24"><path d="M9 3.5h6v3H9z" fill="currentColor"/><path d="M8 5H6.5A1.5 1.5 0 0 0 5 6.5v13A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5v-13A1.5 1.5 0 0 0 17.5 5H16M8.5 11h7M8.5 15h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+      <symbol id="i-gear" viewBox="0 0 24 24"><path d="M12 8.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8Zm8.5 4.6v-2.4l-2.3-.5a6.7 6.7 0 0 0-.7-1.6l1.3-2-1.7-1.7-2 1.3a6.7 6.7 0 0 0-1.6-.7L13 3.5h-2.4l-.5 2.3a6.7 6.7 0 0 0-1.6.7l-2-1.3-1.7 1.7 1.3 2a6.7 6.7 0 0 0-.7 1.6l-2.3.5v2.4l2.3.5c.2.6.4 1.1.7 1.6l-1.3 2 1.7 1.7 2-1.3c.5.3 1 .5 1.6.7l.5 2.3H13l.5-2.3c.6-.2 1.1-.4 1.6-.7l2 1.3 1.7-1.7-1.3-2c.3-.5.5-1 .7-1.6z" fill="currentColor"/></symbol>
+      <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="10" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+      <symbol id="i-chevron-up" viewBox="0 0 24 24"><path d="m6 15 6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12.5-7.5z" fill="currentColor"/></symbol>
+      <symbol id="i-pause" viewBox="0 0 24 24"><path d="M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z" fill="currentColor"/></symbol>
+      <symbol id="i-prev" viewBox="0 0 24 24"><path d="M11.5 6v12L3 12zm9 0v12L12 12z" fill="currentColor"/></symbol>
+      <symbol id="i-next" viewBox="0 0 24 24"><path d="M12.5 6v12L21 12zm-9 0v12L12 12z" fill="currentColor"/></symbol>
+      <symbol id="i-shuffle" viewBox="0 0 24 24"><path d="M3 7h3.5c4.5 0 6.5 10 11 10H21m0 0-2.5-2.5M21 17l-2.5 2.5M3 17h3.5c1.7 0 3-1.4 4-3m3.5-4c1-1.6 2.3-3 4-3H21m0 0-2.5-2.5M21 7l-2.5 2.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M4 11V9.5A2.5 2.5 0 0 1 6.5 7H19m0 0-3-3m3 3-3 3M20 13v1.5a2.5 2.5 0 0 1-2.5 2.5H5m0 0 3 3m-3-3 3-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-speaker" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5v14l-4.5-4.5H4z" fill="currentColor"/><path d="M15.5 9a4.5 4.5 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2" fill="currentColor"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+      <symbol id="i-tray-down" viewBox="0 0 24 24"><path d="M12 3v9m0 0-3.5-3.5M12 12l3.5-3.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.5 13.5h4.5l1.5 2.5h5l1.5-2.5h4.5V19a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 19z" fill="currentColor"/></symbol>
+      <symbol id="i-airdrop" viewBox="0 0 24 24"><circle cx="7" cy="12" r="2" fill="currentColor"/><path d="M11 8a5.5 5.5 0 0 1 0 8M14.5 5.5a9.5 9.5 0 0 1 0 13M18 3.5a12.5 12.5 0 0 1 0 17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+      <symbol id="i-reset" viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4.5v4h4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-skip" viewBox="0 0 24 24"><path d="M5 5v14l10-7zm12 0h2.5v14H17z" fill="currentColor"/></symbol>
+      <symbol id="i-arrow-up-right" viewBox="0 0 24 24"><path d="M7 17 17 7M8.5 7H17v8.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+      <symbol id="i-text" viewBox="0 0 24 24"><path d="M4 6h16M4 11h16M4 16h10" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="currentColor"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" fill="none" stroke="currentColor" stroke-width="2.2"/></symbol>
+      <symbol id="i-chip" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor"/><path d="M9 2.5v3M15 2.5v3M9 18.5v3M15 18.5v3M2.5 9h3M2.5 15h3M18.5 9h3M18.5 15h3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-github" viewBox="0 0 24 24"><path d="M12 2.5a9.5 9.5 0 0 0-3 18.5c.5.1.7-.2.7-.5v-1.8c-2.7.6-3.2-1.2-3.2-1.2-.4-1.1-1.1-1.4-1.1-1.4-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.3 1.1 2.9.8.1-.6.3-1.1.6-1.3-2.1-.2-4.4-1.1-4.4-4.8 0-1.1.4-1.9 1-2.6-.1-.2-.4-1.2.1-2.6 0 0 .8-.3 2.6 1a9 9 0 0 1 4.8 0c1.8-1.3 2.6-1 2.6-1 .5 1.4.2 2.4.1 2.6.6.7 1 1.5 1 2.6 0 3.7-2.3 4.6-4.4 4.8.3.3.6.8.6 1.6v2.4c0 .3.2.6.7.5A9.5 9.5 0 0 0 12 2.5Z" fill="currentColor"/></symbol>
+      <symbol id="i-message" viewBox="0 0 24 24"><path d="M12 4C7 4 3.5 7.2 3.5 11c0 2.1 1.1 4 2.9 5.3L5.5 20l4-2.1c.8.2 1.6.3 2.5.3 5 0 8.5-3.2 8.5-7.1S17 4 12 4Z" fill="currentColor"/></symbol>
+      <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5.5" width="18" height="13" rx="2.5" fill="currentColor"/><path d="m4 7.5 8 6 8-6" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-note" viewBox="0 0 24 24"><path d="M9 18V6l11-2v12" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="6.5" cy="18" r="2.6" fill="currentColor"/><circle cx="17.5" cy="16" r="2.6" fill="currentColor"/></symbol>
+    </defs>
+  </svg>
 
-    <nav aria-label="Ana menü">
-      <a href="#layouts" data-tr="Düzenler" data-en="Layouts">Düzenler</a>
-      <a href="#smart" data-tr="Akıllı Açılma" data-en="Smart Activation">Akıllı Açılma</a>
-      <a href="#features" data-tr="Özellikler" data-en="Features">Özellikler</a>
-      <a href="#install" data-tr="Kurulum" data-en="Install">Kurulum</a>
-      <a href="#gallery" data-tr="Görseller" data-en="Gallery">Görseller</a>
-    </nav>
+  <!-- The website's own notch: it lives where a MacBook's camera housing is. -->
+  <div class="site-notch" id="siteNotch" data-state="idle" tabindex="0" role="button" aria-label="islo. çentiği — açmak için tıklayın" data-tr-aria="islo. çentiği — açmak için tıklayın" data-en-aria="The islo. notch — click to open">
+    <span class="notch-lens" aria-hidden="true"></span>
 
-    <div class="language-switch" role="group" aria-label="Dil / Language">
-      <button class="language-button active" type="button" data-language="tr" aria-pressed="true">TR</button>
-      <button class="language-button" type="button" data-language="en" aria-pressed="false">EN</button>
+    <div class="nl nl-wings" aria-hidden="true">
+      <span class="mini-art"></span>
+      <span class="wave"><i></i><i></i><i></i><i></i></span>
+    </div>
+
+    <div class="nl nl-volume" aria-hidden="true">
+      <svg class="nl-icon"><use href="#i-speaker"/></svg>
+      <span class="nl-pct"><span class="js-vol">42</span>%</span>
+    </div>
+
+    <div class="nl nl-notification" aria-hidden="true">
+      <div class="nl-band">
+        <span class="nl-app"><span class="app-dot app-messages"><svg><use href="#i-message"/></svg></span><span data-tr="Mesajlar" data-en="Messages">Mesajlar</span></span>
+        <span class="nl-time" data-tr="şimdi" data-en="now">şimdi</span>
+      </div>
+      <strong>Ayşe</strong>
+      <span class="nl-body" data-tr="Yarın akşam görüşelim mi? Mekânı ben ayarlarım." data-en="Dinner tomorrow? I'll book the place.">Yarın akşam görüşelim mi? Mekânı ben ayarlarım.</span>
+    </div>
+
+    <div class="nl nl-drop" aria-hidden="true">
+      <div class="drop-zone">
+        <span class="drop-title"><svg><use href="#i-tray-down"/></svg><span data-tr="Dosyaları buraya bırak" data-en="Drop your files here">Dosyaları buraya bırak</span></span>
+        <div class="drop-tiles">
+          <span class="drop-tile"><svg><use href="#i-tray-down"/></svg><span data-tr="Raf" data-en="Shelf">Raf</span></span>
+          <span class="drop-tile"><svg><use href="#i-airdrop"/></svg>AirDrop</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="nl nl-theme" aria-hidden="true">
+      <span class="theme-dot"></span>
+      <span class="nl-pct js-theme-name">Mavi · Hafif</span>
+    </div>
+
+    <div class="nl nl-ready" aria-hidden="true">
+      <svg class="nl-icon"><use href="#i-download"/></svg>
+      <span class="nl-pct" data-tr="islo. 2.0 hazır" data-en="islo. 2.0 is ready">islo. 2.0 hazır</span>
+    </div>
+
+    <div class="nl nl-dash">
+      <div class="nd-top">
+        <span class="nd-pill"><svg><use href="#i-house"/></svg><span data-tr="Ana" data-en="Home">Ana</span></span>
+        <span class="nd-gap"></span>
+        <button class="nd-close" type="button" aria-label="Küçült" data-tr-aria="Küçült" data-en-aria="Collapse"><svg><use href="#i-chevron-up"/></svg></button>
+      </div>
+      <div class="nd-body">
+        <div class="nd-card nd-media">
+          <span class="mini-art big"></span>
+          <div class="nd-track">
+            <strong data-tr="Gece Yarısı Treni" data-en="Midnight Train">Gece Yarısı Treni</strong>
+            <span>Lofi Ensemble</span>
+            <span class="nd-progress"><i></i></span>
+          </div>
+          <button class="nd-play" type="button" aria-label="Oynat / duraklat" data-tr-aria="Oynat / duraklat" data-en-aria="Play / pause"><svg><use href="#i-pause"/></svg></button>
+        </div>
+        <div class="nd-card nd-day">
+          <span class="eyebrow-red js-weekday">CUMA</span>
+          <strong class="js-date">30 Eki</strong>
+          <span class="js-time">21:07</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <header class="menubar">
+    <div class="menubar-side">
+      <a class="brand" href="#top" aria-label="islo.">
+        <img src="assets/islo-icon.png" alt="" width="22" height="22">
+        <span>islo.</span>
+      </a>
+      <nav class="menu-links" aria-label="Ana menü">
+        <a href="#demo" data-tr="Çentik" data-en="Notch">Çentik</a>
+        <a href="#themes" data-tr="Tema" data-en="Themes">Tema</a>
+        <a href="#features" data-tr="Özellikler" data-en="Features">Özellikler</a>
+        <a href="#install" data-tr="Kurulum" data-en="Install">Kurulum</a>
+      </nav>
+    </div>
+    <div class="menubar-side right">
+      <div class="lang" role="group" aria-label="Dil / Language">
+        <button type="button" data-language="tr" aria-pressed="true">TR</button>
+        <button type="button" data-language="en" aria-pressed="false">EN</button>
+      </div>
+      <a class="menu-cta" href="https://github.com/OzdmrYsn/islo/releases/latest/download/islo.dmg">
+        <svg><use href="#i-download"/></svg><span data-tr="İndir" data-en="Download">İndir</span>
+      </a>
+      <span class="menu-clock js-clock" aria-hidden="true">21:07</span>
     </div>
   </header>
 
   <main id="top">
-    <section class="hero section-shell">
-      <div class="hero-copy reveal">
-        <span class="eyebrow" data-tr="macOS için dinamik medya kontrolleri" data-en="Dynamic media controls for macOS">macOS için dinamik medya kontrolleri</span>
-        <h1 data-tr="Mac'inizin üstünde. Müziğinizin yanında." data-en="At the top of your Mac. Close to your music.">Mac'inizin üstünde.<br>Müziğinizin yanında.</h1>
-        <p data-tr="islo., medya kontrollerini ve günlük araçları MacBook'unuzun kamera çentiğiyle bütünleştirir. Dock'ta yer kaplamadan menü çubuğunda yaşar." data-en="islo. blends media controls and everyday utilities into your MacBook notch. It lives in the menu bar without occupying the Dock.">islo., medya kontrollerini ve günlük araçları MacBook'unuzun kamera çentiğiyle bütünleştirir. Dock'ta yer kaplamadan menü çubuğunda yaşar.</p>
-        <div class="hero-actions">
-          <a class="button button-primary" href="https://github.com/OzdmrYsn/islo/releases/latest/download/islo.dmg" data-tr="DMG'yi indir" data-en="Download DMG">DMG'yi indir</a>
-          <a class="button button-secondary" href="https://github.com/OzdmrYsn/islo" data-tr="GitHub'da görüntüle" data-en="View on GitHub">GitHub'da görüntüle</a>
-        </div>
-        <p class="compatibility" data-tr="macOS 13 ve sonrası · Apple Silicon ve Intel" data-en="macOS 13 or later · Apple Silicon and Intel">macOS 13 ve sonrası · Apple Silicon ve Intel</p>
+    <!-- Hero -->
+    <section class="hero" data-notch="story">
+      <div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
+      <p class="hero-badge reveal"><span class="pulse"></span><span data-tr="Yeni · islo. 2.0" data-en="New · islo. 2.0">Yeni · islo. 2.0</span></p>
+      <h1 class="reveal" data-tr-html="Çentiğin artık <em>bir işi</em> var." data-en-html="Your notch, <em>finally</em> useful.">Çentiğin artık <em>bir işi</em> var.</h1>
+      <p class="lead reveal" data-tr="islo., MacBook'unun kamera çentiğini müziğe, bildirimlere, dosyalara ve gününe açılan küçük bir kapıya dönüştürür." data-en="islo. turns your MacBook's camera notch into a small door to your music, notifications, files, and day.">islo., MacBook'unun kamera çentiğini müziğe, bildirimlere, dosyalara ve gününe açılan küçük bir kapıya dönüştürür.</p>
+      <div class="hero-actions reveal">
+        <a class="btn btn-primary" href="https://github.com/OzdmrYsn/islo/releases/latest/download/islo.dmg">
+          <svg><use href="#i-download"/></svg><span data-tr="macOS için indir" data-en="Download for macOS">macOS için indir</span>
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/OzdmrYsn/islo/releases/latest">
+          <svg><use href="#i-github"/></svg><span data-tr="Yenilikler" data-en="Release notes">Yenilikler</span>
+        </a>
       </div>
+      <p class="hero-meta reveal">2.0.0 · macOS 13+ · Apple Silicon &amp; Intel · <span data-tr="Ücretsiz" data-en="Free">Ücretsiz</span></p>
 
-      <div class="hero-stage reveal" aria-label="islo. genişleme animasyonu">
-        <div class="ambient ambient-one"></div>
-        <div class="ambient ambient-two"></div>
-        <div class="mac-screen">
-          <div class="menu-line"></div>
-          <div class="notch-demo">
-            <div class="demo-top"></div>
-            <div class="demo-content">
-              <img src="assets/islo-icon.png" alt="" width="66" height="66">
-              <div class="track-copy">
-                <strong>islo. Sessions</strong>
-                <span data-tr="Şimdi Çalıyor" data-en="Now Playing">Şimdi Çalıyor</span>
-                <div class="demo-controls" aria-hidden="true"><span>◀</span><span class="demo-play">▶</span><span>▶</span></div>
+      <button class="look-up reveal" type="button" data-play="story">
+        <span class="look-arrow" aria-hidden="true">↑</span>
+        <span data-tr="Yukarı bak — bu sayfanın da bir çentiği var" data-en="Look up — this page has a notch too">Yukarı bak — bu sayfanın da bir çentiği var</span>
+      </button>
+    </section>
+
+    <!-- Showcase -->
+    <section id="demo" class="showcase" data-notch="music">
+      <header class="section-head reveal">
+        <p class="eyebrow" data-tr="Bir çentik, altı alan" data-en="One notch, six places">Bir çentik, altı alan</p>
+        <h2 data-tr-html="Açıldığında, <em>gününün tamamı.</em>" data-en-html="Open it, and there's <em>your whole day.</em>">Açıldığında, <em>gününün tamamı.</em></h2>
+        <p data-tr="Üzerine gel ya da tıkla: çentik yukarıdan büyür, içinde müzik, bildirimler, takvim, zamanlayıcı, dosyalar ve pano bekler." data-en="Hover or click: the notch grows from the top, with music, notifications, calendar, timer, files, and clipboard inside.">Üzerine gel ya da tıkla: çentik yukarıdan büyür, içinde müzik, bildirimler, takvim, zamanlayıcı, dosyalar ve pano bekler.</p>
+      </header>
+
+      <div class="device reveal" id="device">
+        <div class="device-screen">
+          <div class="wallpaper" aria-hidden="true"></div>
+          <div class="screen-menubar" aria-hidden="true">
+            <span class="sm-left"><b></b><i></i><i></i><i></i></span>
+            <span class="sm-right"><i></i><i></i><i></i><b class="js-time">21:07</b></span>
+          </div>
+
+          <div class="dash-wrap" id="dashWrap">
+            <div class="dash" id="dash" data-tab="home">
+              <div class="d-nav">
+                <div class="d-tabs" role="tablist" aria-label="Çentik sekmeleri">
+                  <button class="d-tab" data-tab="home" role="tab"><svg><use href="#i-house"/></svg><span data-tr="Ana" data-en="Home">Ana</span></button>
+                  <button class="d-tab" data-tab="notifications" role="tab"><svg><use href="#i-bell"/></svg><span data-tr="Bildirimler" data-en="Notifications">Bildirimler</span><em>3</em></button>
+                  <button class="d-tab" data-tab="calendar" role="tab"><svg><use href="#i-calendar"/></svg><span data-tr="Takvim" data-en="Calendar">Takvim</span></button>
+                  <button class="d-tab" data-tab="timer" role="tab"><svg><use href="#i-timer"/></svg><span data-tr="Zamanlayıcı" data-en="Timer">Zamanlayıcı</span></button>
+                  <button class="d-tab" data-tab="shelf" role="tab"><svg><use href="#i-tray"/></svg><span data-tr="Dosya Rafı" data-en="File Shelf">Dosya Rafı</span></button>
+                  <button class="d-tab" data-tab="clipboard" role="tab"><svg><use href="#i-clip"/></svg><span data-tr="Pano" data-en="Clipboard">Pano</span></button>
+                </div>
+                <div class="d-housing" aria-hidden="true"></div>
+                <div class="d-actions" aria-hidden="true">
+                  <span class="d-round"><svg><use href="#i-sliders"/></svg></span>
+                  <span class="d-round"><svg><use href="#i-gear"/></svg></span>
+                  <span class="d-round"><svg><use href="#i-chevron-up"/></svg></span>
+                </div>
               </div>
-              <div class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
-            </div>
-            <div class="progress"><span></span></div>
-          </div>
-          <div class="screen-copy">
-            <span data-tr="Üzerine gelin" data-en="Hover to expand">Üzerine gelin</span>
-            <small data-tr="ve müzik kontrolünüz parmaklarınızın ucunda olsun" data-en="and keep playback at your fingertips">ve müzik kontrolünüz parmaklarınızın ucunda olsun</small>
-          </div>
-        </div>
-      </div>
-    </section>
 
-    <section class="marquee" aria-label="Öne çıkan özellikler">
-      <div><span>Music</span><i></i><span>Spotify</span><i></i><span data-tr="Genel Panel" data-en="General Dashboard">Genel Panel</span><i></i><span data-tr="Akıllı Açılma" data-en="Smart Activation">Akıllı Açılma</span><i></i><span>Liquid Glass</span><i></i><span data-tr="Otomatik Güncelleme" data-en="Automatic Updates">Otomatik Güncelleme</span><i></i><span data-tr="Tüm Ekranlar" data-en="Every Display">Tüm Ekranlar</span></div>
-    </section>
-
-    <section id="layouts" class="section-shell layouts-section">
-      <div class="section-heading reveal">
-        <span class="eyebrow" data-tr="islo. 1.8.0" data-en="islo. 1.8.0">islo. 1.8.0</span>
-        <h2 data-tr="İki düzen. Tek çentik." data-en="Two layouts. One notch.">İki düzen. Tek çentik.</h2>
-        <p data-tr="Yalnızca müziğe odaklanan kompakt görünümü veya medya, tarih, saat ve günlük araçları birleştiren Genel paneli seçin." data-en="Choose the compact music-first view or the General dashboard that brings media, date, time, and everyday tools together.">Yalnızca müziğe odaklanan kompakt görünümü veya medya, tarih, saat ve günlük araçları birleştiren Genel paneli seçin.</p>
-      </div>
-
-      <div class="layout-showcase reveal" data-layout="dashboard">
-        <div class="layout-switch" role="group" aria-label="islo. düzeni">
-          <button class="layout-button" type="button" data-layout-choice="music" aria-pressed="false" data-tr="Yalnızca Müzik" data-en="Music Only">Yalnızca Müzik</button>
-          <button class="layout-button active" type="button" data-layout-choice="dashboard" aria-pressed="true" data-tr="Genel" data-en="General">Genel</button>
-        </div>
-
-        <div class="layout-stage" aria-live="polite">
-          <div class="layout-menubar"><span></span><span></span><span></span></div>
-          <div class="layout-island">
-            <div class="layout-camera"></div>
-            <div class="layout-toolbar">
-              <div class="layout-tabs" aria-hidden="true"><b>⌂</b><b>▦</b><b>◷</b><b>▰</b></div>
-              <small data-tr="GENEL" data-en="GENERAL">GENEL</small>
-              <span>⚙︎</span>
-            </div>
-            <div class="layout-body">
-              <div class="layout-player">
-                <img src="assets/islo-icon.png" alt="" width="64" height="64">
-                <div class="layout-track"><strong>islo. Sessions</strong><small data-tr="Şimdi Çalıyor" data-en="Now Playing">Şimdi Çalıyor</small><div>↝ &nbsp; ◀ &nbsp; <b>▶</b> &nbsp; ▶ &nbsp; ↻</div></div>
-                <div class="layout-progress"><i></i></div>
-                <div class="layout-volume">▸ <i><b></b></i> ◖</div>
+              <!-- Home -->
+              <div class="d-pane" data-pane="home">
+                <div class="d-row">
+                  <div class="d-card d-grow">
+                    <div class="media-head">
+                      <span class="art art-1"></span>
+                      <div class="media-meta">
+                        <strong data-tr="Gece Yarısı Treni" data-en="Midnight Train">Gece Yarısı Treni</strong>
+                        <span>Lofi Ensemble</span>
+                      </div>
+                      <span class="source"><svg><use href="#i-note"/></svg>Music</span>
+                    </div>
+                    <div class="scrub"><i style="--p:.62"></i><b style="--p:.62"></b></div>
+                    <div class="scrub-times"><span>2:14</span><span>-1:21</span></div>
+                    <div class="controls">
+                      <svg class="c-mode on"><use href="#i-shuffle"/></svg>
+                      <svg class="c-skip"><use href="#i-prev"/></svg>
+                      <span class="c-play"><svg><use href="#i-pause"/></svg></span>
+                      <svg class="c-skip"><use href="#i-next"/></svg>
+                      <svg class="c-mode on"><use href="#i-repeat"/></svg>
+                      <span class="c-divider"></span>
+                      <svg class="c-vol"><use href="#i-speaker"/></svg>
+                      <span class="vol-track"><i style="--p:.7"></i></span>
+                    </div>
+                  </div>
+                  <div class="d-card d-side">
+                    <span class="eyebrow-red js-weekday">CUMA</span>
+                    <div class="side-head"><strong class="js-date">30 Eki</strong><span class="js-time">21:07</span></div>
+                    <div class="summary"><span class="s-icon"><svg><use href="#i-calendar"/></svg></span><div><b data-tr="Bugün için hazırsın" data-en="You're clear for today">Bugün için hazırsın</b><small data-tr="Takvimi aç" data-en="Open Calendar">Takvimi aç</small></div></div>
+                    <small class="s-label" data-tr="Sıradaki" data-en="Up next">Sıradaki</small>
+                    <div class="summary"><span class="s-icon"><svg><use href="#i-plus"/></svg></span><div><b data-tr="Yeni etkinlik" data-en="New event">Yeni etkinlik</b><small data-tr="Takvim'de oluştur" data-en="Create in Calendar">Takvim'de oluştur</small></div></div>
+                  </div>
+                </div>
               </div>
-              <div class="layout-widgets">
-                <div class="layout-date"><small data-tr="BUGÜN" data-en="TODAY">BUGÜN</small><strong>29 Eki</strong><span>02:56</span></div>
-                <button type="button" tabindex="-1"><i>▦</i><span><b data-tr="Bugün için hazırsın" data-en="You're ready for today">Bugün için hazırsın</b><small data-tr="Takvimi aç" data-en="Open Calendar">Takvimi aç</small></span><em>›</em></button>
-                <button type="button" tabindex="-1"><i>＋</i><span><b data-tr="Yeni etkinlik" data-en="New event">Yeni etkinlik</b><small data-tr="Takvim'de oluştur" data-en="Create in Calendar">Takvim'de oluştur</small></span><em>›</em></button>
+
+              <!-- Notifications -->
+              <div class="d-pane" data-pane="notifications">
+                <div class="d-row">
+                  <div class="d-card d-summary">
+                    <div class="sum-head"><small data-tr="Son bildirimler" data-en="Recent notifications">Son bildirimler</small><span class="mini-round"><svg><use href="#i-x"/></svg></span></div>
+                    <strong class="big-num">3</strong>
+                    <small class="muted" data-tr="bu oturumda gelen bildirim" data-en="notifications this session">bu oturumda gelen bildirim</small>
+                  </div>
+                  <div class="d-card d-grow">
+                    <div class="chips"><span class="chip on" data-tr="Tümü" data-en="All">Tümü</span><span class="chip" data-tr="Mesajlar" data-en="Messages">Mesajlar</span><span class="chip">Mail</span><span class="chip" data-tr="Takvim" data-en="Calendar">Takvim</span></div>
+                    <div class="list">
+                      <div class="row"><span class="app-dot app-messages"><svg><use href="#i-message"/></svg></span><div><b><span data-tr="Mesajlar" data-en="Messages">Mesajlar</span> <i data-tr="şimdi" data-en="now">şimdi</i></b><span>Ayşe · <span data-tr="Yarın akşam görüşelim mi?" data-en="Dinner tomorrow?">Yarın akşam görüşelim mi?</span></span></div></div>
+                      <div class="row"><span class="app-dot app-mail"><svg><use href="#i-mail"/></svg></span><div><b>Mail <i data-tr="12 dk önce" data-en="12 min ago">12 dk önce</i></b><span data-tr="Fatura hazır · Ekim ayı faturanız ekte." data-en="Invoice ready · October's invoice is attached.">Fatura hazır · Ekim ayı faturanız ekte.</span></div></div>
+                      <div class="row"><span class="app-dot app-cal"><svg><use href="#i-calendar"/></svg></span><div><b><span data-tr="Takvim" data-en="Calendar">Takvim</span> <i data-tr="25 dk önce" data-en="25 min ago">25 dk önce</i></b><span data-tr="Toplantı 15 dk sonra · Salon B" data-en="Meeting in 15 min · Room B">Toplantı 15 dk sonra · Salon B</span></div></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Calendar -->
+              <div class="d-pane" data-pane="calendar">
+                <div class="d-row">
+                  <div class="d-card d-summary">
+                    <span class="eyebrow-red js-weekday">CUMA</span>
+                    <strong class="day-num js-day">30</strong>
+                    <small class="muted js-monthyear">Ekim 2026</small>
+                    <span class="cal-time js-time">21:07</span>
+                  </div>
+                  <div class="d-card d-grow">
+                    <small class="s-label" data-tr="Bu hafta" data-en="This week">Bu hafta</small>
+                    <div class="week js-week"></div>
+                    <div class="summary-pair">
+                      <div class="summary"><span class="s-icon"><svg><use href="#i-calendar"/></svg></span><div><b data-tr="Takvimi aç" data-en="Open Calendar">Takvimi aç</b><small class="js-longdate">30 Ekim 2026</small></div></div>
+                      <div class="summary"><span class="s-icon"><svg><use href="#i-plus"/></svg></span><div><b data-tr="Yeni etkinlik" data-en="New event">Yeni etkinlik</b><small data-tr="Takvim'de oluştur" data-en="Create in Calendar">Takvim'de oluştur</small></div></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Timer -->
+              <div class="d-pane" data-pane="timer">
+                <div class="d-row">
+                  <div class="d-card d-grow timer-card">
+                    <div class="ring">
+                      <svg viewBox="0 0 120 120"><circle class="ring-bg" cx="60" cy="60" r="52"/><circle class="ring-fg js-ring" cx="60" cy="60" r="52"/></svg>
+                      <div class="ring-label"><strong class="js-timer">25:00</strong><small><i></i><span data-tr="Odak" data-en="Focus">Odak</span></small></div>
+                    </div>
+                    <div class="timer-side">
+                      <div class="seg"><span data-tr="Zamanlayıcı" data-en="Timer">Zamanlayıcı</span><span class="on">Pomodoro</span></div>
+                      <div class="chips"><span class="chip accent" data-tr="Odak · 25 dk" data-en="Focus · 25 min">Odak · 25 dk</span><span class="chip" data-tr="Mola · 5 dk" data-en="Break · 5 min">Mola · 5 dk</span></div>
+                      <div class="timer-controls">
+                        <button class="t-play js-timer-toggle" type="button" aria-label="Başlat" data-tr-aria="Başlat" data-en-aria="Start"><svg><use href="#i-play"/></svg></button>
+                        <span class="t-round"><svg><use href="#i-reset"/></svg></span>
+                        <span class="t-round"><svg><use href="#i-skip"/></svg></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Shelf -->
+              <div class="d-pane" data-pane="shelf">
+                <div class="d-row">
+                  <div class="d-card d-summary">
+                    <div class="sum-head"><small data-tr="Rafta" data-en="On the shelf">Rafta</small><span class="mini-round"><svg><use href="#i-x"/></svg></span></div>
+                    <strong class="big-num">6</strong>
+                    <small class="muted" data-tr="dosya elinin altında" data-en="files within reach">dosya elinin altında</small>
+                    <span class="hairline"></span>
+                    <small class="muted strong" data-tr="2 görsel · 4 belge" data-en="2 images · 4 documents">2 görsel · 4 belge</small>
+                  </div>
+                  <div class="d-card d-grow">
+                    <div class="chips"><span class="chip on" data-tr="Tümü · 6" data-en="All · 6">Tümü · 6</span><span class="chip" data-tr="Görseller · 2" data-en="Images · 2">Görseller · 2</span><span class="chip" data-tr="Belgeler · 4" data-en="Documents · 4">Belgeler · 4</span></div>
+                    <div class="tiles">
+                      <div class="tile"><span class="thumb t-photo"></span><b>hero-poster.jpg</b><small data-tr="Görsel · 2,4 MB" data-en="Image · 2.4 MB">Görsel · 2,4 MB</small></div>
+                      <div class="tile"><span class="thumb t-pdf">PDF</span><b>brief.pdf</b><small>PDF · 184 KB</small></div>
+                      <div class="tile"><span class="thumb t-wave"></span><b>blue-hour.webp</b><small data-tr="Görsel · 195 KB" data-en="Image · 195 KB">Görsel · 195 KB</small></div>
+                      <div class="tile"><span class="thumb t-md">MD</span><b>release-notes.md</b><small data-tr="Metin · 12 KB" data-en="Text · 12 KB">Metin · 12 KB</small></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Clipboard -->
+              <div class="d-pane" data-pane="clipboard">
+                <div class="d-row">
+                  <div class="d-card d-selected">
+                    <div class="sum-head"><small data-tr="Seçili öğe" data-en="Selected item">Seçili öğe</small><span class="mini-round solid"><svg><use href="#i-arrow-up-right"/></svg></span></div>
+                    <strong class="sel-text">ozdmrysn.github.io/islo</strong>
+                    <small class="muted" data-tr="Bağlantı · Safari" data-en="Link · Safari">Bağlantı · Safari</small>
+                  </div>
+                  <div class="d-card d-grow">
+                    <div class="chips"><span class="chip on" data-tr="Tümü · 4" data-en="All · 4">Tümü · 4</span><span class="chip" data-tr="Metin · 2" data-en="Text · 2">Metin · 2</span><span class="chip" data-tr="Bağlantı · 2" data-en="Links · 2">Bağlantı · 2</span></div>
+                    <div class="clips">
+                      <div class="clip selected"><span class="clip-icon"><svg><use href="#i-link"/></svg></span><small data-tr="Bağlantı · Safari" data-en="Link · Safari">Bağlantı · Safari</small><b>ozdmrysn.github.io/islo</b></div>
+                      <div class="clip"><span class="clip-icon"><svg><use href="#i-text"/></svg></span><small data-tr="Metin · Terminal" data-en="Text · Terminal">Metin · Terminal</small><b>npm run build</b></div>
+                      <div class="clip"><span class="clip-icon"><svg><use href="#i-text"/></svg></span><small data-tr="Metin · Notlar" data-en="Text · Notes">Metin · Notlar</small><b data-tr="Ayarlara karanlık mod ekle" data-en="Add a dark mode to Settings">Ayarlara karanlık mod ekle</b></div>
+                      <div class="clip"><span class="clip-icon"><svg><use href="#i-link"/></svg></span><small data-tr="Bağlantı · Chrome" data-en="Link · Chrome">Bağlantı · Chrome</small><b>github.com/OzdmrYsn/islo</b></div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-          <div class="layout-pointer" aria-hidden="true"><span></span></div>
         </div>
+      </div>
 
-        <p class="layout-caption" data-tr="Genel panelde üst menüler ve sağ taraftaki kartlar tıklanabilir; Takvim, Saat ve Pil ayarlarına doğrudan ulaşılır." data-en="Top tabs and right-side cards are interactive in General mode, with direct access to Calendar, Clock, and Battery settings.">Genel panelde üst menüler ve sağ taraftaki kartlar tıklanabilir; Takvim, Saat ve Pil ayarlarına doğrudan ulaşılır.</p>
+      <p class="tab-caption reveal js-tab-caption" aria-live="polite"></p>
+    </section>
+
+    <!-- Moments -->
+    <section class="moments" id="moments" data-notch="music">
+      <header class="section-head reveal">
+        <p class="eyebrow" data-tr="Küçük anlar" data-en="Small moments">Küçük anlar</p>
+        <h2 data-tr-html="Gerektiğinde <em>görünür,</em> sonra çekilir." data-en-html="It <em>appears</em> when needed, then steps back.">Gerektiğinde <em>görünür,</em> sonra çekilir.</h2>
+      </header>
+
+      <div class="moment-grid">
+        <article class="moment reveal" data-notch="volume">
+          <div class="mini-stage"><div class="mini-notch mn-volume"><svg><use href="#i-speaker"/></svg><span class="mn-pct"><span class="js-mini-vol">64</span>%</span></div></div>
+          <h3>Command Echo</h3>
+          <p data-tr="Ses ve parlaklık tuşlarında macOS'un kendi göstergesi yerine islo. belirir — etrafında yumuşak bir ışıkla." data-en="Volume and brightness keys show islo. instead of the macOS indicator — with a soft glow around it.">Ses ve parlaklık tuşlarında macOS'un kendi göstergesi yerine islo. belirir — etrafında yumuşak bir ışıkla.</p>
+          <button class="play-in-notch" type="button" data-play="volume"><span data-tr="Çentikte oynat" data-en="Play in the notch">Çentikte oynat</span> ↑</button>
+        </article>
+
+        <article class="moment reveal" data-notch="notification">
+          <div class="mini-stage"><div class="mini-notch mn-notif"><span class="app-dot app-messages"><svg><use href="#i-message"/></svg></span><div><b>Ayşe</b><small data-tr="Yarın akşam görüşelim mi?" data-en="Dinner tomorrow?">Yarın akşam görüşelim mi?</small></div></div></div>
+          <h3 data-tr="Bildirimler" data-en="Notifications">Bildirimler</h3>
+          <p data-tr="Gelen bildirim çentiği genişletir. İster içeriği, ister yalnızca “1 yeni bildirim” — tıkla, hepsi tek sekmede." data-en="A new notification widens the notch. Show the content or just “1 new notification” — click to see them all.">Gelen bildirim çentiği genişletir. İster içeriği, ister yalnızca “1 yeni bildirim” — tıkla, hepsi tek sekmede.</p>
+          <button class="play-in-notch" type="button" data-play="notification"><span data-tr="Çentikte oynat" data-en="Play in the notch">Çentikte oynat</span> ↑</button>
+        </article>
+
+        <article class="moment reveal" data-notch="drop">
+          <div class="mini-stage"><div class="mini-notch mn-drop"><span class="mn-tile"><svg><use href="#i-tray-down"/></svg><span data-tr="Raf" data-en="Shelf">Raf</span></span><span class="mn-tile"><svg><use href="#i-airdrop"/></svg>AirDrop</span></div><span class="floating-file" aria-hidden="true"></span></div>
+          <h3 data-tr="Dosyayı tut, bırak" data-en="Pick up, drop">Dosyayı tut, bırak</h3>
+          <p data-tr="Bir dosyayı tuttuğun anda çentik bırakma alanına dönüşür: rafa koy ya da doğrudan AirDrop ile gönder." data-en="The moment you pick up a file, the notch becomes a drop zone: keep it on the shelf or send it with AirDrop.">Bir dosyayı tuttuğun anda çentik bırakma alanına dönüşür: rafa koy ya da doğrudan AirDrop ile gönder.</p>
+          <button class="play-in-notch" type="button" data-play="drop"><span data-tr="Çentikte oynat" data-en="Play in the notch">Çentikte oynat</span> ↑</button>
+        </article>
       </div>
     </section>
 
-    <section id="smart" class="section-shell smart-section">
-      <div class="section-heading reveal">
-        <span class="eyebrow" data-tr="Size göre açılır" data-en="Opens your way">Size göre açılır</span>
-        <h2 data-tr="Çentiğe yaklaşın. Gerisini islo. halletsin." data-en="Approach the notch. islo. handles the rest.">Çentiğe yaklaşın. Gerisini islo. halletsin.</h2>
-        <p data-tr="Hover, tıklama veya çentiğin orta bölgesi: islo.'nun ne zaman genişleyeceğini siz seçin. Aşağıdaki davranışları deneyin." data-en="Hover, click, or the center of the notch: you decide when islo. expands. Try the behaviors below.">Hover, tıklama veya çentiğin orta bölgesi: islo.'nun ne zaman genişleyeceğini siz seçin. Aşağıdaki davranışları deneyin.</p>
+    <!-- Themes -->
+    <section class="themes" id="themes" data-notch="theme">
+      <div class="themes-copy reveal">
+        <p class="eyebrow" data-tr="Tema" data-en="Themes">Tema</p>
+        <h2 data-tr-html="Senin rengin, <em>senin tonun.</em>" data-en-html="Your color, <em>your tone.</em>">Senin rengin, <em>senin tonun.</em></h2>
+        <p data-tr="On renk ve dört ton. Rengin çentiğe ne kadar sineceğini sen seçersin; kamera çentiğinin yanı hep siyah kalır. Bir renk seç — bu sayfa da seninle değişsin." data-en="Ten colors and four tones. You choose how much color soaks into the notch; the area by the camera always stays black. Pick one — this page changes with you.">On renk ve dört ton. Rengin çentiğe ne kadar sineceğini sen seçersin; kamera çentiğinin yanı hep siyah kalır. Bir renk seç — bu sayfa da seninle değişsin.</p>
+
+        <div class="picker" role="radiogroup" aria-label="Renk" data-tr-aria="Renk" data-en-aria="Color" id="swatches"></div>
+        <div class="tones" role="radiogroup" aria-label="Ton" data-tr-aria="Ton" data-en-aria="Tone" id="tones"></div>
       </div>
 
-      <div class="behavior-demo reveal" data-demo-mode="hover">
-        <div class="behavior-switch" role="group" aria-label="islo. açılma davranışı">
-          <button class="behavior-button active" type="button" data-behavior="hover" aria-pressed="true" data-tr="Üzerine gel" data-en="Hover">Üzerine gel</button>
-          <button class="behavior-button" type="button" data-behavior="click" aria-pressed="false" data-tr="Tıkla" data-en="Click">Tıkla</button>
-          <button class="behavior-button" type="button" data-behavior="zone" aria-pressed="false" data-tr="Orta bölge" data-en="Center zone">Orta bölge</button>
-        </div>
-
-        <div class="behavior-stage" aria-hidden="true">
-          <div class="behavior-menubar"><span></span><span></span><span></span></div>
-          <div class="behavior-zone"></div>
-          <div class="behavior-island">
-            <div class="behavior-camera"></div>
-            <div class="behavior-details">
-              <img src="assets/islo-icon.png" alt="" width="58" height="58">
-              <div><strong>islo. Sessions</strong><small>Now Playing</small><span>◀ &nbsp; ● &nbsp; ▶</span></div>
-              <div class="behavior-wave"><i></i><i></i><i></i><i></i></div>
+      <div class="theme-preview reveal" aria-hidden="true">
+        <div class="tp-notch">
+          <div class="tp-band"><span class="nd-pill"><svg><use href="#i-house"/></svg><span data-tr="Ana" data-en="Home">Ana</span></span><span class="tp-ico"><svg><use href="#i-bell"/></svg></span><span class="tp-ico"><svg><use href="#i-calendar"/></svg></span><span class="tp-ico"><svg><use href="#i-timer"/></svg></span></div>
+          <div class="tp-body">
+            <div class="tp-card">
+              <span class="art art-1"></span>
+              <div><b data-tr="Gece Yarısı Treni" data-en="Midnight Train">Gece Yarısı Treni</b><small>Lofi Ensemble</small></div>
+              <span class="wave accent"><i></i><i></i><i></i><i></i></span>
+            </div>
+            <div class="tp-card ring-card">
+              <svg viewBox="0 0 120 120"><circle class="ring-bg" cx="60" cy="60" r="46"/><circle class="ring-fg" cx="60" cy="60" r="46" style="stroke-dashoffset:90"/></svg>
+              <strong>18:24</strong>
             </div>
           </div>
-          <div class="behavior-pointer"><span></span></div>
         </div>
-
-        <p class="behavior-caption" data-tr="İmleç çentiğe geldiğinde kontroller yumuşakça açılır." data-en="Controls expand smoothly when the pointer reaches the notch.">İmleç çentiğe geldiğinde kontroller yumuşakça açılır.</p>
-      </div>
-
-      <div class="smart-grid">
-        <article class="smart-card reveal"><span>♫</span><div><h3 data-tr="Şarkı değişince kısa bir bakış" data-en="A quick glance on track change">Şarkı değişince kısa bir bakış</h3><p data-tr="Yeni parçayı birkaç saniye gösterir, ardından dikkat dağıtmadan tekrar küçülür." data-en="Shows the new track for a few seconds, then quietly returns to its compact state.">Yeni parçayı birkaç saniye gösterir, ardından dikkat dağıtmadan tekrar küçülür.</p></div></article>
-        <article class="smart-card reveal"><span>↗</span><div><h3 data-tr="Kaynağı tek dokunuşla açın" data-en="Open the source in one tap">Kaynağı tek dokunuşla açın</h3><p data-tr="Kapak görseline veya kaynak simgesine tıklayın; Music ya da Spotify öne gelsin." data-en="Click the artwork or source icon to bring Music or Spotify to the front.">Kapak görseline veya kaynak simgesine tıklayın; Music ya da Spotify öne gelsin.</p></div></article>
-        <article class="smart-card reveal"><span>▣</span><div><h3 data-tr="Tam ekranda görünmez" data-en="Stays out of full screen">Tam ekranda görünmez</h3><p data-tr="İsterseniz tam ekran uygulamalarda otomatik gizlenir ve çalışma alanınızı size bırakır." data-en="Optionally hides itself in full-screen apps and leaves your workspace untouched.">İsterseniz tam ekran uygulamalarda otomatik gizlenir ve çalışma alanınızı size bırakır.</p></div></article>
       </div>
     </section>
 
-    <section id="features" class="section-shell content-section">
-      <div class="section-heading reveal">
-        <span class="eyebrow" data-tr="Her ayrıntı yerli yerinde" data-en="Every detail in its place">Her ayrıntı yerli yerinde</span>
-        <h2 data-tr="Küçük bir alanda, büyük kontrol." data-en="Big control in a small space.">Küçük bir alanda, büyük kontrol.</h2>
-        <p data-tr="islo., dikkatinizi dağıtmadan ihtiyacınız olan medya bilgilerini ve araçları gösterir." data-en="islo. shows the media information and utilities you need without pulling you away from your work.">islo., dikkatinizi dağıtmadan ihtiyacınız olan medya bilgilerini ve araçları gösterir.</p>
-      </div>
+    <!-- Features -->
+    <section class="features" id="features" data-notch="music">
+      <header class="section-head reveal">
+        <p class="eyebrow" data-tr="Ve dahası" data-en="And more">Ve dahası</p>
+        <h2 data-tr-html="Küçük bir çentikte <em>çok iş.</em>" data-en-html="A lot of work in <em>a small notch.</em>">Küçük bir çentikte <em>çok iş.</em></h2>
+      </header>
 
-      <div class="feature-grid">
-        <article class="feature-card feature-wide reveal">
-          <span class="feature-icon">⌁</span>
-          <h3 data-tr="Çentiğe göre kendini şekillendirir" data-en="Shapes itself around your notch">Çentiğe göre kendini şekillendirir</h3>
-          <p data-tr="Ekran geometrisini otomatik algılar. Görünür Ada ile medya bilgisi çentiğin yanında kalır; Gizli Mini ile boşta tamamen kamera çentiğinin içine saklanır." data-en="It detects display geometry automatically. Visible Island keeps media beside the notch; Hidden Mini disappears completely into the camera notch while idle.">Ekran geometrisini otomatik algılar. Görünür Ada ile medya bilgisi çentiğin yanında kalır; Gizli Mini ile boşta tamamen kamera çentiğinin içine saklanır.</p>
-          <div class="mini-island"><img src="assets/islo-compact.png" alt="islo. kompakt görünüm"></div>
+      <div class="bento">
+        <article class="b-card b-wide reveal">
+          <div class="b-visual wings-visual"><span class="housing"><span class="mini-art"></span><span class="gap"></span><span class="wave accent"><i></i><i></i><i></i><i></i></span></span></div>
+          <h3 data-tr="Müzik, tam zamanında" data-en="Music, right on time">Müzik, tam zamanında</h3>
+          <p data-tr="Spotify veya Music çalınca çentik hafifçe genişler, durunca standart çentiğe döner. Değişiklikler anında yansır." data-en="When Spotify or Music plays, the notch widens slightly and returns to the standard notch when it stops — instantly.">Spotify veya Music çalınca çentik hafifçe genişler, durunca standart çentiğe döner. Değişiklikler anında yansır.</p>
         </article>
-
-        <article class="feature-card reveal">
-          <span class="feature-icon">◐</span>
-          <h3 data-tr="Dört görünüm" data-en="Four appearances">Dört görünüm</h3>
-          <p data-tr="Sistem, Beyaz, Siyah ve desteklenen macOS sürümlerinde Liquid Glass. Görünümü ilk kurulumda veya istediğiniz zaman değiştirin." data-en="System, White, Black, and Liquid Glass on supported macOS versions. Choose during setup or change it any time.">Sistem, Beyaz, Siyah ve desteklenen macOS sürümlerinde Liquid Glass. Görünümü ilk kurulumda veya istediğiniz zaman değiştirin.</p>
+        <article class="b-card reveal">
+          <div class="b-visual"><div class="ring small"><svg viewBox="0 0 120 120"><circle class="ring-bg" cx="60" cy="60" r="46"/><circle class="ring-fg spin" cx="60" cy="60" r="46"/></svg><strong>25:00</strong></div></div>
+          <h3 data-tr="Zamanlayıcı + Pomodoro" data-en="Timer + Pomodoro">Zamanlayıcı + Pomodoro</h3>
+          <p data-tr="Odak ve mola, çentiğin kendi tasarımında." data-en="Focus and breaks, in the notch's own design.">Odak ve mola, çentiğin kendi tasarımında.</p>
         </article>
-
-        <article class="feature-card reveal">
-          <span class="feature-icon">↻</span>
-          <h3 data-tr="Kendini güncel tutar" data-en="Keeps itself current">Kendini güncel tutar</h3>
-          <p data-tr="Sparkle tabanlı imzalı güncellemeler yeni GitHub sürümlerini denetler. Otomatik güncellemeyi ilk kurulumda seçebilirsiniz." data-en="Signed Sparkle updates check for new GitHub releases. You can opt into automatic updates during first-run setup.">Sparkle tabanlı imzalı güncellemeler yeni GitHub sürümlerini denetler. Otomatik güncellemeyi ilk kurulumda seçebilirsiniz.</p>
+        <article class="b-card reveal">
+          <div class="b-visual clip-visual"><span><svg><use href="#i-link"/></svg>ozdmrysn.github.io</span><span><svg><use href="#i-text"/></svg>npm run build</span><span><svg><use href="#i-text"/></svg>…</span></div>
+          <h3 data-tr="Pano geçmişi" data-en="Clipboard history">Pano geçmişi</h3>
+          <p data-tr="Son 40 kopyan; bağlantılar tek tıkla açılır. Yalnızca bellekte tutulur." data-en="Your last 40 copies; links open in one click. Kept in memory only.">Son 40 kopyan; bağlantılar tek tıkla açılır. Yalnızca bellekte tutulur.</p>
         </article>
-
-        <article class="feature-card reveal">
-          <span class="feature-icon">◴</span>
-          <h3 data-tr="Günlük araçlar, isteğe bağlı" data-en="Everyday tools, on your terms">Günlük araçlar, isteğe bağlı</h3>
-          <p data-tr="Command Echo, Zamanlayıcı + Pomodoro, Uyanık Tut ve Dosya Rafı + AirDrop modüllerini ayrı ayrı açıp kapatın." data-en="Enable Command Echo, Timer + Pomodoro, Keep Awake, and File Shelf + AirDrop independently.">Command Echo, Zamanlayıcı + Pomodoro, Uyanık Tut ve Dosya Rafı + AirDrop modüllerini ayrı ayrı açıp kapatın.</p>
+        <article class="b-card reveal">
+          <div class="b-visual icon-visual"><svg><use href="#i-lock"/></svg></div>
+          <h3 data-tr="Gizlilik önce" data-en="Private by design">Gizlilik önce</h3>
+          <p data-tr="Hesap yok, izleme yok. Pano ve bildirimler cihazından çıkmaz, uygulama kapanınca silinir." data-en="No account, no tracking. Clipboard and notifications never leave your Mac and vanish when you quit.">Hesap yok, izleme yok. Pano ve bildirimler cihazından çıkmaz, uygulama kapanınca silinir.</p>
         </article>
-
-        <article class="feature-card reveal">
-          <span class="feature-icon">⌃</span>
-          <h3 data-tr="Dock'ta değil, menü çubuğunda" data-en="In the menu bar, not the Dock">Dock'ta değil, menü çubuğunda</h3>
-          <p data-tr="islo. Dock'ta yer kaplamaz. Ayarlar ve hızlı işlemler her zaman üst menü çubuğundaki küçük simgesindedir." data-en="islo. stays out of the Dock. Settings and quick actions remain available from its small menu bar icon.">islo. Dock'ta yer kaplamaz. Ayarlar ve hızlı işlemler her zaman üst menü çubuğundaki küçük simgesindedir.</p>
+        <article class="b-card reveal">
+          <div class="b-visual icon-visual"><svg><use href="#i-chip"/></svg></div>
+          <h3 data-tr="Her Mac'te" data-en="On every Mac">Her Mac'te</h3>
+          <p data-tr="Apple Silicon ve Intel için tek paket. Çentiksiz ekranlarda zarif bir yüzen adaya dönüşür." data-en="One package for Apple Silicon and Intel. On displays without a notch, it becomes an elegant floating island.">Apple Silicon ve Intel için tek paket. Çentiksiz ekranlarda zarif bir yüzen adaya dönüşür.</p>
         </article>
-
-        <article class="feature-card feature-wide reveal">
-          <span class="feature-icon">♫</span>
-          <h3 data-tr="Music ve Spotify, tek yerde" data-en="Music and Spotify, together">Music ve Spotify, tek yerde</h3>
-          <p data-tr="Kapak görseli, parça ve sanatçı bilgisi, ilerleme, oynat/duraklat, önceki/sonraki, karışık çal, tekrar ve sistem sesi kontrolleri." data-en="Artwork, track and artist details, progress, play/pause, previous/next, shuffle, repeat, and system volume controls.">Kapak görseli, parça ve sanatçı bilgisi, ilerleme, oynat/duraklat, önceki/sonraki, karışık çal, tekrar ve sistem sesi kontrolleri.</p>
-          <img class="player-shot" src="assets/islo-player.png" width="920" height="272" alt="islo. genişletilmiş medya kontrolleri" loading="lazy" decoding="async">
+        <article class="b-card b-wide reveal">
+          <div class="b-visual shape-visual" aria-hidden="true">
+            <svg viewBox="0 0 320 80"><path class="shape-path" d="M0 0H320C314 0 313 4 313 8V58A14 14 0 0 1 299 72H21A14 14 0 0 1 7 58V8C7 4 6 0 0 0Z"/></svg>
+          </div>
+          <h3 data-tr="Gerçek çentik gibi" data-en="Shaped like the real notch">Gerçek çentik gibi</h3>
+          <p data-tr="İçbükey üst kavis, düz yanlar, yuvarlak alt köşeler. Açılırken ortadan değil, yukarıdan büyür." data-en="Concave top fillets, straight sides, round lower corners. It grows from the top, never from the middle.">İçbükey üst kavis, düz yanlar, yuvarlak alt köşeler. Açılırken ortadan değil, yukarıdan büyür.</p>
         </article>
       </div>
     </section>
 
-    <section id="install" class="install-section">
-      <div class="section-shell install-layout">
-        <div class="section-heading reveal">
-          <span class="eyebrow" data-tr="Birkaç dakikada hazır" data-en="Ready in minutes">Birkaç dakikada hazır</span>
-          <h2 data-tr="İndir, Uygulamalar'a taşı, müziğini aç." data-en="Download, move to Applications, press play.">İndir, Uygulamalar'a taşı, müziğini aç.</h2>
-          <p data-tr="islo. bağımsız bir GitHub sürümü olarak dağıtılır. İlk açılışta macOS'un Automation iznini isteyebilir." data-en="islo. is distributed as an independent GitHub release. macOS may request Automation access on first launch.">islo. bağımsız bir GitHub sürümü olarak dağıtılır. İlk açılışta macOS'un Automation iznini isteyebilir.</p>
-          <a class="button button-primary" href="https://github.com/OzdmrYsn/islo/releases/latest/download/islo.dmg" data-tr="islo. DMG'yi indir" data-en="Download islo. DMG">islo. DMG'yi indir</a>
+    <!-- What's new -->
+    <section class="whatsnew reveal" data-notch="music">
+      <div class="wn-card">
+        <div class="wn-head">
+          <span class="wn-version">2.0</span>
+          <div>
+            <p class="eyebrow" data-tr="Bu sürümde" data-en="In this release">Bu sürümde</p>
+            <h2 data-tr-html="Yeniden <em>tasarlandı.</em>" data-en-html="Designed <em>again.</em>">Yeniden <em>tasarlandı.</em></h2>
+          </div>
         </div>
-
-        <ol class="steps reveal">
-          <li><span>1</span><div><strong data-tr="DMG'yi açın" data-en="Open the DMG">DMG'yi açın</strong><p data-tr="islo. DMG dosyasını indirin ve çift tıklayarak kurulum penceresini açın." data-en="Download the islo. DMG and double-click it to open the installation window.">islo. DMG dosyasını indirin ve çift tıklayarak kurulum penceresini açın.</p></div></li>
-          <li><span>2</span><div><strong data-tr="Uygulamalar'a taşıyın" data-en="Move it to Applications">Uygulamalar'a taşıyın</strong><p data-tr="islo.app dosyasını Applications / Uygulamalar klasörüne sürükleyin." data-en="Drag islo.app into your Applications folder.">islo.app dosyasını Applications / Uygulamalar klasörüne sürükleyin.</p></div></li>
-          <li><span>3</span><div><strong data-tr="İlk kez güvenle açın" data-en="Open it safely the first time">İlk kez güvenle açın</strong><p data-tr="Uygulamaya Control-tıklayın, Aç'ı seçin ve macOS uyarısında yeniden Aç'a basın." data-en="Control-click the app, choose Open, then confirm Open in the macOS prompt.">Uygulamaya Control-tıklayın, Aç'ı seçin ve macOS uyarısında yeniden Aç'a basın.</p></div></li>
-          <li><span>4</span><div><strong data-tr="İzinleri tamamlayın" data-en="Complete permissions">İzinleri tamamlayın</strong><p data-tr="Music veya Spotify kontrolü için istenen Automation iznine onay verin." data-en="Approve the requested Automation access to control Music or Spotify.">Music veya Spotify kontrolü için istenen Automation iznine onay verin.</p></div></li>
-        </ol>
+        <ul class="wn-list">
+          <li data-tr="Bildirimler sekmesi ve genişleyen bildirim çubuğu" data-en="Notifications tab and a widening notification bar">Bildirimler sekmesi ve genişleyen bildirim çubuğu</li>
+          <li data-tr="10 renk × 4 tonluk tema" data-en="Themes: 10 colors × 4 tones">10 renk × 4 tonluk tema</li>
+          <li data-tr="macOS ses/parlaklık göstergesinin yerine Command Echo" data-en="Command Echo replaces the macOS volume/brightness indicator">macOS ses/parlaklık göstergesinin yerine Command Echo</li>
+          <li data-tr="Dosya tutunca açılan Raf / AirDrop alanı" data-en="Shelf / AirDrop zone that opens as you pick up a file">Dosya tutunca açılan Raf / AirDrop alanı</li>
+          <li data-tr="Yukarıdan açılan, gerçek çentik biçiminde yeni gövde" data-en="A new body shaped like the real notch, opening from the top">Yukarıdan açılan, gerçek çentik biçiminde yeni gövde</li>
+          <li data-tr="Yeni Zamanlayıcı ve Takvim, kayan Raf ve Pano" data-en="New Timer and Calendar, scrolling Shelf and Clipboard">Yeni Zamanlayıcı ve Takvim, kayan Raf ve Pano</li>
+          <li data-tr="İzinler sayfası ve kararlılık düzeltmeleri" data-en="A Permissions page and stability fixes">İzinler sayfası ve kararlılık düzeltmeleri</li>
+        </ul>
+        <a class="wn-link" href="https://github.com/OzdmrYsn/islo/releases/latest"><span data-tr="Tüm sürüm notları" data-en="Full release notes">Tüm sürüm notları</span> →</a>
       </div>
     </section>
 
-    <section id="gallery" class="section-shell content-section gallery-section">
-      <div class="section-heading reveal">
-        <span class="eyebrow" data-tr="İlk açılıştan ilk şarkıya" data-en="From first launch to first track">İlk açılıştan ilk şarkıya</span>
-        <h2 data-tr="Kendi tarzınıza göre ayarlayın." data-en="Make it feel like yours.">Kendi tarzınıza göre ayarlayın.</h2>
-      </div>
-      <div class="gallery-grid">
-        <figure class="gallery-onboarding reveal">
-          <img src="assets/islo-logo.png" alt="islo. logosu" loading="lazy">
-          <figcaption data-tr="Çentik etrafında yaşayan yeni islo. kimliği." data-en="The new islo. identity, designed to live around the notch.">Çentik etrafında yaşayan yeni islo. kimliği.</figcaption>
-        </figure>
-        <figure class="gallery-icon reveal">
-          <img src="assets/islo-icon.png" alt="islo. uygulama ikonu" loading="lazy">
-          <figcaption data-tr="Yeni, sıcak ve neşeli islo. ikonu." data-en="The new warm and playful islo. icon.">Yeni, sıcak ve neşeli islo. ikonu.</figcaption>
-        </figure>
+    <!-- Install -->
+    <section class="install" id="install" data-notch="ready">
+      <header class="section-head reveal">
+        <p class="eyebrow" data-tr="Kurulum" data-en="Install">Kurulum</p>
+        <h2 data-tr-html="Bir dakikadan <em>kısa.</em>" data-en-html="Under <em>a minute.</em>">Bir dakikadan <em>kısa.</em></h2>
+      </header>
+      <ol class="steps">
+        <li class="step reveal"><span class="step-num">1</span><h3 data-tr="İndir ve sürükle" data-en="Download and drag">İndir ve sürükle</h3><p data-tr="DMG'yi aç, islo.'yu Uygulamalar klasörüne sürükle." data-en="Open the DMG and drag islo. into Applications.">DMG'yi aç, islo.'yu Uygulamalar klasörüne sürükle.</p></li>
+        <li class="step reveal"><span class="step-num">2</span><h3 data-tr="İlk açılış" data-en="First launch">İlk açılış</h3><p data-tr="Uygulamaya Control-tıkla ve Aç'ı seç. Bu yalnızca bir kez gerekir." data-en="Control-click the app and choose Open. You only do this once.">Uygulamaya Control-tıkla ve Aç'ı seç. Bu yalnızca bir kez gerekir.</p></li>
+        <li class="step reveal"><span class="step-num">3</span><h3 data-tr="İzinler" data-en="Permissions">İzinler</h3><p data-tr="Bildirimler ve macOS göstergesinin gizlenmesi için Ayarlar › İzinler'den Erişilebilirlik iznini ver." data-en="For notifications and hiding the macOS indicator, allow Accessibility in Settings › Permissions.">Bildirimler ve macOS göstergesinin gizlenmesi için Ayarlar › İzinler'den Erişilebilirlik iznini ver.</p></li>
+      </ol>
+
+      <div class="cta reveal">
+        <img src="assets/islo-icon.png" alt="" width="96" height="96">
+        <h2 data-tr-html="Çentiğine <em>bir iş</em> ver." data-en-html="Give your notch <em>a job.</em>">Çentiğine <em>bir iş</em> ver.</h2>
+        <a class="btn btn-primary big" href="https://github.com/OzdmrYsn/islo/releases/latest/download/islo.dmg">
+          <svg><use href="#i-download"/></svg><span data-tr="islo. 2.0'ı indir" data-en="Download islo. 2.0">islo. 2.0'ı indir</span>
+        </a>
+        <p class="hero-meta">2.0.0 · DMG · macOS 13+ · Universal</p>
       </div>
     </section>
 
-    <section class="closing section-shell reveal">
-      <img src="assets/islo-icon.png" alt="" width="76" height="76">
-      <h2 data-tr="Müziğiniz için biraz daha iyi bir yer." data-en="A better little place for your music.">Müziğiniz için biraz daha iyi bir yer.</h2>
-      <p data-tr="islo. GitHub'da geliştiriliyor." data-en="islo. is developed on GitHub.">islo. GitHub'da geliştiriliyor.</p>
-      <div class="hero-actions">
-          <a class="button button-primary" href="https://github.com/OzdmrYsn/islo/releases/latest/download/islo.dmg" data-tr="islo. DMG'yi indir" data-en="Download islo. DMG">islo. DMG'yi indir</a>
-        <a class="button button-secondary" href="https://github.com/OzdmrYsn/islo/issues" data-tr="Geri bildirim paylaş" data-en="Share feedback">Geri bildirim paylaş</a>
+    <!-- FAQ -->
+    <section class="faq" data-notch="music">
+      <header class="section-head reveal">
+        <p class="eyebrow" data-tr="Sorular" data-en="Questions">Sorular</p>
+      </header>
+      <div class="faq-list">
+        <details class="reveal">
+          <summary data-tr="Neden ilk açılışta uyarı görüyorum?" data-en="Why do I see a warning on first launch?">Neden ilk açılışta uyarı görüyorum?</summary>
+          <p data-tr="islo. henüz Apple tarafından notarize edilmedi. Uygulamaya Control-tıklayıp Aç dediğinde macOS bunu kalıcı olarak hatırlar." data-en="islo. isn't notarized by Apple yet. Control-click the app and choose Open, and macOS remembers it for good.">islo. henüz Apple tarafından notarize edilmedi. Uygulamaya Control-tıklayıp Aç dediğinde macOS bunu kalıcı olarak hatırlar.</p>
+        </details>
+        <details class="reveal">
+          <summary data-tr="Erişilebilirlik izni ne için?" data-en="What is Accessibility access for?">Erişilebilirlik izni ne için?</summary>
+          <p data-tr="Ekranda beliren bildirim afişlerini okuyup çentikte göstermek, ses ve parlaklık tuşlarında macOS'un kendi göstergesini gizlemek ve yapıştırma tuşunu algılamak için. Bunlar olmadan da islo. çalışır." data-en="To read on-screen notification banners for the notch, hide the macOS volume and brightness indicator, and detect paste. islo. works without it, too.">Ekranda beliren bildirim afişlerini okuyup çentikte göstermek, ses ve parlaklık tuşlarında macOS'un kendi göstergesini gizlemek ve yapıştırma tuşunu algılamak için. Bunlar olmadan da islo. çalışır.</p>
+        </details>
+        <details class="reveal">
+          <summary data-tr="Çentiği olmayan bir Mac'te çalışır mı?" data-en="Does it work on a Mac without a notch?">Çentiği olmayan bir Mac'te çalışır mı?</summary>
+          <p data-tr="Evet. Çentiksiz ve harici ekranlarda ekranın üst ortasında yüzen bir ada olarak görünür." data-en="Yes. On displays without a notch it appears as a floating island at the top center.">Evet. Çentiksiz ve harici ekranlarda ekranın üst ortasında yüzen bir ada olarak görünür.</p>
+        </details>
+        <details class="reveal">
+          <summary data-tr="Nasıl güncellenir?" data-en="How does it update?">Nasıl güncellenir?</summary>
+          <p data-tr="islo. imzalı Sparkle güncellemeleri kullanır. Ayarlar › Güncellemeler'den denetleyebilir ya da otomatik güncellemeyi açabilirsin." data-en="islo. uses signed Sparkle updates. Check from Settings › Updates or turn on automatic updates.">islo. imzalı Sparkle güncellemeleri kullanır. Ayarlar › Güncellemeler'den denetleyebilir ya da otomatik güncellemeyi açabilirsin.</p>
+        </details>
       </div>
     </section>
   </main>
 
-  <footer>
-    <div class="footer-brand"><img src="assets/islo-icon.png" alt="" width="30" height="30"><strong>islo.</strong></div>
-    <p><a href="https://github.com/OzdmrYsn">github.com/OzdmrYsn</a> <span>|</span> Yasin Özdemir</p>
-    <p class="copyright">© <span id="year"></span> islo.</p>
+  <footer class="footer">
+    <div class="footer-brand"><img src="assets/islo-icon.png" alt="" width="28" height="28"><span>islo.</span></div>
+    <p data-tr="Mac'inin üstünde, gününün yanında." data-en="At the top of your Mac, close to your day.">Mac'inin üstünde, gününün yanında.</p>
+    <p class="footer-meta"><a href="https://github.com/OzdmrYsn/islo">GitHub</a> · <a href="https://github.com/OzdmrYsn/islo/releases">Releases</a> · Yasin Özdemir · <span class="js-year">2026</span></p>
   </footer>
 </body>
 </html>
