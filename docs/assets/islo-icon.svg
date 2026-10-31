@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+<defs>
+  <clipPath id="body"><rect x="100" y="100" width="824" height="824" rx="185"/></clipPath>
+  <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#000" flood-opacity="0.32"/></filter>
+  <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset=".5" stop-color="#fff" stop-opacity=".04"/><stop offset="1" stop-color="#fff" stop-opacity=".1"/></linearGradient>
+  <linearGradient id="ink" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1E1F27"/><stop offset="1" stop-color="#07070A"/></linearGradient>
+  <radialGradient id="dotglow" cx=".63" cy=".7" r=".35"><stop offset="0" stop-color="#FF6FA5" stop-opacity=".35"/><stop offset="1" stop-color="#FF6FA5" stop-opacity="0"/></radialGradient>
+  <linearGradient id="tittle" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7AB2FF"/><stop offset="1" stop-color="#3D6BFF"/></linearGradient>
+  <linearGradient id="stop" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF6FA5"/><stop offset="1" stop-color="#FF9A3D"/></linearGradient>
+  <filter id="tglow" x="-50%" y="-80%" width="200%" height="260%"><feGaussianBlur stdDeviation="22"/></filter>
+</defs>
+<g filter="url(#shadow)"><rect x="100" y="100" width="824" height="824" rx="185" fill="#000"/></g>
+<g clip-path="url(#body)">
+<rect width="1024" height="1024" fill="url(#ink)"/><rect width="1024" height="1024" fill="url(#dotglow)"/>
+<g transform="translate(12 0)"><rect x="282" y="232" width="250" height="118" rx="59" fill="#4D84FF" filter="url(#tglow)" opacity=".8"/>
+<rect x="282" y="232" width="250" height="118" rx="59" fill="url(#tittle)"/>
+<rect x="332" y="404" width="150" height="390" rx="75" fill="#F5F5F7"/>
+<circle cx="640" cy="719" r="75" fill="url(#stop)"/></g>
+</g>
+<rect x="101.5" y="101.5" width="821" height="821" rx="183.5" fill="none" stroke="url(#rim)" stroke-width="3"/>
+</svg>

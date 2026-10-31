@@ -165,6 +165,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NSApp.dockTile.display()
     }
 
+    /// The app icon's "i." drawn as a template image, so macOS tints it for
+    /// light and dark menu bars like its own icons.
+    private static func menuBarMark() -> NSImage {
+        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: true) { rect in
+            // The glyph's parts in the icon's 1024-point artwork.
+            let glyph = CGRect(x: 294, y: 232, width: 433, height: 562)
+            let scale = 14 / glyph.height
+            let origin = CGPoint(
+                x: (rect.width - glyph.width * scale) / 2,
+                y: (rect.height - glyph.height * scale) / 2
+            )
+            func place(_ part: CGRect) -> CGRect {
+                CGRect(
+                    x: origin.x + (part.minX - glyph.minX) * scale,
+                    y: origin.y + (part.minY - glyph.minY) * scale,
+                    width: part.width * scale,
+                    height: part.height * scale
+                )
+            }
+            NSColor.black.setFill()
+            let tittle = place(CGRect(x: 294, y: 232, width: 250, height: 118))
+            NSBezierPath(roundedRect: tittle, xRadius: tittle.height / 2, yRadius: tittle.height / 2).fill()
+            let stem = place(CGRect(x: 344, y: 404, width: 150, height: 390))
+            NSBezierPath(roundedRect: stem, xRadius: stem.width / 2, yRadius: stem.width / 2).fill()
+            NSBezierPath(ovalIn: place(CGRect(x: 577, y: 644, width: 150, height: 150))).fill()
+            return true
+        }
+        image.isTemplate = true
+        image.accessibilityDescription = "islo."
+        return image
+    }
+
     private func configureMenuBarItem() {
         if let statusItem {
             NSStatusBar.system.removeStatusItem(statusItem)
@@ -174,15 +206,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = item.button {
-            if let iconURL = Bundle.main.url(
-                forResource: "AppIcon",
-                withExtension: "icns"
-            ), let image = NSImage(contentsOf: iconURL) {
-                image.size = NSSize(width: 18, height: 18)
-                image.isTemplate = false
-                image.accessibilityDescription = "islo."
-                button.image = image
-            }
+            button.image = Self.menuBarMark()
             button.toolTip = "islo."
         }
 
