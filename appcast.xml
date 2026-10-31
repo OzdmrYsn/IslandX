@@ -3,6 +3,60 @@
     <channel>
         <title>islo.</title>
         <item>
+            <title>2.3.0</title>
+            <description><![CDATA[
+<style>body{font:13px -apple-system,sans-serif;line-height:1.45}h3{margin:14px 0 4px}h4{margin:10px 0 2px}ul{padding-left:18px;margin:4px 0}</style>
+<h3>Türkçe</h3>
+<p>islo. 2.3 ayarları baştan tasarlıyor ve WhatsApp gibi uygulamaların bildirimlerinin çentiğe gelmemesi sorununu düzeltiyor.</p>
+<h4>Yeni</h4>
+<ul>
+<li><b>Yeni ayarlar:</b> Ayarlar artık beş sayfa: Genel, Görünüm, Özellikler, İzinler ve Hakkında. Çentikle aynı koyu görünümde; Görünüm'de seçtiğin ton pencereye de siner.</li>
+<li><b>Özellik kutucukları:</b> 13 özellik renkli kutucuklarda, her birinin kendi anahtarı var. Kutucuğa tıklayınca ne işe yaradığı, gereken izin ve seçenekleri tek sayfada.</li>
+<li><b>Klasör izinleri:</b> İzinler sayfası, ekran görüntüsü önizlemesi ve indirme takibinin ihtiyaç duyduğu Masaüstü ve İndirilenler erişimini de gösterir; kapalıysa <b>Düzelt</b> ile macOS yeniden sorar.</li>
+<li><b>"Bildirim gelmiyor mu?" ipuçları:</b> Bildirimleri engelleyen durumlar (Odak, uygulamanın bildirim ayarı) ve Bildirim ayarlarına tek tıkla geçiş.</li>
+</ul>
+<h4>Düzeltmeler</h4>
+<ul>
+<li>WhatsApp, Mesajlar gibi uygulamaların aynı sohbetten gelen bildirimleri çentikte görünmüyordu; artık her yeni mesaj görünür.</li>
+<li>Bildirim Merkezi açıldığında oradaki eski bildirimler yeni bildirim gibi gösterilmez.</li>
+<li>macOS Masaüstü erişimini sorarken çentik, soru cevaplanana kadar donmaz.</li>
+<li>Adı aynı görünen iki kısayol, Kısayollar listesinde boşluk bırakmaz.</li>
+</ul>
+<h4>Kaldırılanlar</h4>
+<ul>
+<li>Sistem / Beyaz / Siyah / Liquid Glass pencere görünümü seçimi kaldırıldı. islo.'nun pencereleri ve çentiği her zaman koyu; rengi Görünüm › Ton'dan gelir.</li>
+</ul>
+<p><i>İzinlerin bu güncellemede korunur.</i></p>
+<h3>English</h3>
+<p>islo. 2.3 redesigns Settings and fixes notifications from apps like WhatsApp not reaching the notch.</p>
+<h4>New</h4>
+<ul>
+<li><b>New Settings:</b> Settings now has five pages: General, Appearance, Features, Permissions and About. It shares the notch's dark look, and the tone you pick in Appearance tints the window too.</li>
+<li><b>Feature tiles:</b> 13 features sit in colour tiles, each with its own switch. Click a tile to see what it does, the permission it needs and its options on one page.</li>
+<li><b>Folder permissions:</b> Permissions also shows the Desktop and Downloads access that screenshot previews and download progress need; if it's off, <b>Fix</b> makes macOS ask again.</li>
+<li><b>"Not seeing notifications?" tips:</b> What can block notifications (a Focus, the app's notification setting) and a one-click way to Notification settings.</li>
+</ul>
+<h4>Fixes</h4>
+<ul>
+<li>Notifications from one chat in apps like WhatsApp and Messages didn't reach the notch; every new message now shows.</li>
+<li>Opening Notification Center no longer shows the older notifications there as new ones.</li>
+<li>The notch no longer freezes while macOS asks for Desktop access.</li>
+<li>Two shortcuts whose names look the same no longer leave a gap in the Shortcuts list.</li>
+</ul>
+<h4>Removed</h4>
+<ul>
+<li>The System / Light / Dark / Liquid Glass window appearance choice is gone. islo.'s windows and notch are always dark, coloured by Appearance › Tone.</li>
+</ul>
+<p><i>Your permissions are kept with this update.</i></p>
+]]></description>
+            <pubDate>Sat, 31 Oct 2026 10:39:59 +0300</pubDate>
+            <link>https://github.com/OzdmrYsn/islo</link>
+            <sparkle:version>19</sparkle:version>
+            <sparkle:shortVersionString>2.3.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/OzdmrYsn/islo/releases/download/v2.3.0/islo-2.3.0.zip" length="5264268" type="application/octet-stream" sparkle:edSignature="YwCXA/UavqIjyZaZI0d8xJdcL6xP/UZujUqazJ1Um103qZuKDywMGnFhU34tsAZOXVblzkwdMrknZ4GtuLJSCg=="/>
+        </item>
+        <item>
             <title>2.2.0</title>
             <description><![CDATA[
 <style>body{font:13px -apple-system,sans-serif;line-height:1.45}h3{margin:14px 0 4px}h4{margin:10px 0 2px}ul{padding-left:18px;margin:4px 0}</style>
@@ -119,81 +173,6 @@
             <sparkle:shortVersionString>2.1.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
             <enclosure url="https://github.com/OzdmrYsn/islo/releases/download/v2.1.0/islo-2.1.0.zip" length="4504022" type="application/octet-stream" sparkle:edSignature="temzsnYKF532YcEac1Quzo4i9zhj6akwS3JioWR/UmiduXTKGv17bskG37M+BI7og0oAuqf3gX+c/9lF222dBA=="/>
-        </item>
-        <item>
-            <title>2.0.0</title>
-            <description><![CDATA[
-<style>body{font:13px -apple-system,sans-serif;line-height:1.45}h3{margin:14px 0 4px}h4{margin:10px 0 2px}ul{padding-left:18px;margin:4px 0}</style>
-<h3>Türkçe</h3>
-<p>islo. 2.0, çentiği baştan tasarlıyor: artık gerçek MacBook çentiği gibi görünüyor, yukarıdan açılıyor ve günün geri kalanını da üstleniyor.</p>
-<h4>Yeni</h4>
-<ul>
-<li><b>Bildirimler:</b> Gelen bildirim çentiği genişletir; tıklayınca yeni <b>Bildirimler</b> sekmesi açılır. Ayarlardan bildirimin içeriğini ya da yalnızca "1 yeni bildirim"i göstermeyi seçebilirsiniz.</li>
-<li><b>Tema:</b> 10 renk ve 4 ton. Rengin çentiğe ne kadar sineceğini siz seçersiniz; kamera çentiğinin yanı her zaman siyah kalır.</li>
-<li><b>macOS göstergesinin yerine Command Echo:</b> Ses ve parlaklık tuşlarında yalnızca islo. görünür; HUD'ın etrafında yumuşak bir ışık yanar.</li>
-<li><b>Dosya Rafı:</b> Bir dosyayı tuttuğunuz anda çentik bırakma alanına dönüşür: <b>Raf</b> veya <b>AirDrop</b>. Raf artık küçük resimli, filtreli, kaydırılabilir ve tek dokunuşla temizlenebilir (dosyalar silinmez).</li>
-<li><b>Pano:</b> Metin ve bağlantı filtreleri, bağlantıyı tek tıkla açma, kaydırma ve 40 öğelik geçmiş.</li>
-<li><b>İzinler sayfası:</b> islo.'nun istediği izinler ve durumları tek yerde.</li>
-</ul>
-<h4>Yeniden tasarlandı</h4>
-<ul>
-<li>Fiziksel çentik gibi kenarlar: içbükey üst kavis, düz yanlar, yuvarlak alt köşeler.</li>
-<li>Çentik artık ortadan değil, <b>üstten</b> büyüyerek açılır.</li>
-<li>Müzik çalarken hafifçe genişler, çalmazken standart çentiğe döner; Spotify ve Music'teki değişikliklere anında tepki verir.</li>
-<li>Panel içindeki bütün bölmeler yumuşak köşeli kartlar; seçili sekme adıyla genişler.</li>
-<li><b>Zamanlayıcı</b> ve <b>Takvim</b> çentiğe uygun yeni görünümlerde; sağdaki özet sütunu yalnızca Ana sayfada.</li>
-</ul>
-<h4>Düzeltmeler</h4>
-<ul>
-<li>Genel görünümde açıp kapatırken yaşanan çökme giderildi.</li>
-<li>Üzerine gelince açılma modunda ˄ düğmesi paneli artık kapalı tutuyor.</li>
-<li>Ada yüksekliği fiziksel çentikle birebir aynı.</li>
-</ul>
-<h4>Kaldırılanlar</h4>
-<ul>
-<li>"Yalnızca Müzik" modu: Genel panel artık tek görünüm.</li>
-<li>"Sahne" seçeneği: yerini renk + ton aldı; önceki seçiminiz en yakın renge taşınır.</li>
-</ul>
-<p><i>İlk açılışta macOS uyarısı görülürse uygulamaya Control-tıklayıp <b>Aç</b> seçeneğini kullanın. Bildirimler ve macOS göstergesinin gizlenmesi için <b>Ayarlar › İzinler</b>'den Erişilebilirlik izni verin.</i></p>
-<h3>English</h3>
-<p>islo. 2.0 redesigns the notch from the ground up: it now looks like the real MacBook notch, opens from the top, and takes on more of your day.</p>
-<h4>New</h4>
-<ul>
-<li><b>Notifications:</b> A new notification widens the notch; click it to open the new <b>Notifications</b> tab. Choose in Settings whether to show the content or only "1 new notification".</li>
-<li><b>Themes:</b> 10 colors and 4 tones. You choose how much the color tints the notch; the area next to the camera always stays black.</li>
-<li><b>Command Echo replaces the macOS indicator:</b> Volume and brightness keys show only islo., with a soft light around the HUD.</li>
-<li><b>File Shelf:</b> The moment you pick up a file, the notch turns into a drop zone: <b>Shelf</b> or <b>AirDrop</b>. The shelf now has thumbnails, filters, scrolling, and a one-tap clear (files are never deleted).</li>
-<li><b>Clipboard:</b> Text and link filters, open links in one click, scrolling, and a 40-item history.</li>
-<li><b>Permissions page:</b> Every permission islo. uses and its status in one place.</li>
-</ul>
-<h4>Redesigned</h4>
-<ul>
-<li>Edges like the physical notch: concave top fillets, straight sides, round lower corners.</li>
-<li>The notch now grows <b>from the top</b> instead of from the middle.</li>
-<li>It widens slightly while music plays and returns to the standard notch otherwise, reacting instantly to Spotify and Music.</li>
-<li>Every section inside the panel is a rounded card; the selected tab widens with its name.</li>
-<li>New <b>Timer</b> and <b>Calendar</b> designs in the notch's own style; the summary column stays on Home only.</li>
-</ul>
-<h4>Fixes</h4>
-<ul>
-<li>Fixed a crash when opening and closing the General layout.</li>
-<li>In hover mode the ˄ button now keeps the panel closed.</li>
-<li>The island now matches the physical notch's height exactly.</li>
-</ul>
-<h4>Removed</h4>
-<ul>
-<li>The "Music Only" mode: the General panel is now the only layout.</li>
-<li>The "Scene" option: replaced by color + tone; your previous choice moves to the closest color.</li>
-</ul>
-<p><i>If macOS shows a warning on first launch, Control-click the app and choose <b>Open</b>. For notifications and hiding the macOS indicator, allow Accessibility in <b>Settings › Permissions</b>.</i></p>
-<p>Requires macOS 13 or later · Universal (Apple Silicon + Intel).</p>
-]]></description>
-            <pubDate>Fri, 30 Oct 2026 22:45:30 +0300</pubDate>
-            <link>https://github.com/OzdmrYsn/islo</link>
-            <sparkle:version>15</sparkle:version>
-            <sparkle:shortVersionString>2.0.0</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/OzdmrYsn/islo/releases/download/v2.0.0/islo-2.0.0.zip" length="3458175" type="application/octet-stream" sparkle:edSignature="I7G6P20RQUZAGLHfqpPK1P/hiTrmoMwyGTXRlPwKlHuu/UFHZVeDccgogQOdSY6LIaCwC0pk8yF3V6HbcobtDA=="/>
         </item>
     </channel>
 </rss>
