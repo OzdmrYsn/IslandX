@@ -607,8 +607,7 @@ final class PrivacyMonitor: ObservableObject {
             let microphoneApp = Self.microphoneApp()
             let microphone = microphoneApp != nil || Self.defaultInputIsRunning()
             let camera = Self.cameraIsRunning()
-            // "" means recording by a process without an app to name.
-            let appName = microphoneApp.flatMap { $0.isEmpty ? nil : $0 }
+            let appName = microphoneApp
             DispatchQueue.main.async {
                 let monitor = PrivacyMonitor.shared
                 monitor.isPolling = false
@@ -625,9 +624,10 @@ final class PrivacyMonitor: ObservableObject {
 
     // MARK: Readers
 
-    /// The app with a running input stream (macOS 14+): its name, "" when
-    /// only system processes record (Safari's WebKit audio, FaceTime's
-    /// conferencing daemon), or nil when nothing does.
+    /// The app with a running input stream (macOS 14+), or nil. Only
+    /// processes that belong to an app count: system services such as
+    /// corespeechd open the microphone whenever audio plays, and macOS
+    /// doesn't light its own indicator for them either.
     nonisolated private static func microphoneApp() -> String? {
         guard #available(macOS 14.0, *) else { return nil }
         var address = AudioObjectPropertyAddress(
@@ -643,7 +643,6 @@ final class PrivacyMonitor: ObservableObject {
         guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &processes) == noErr else {
             return nil
         }
-        var unnamedProcessRecords = false
         for process in processes {
             guard uint32Property(process, kAudioProcessPropertyIsRunningInput) != 0 else { continue }
             var pidAddress = AudioObjectPropertyAddress(
@@ -655,11 +654,22 @@ final class PrivacyMonitor: ObservableObject {
             var pidSize = UInt32(MemoryLayout<pid_t>.size)
             AudioObjectGetPropertyData(process, &pidAddress, 0, nil, &pidSize, &pid)
             guard pid != ProcessInfo.processInfo.processIdentifier else { continue }
-            // Helpers and XPC services record for the app responsible for them.
+            // Helpers and XPC services (Safari's WebKit audio) record for
+            // the app responsible for them.
             if let name = appName(for: responsiblePID(for: pid)) ?? appName(for: pid) { return name }
-            unnamedProcessRecords = true
+            if let name = callServiceName(for: pid) { return name }
         }
-        return unnamedProcessRecords ? "" : nil
+        return nil
+    }
+
+    /// System daemons that record for a call the user is on.
+    nonisolated private static func callServiceName(for pid: pid_t) -> String? {
+        var buffer = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+        guard proc_pidpath(pid, &buffer, UInt32(buffer.count)) > 0 else { return nil }
+        switch (String(cString: buffer) as NSString).lastPathComponent {
+        case "avconferenced": return "FaceTime"
+        default: return nil
+        }
     }
 
     private typealias ResponsiblePIDFunction = @convention(c) (pid_t) -> pid_t
