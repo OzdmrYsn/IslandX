@@ -576,6 +576,9 @@ struct DynamicNotchView: View {
         HStack(spacing: 0) {
             compactLeadingWing
                 .frame(width: layout.compactWingWidth, alignment: .trailing)
+                // The left wing's outer corner is free (its content hugs the
+                // camera housing), so the camera/mic dot sits there.
+                .overlay(alignment: .leading) { privacyCornerDot.padding(.leading, 7) }
 
             Color.clear
                 .frame(width: layout.cameraHousingWidth)
@@ -597,6 +600,7 @@ struct DynamicNotchView: View {
                 .accessibilityHidden(true)
         }
         .padding(.horizontal, 8)
+        .overlay { privacyCornerDot }
     }
 
     /// What the closed notch's wings show, most urgent first.
@@ -636,16 +640,17 @@ struct DynamicNotchView: View {
         }
     }
 
-    /// The trailing wing, with a small camera/microphone dot in its corner
-    /// while something else fills the wings.
     private var compactTrailingWing: some View {
         compactTrailingContent
-            .overlay(alignment: .topTrailing) {
-                if isPrivacyLive, idleActivity != .privacy {
-                    PrivacyDots(usage: privacyMonitor.usage, size: 5)
-                        .offset(x: -2, y: 4)
-                }
-            }
+    }
+
+    /// A small camera/microphone dot while music or a timer fills the wings.
+    @ViewBuilder
+    private var privacyCornerDot: some View {
+        if isPrivacyLive, idleActivity != .privacy {
+            PrivacyDots(usage: privacyMonitor.usage, size: 5)
+                .accessibilityHidden(true)
+        }
     }
 
     @ViewBuilder
