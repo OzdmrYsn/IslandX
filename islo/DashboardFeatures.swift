@@ -773,9 +773,13 @@ final class SystemBannerHider {
     private var firstSeen: [String: Date] = [:]
     private var moved: (window: AXUIElement, original: CGPoint)?
 
-    func update(window: AXUIElement, keys: [String], isCenterOpen: Bool) {
+    func update(window: AXUIElement, keys: [String], unreadable: Int, isCenterOpen: Bool) {
         guard !isCenterOpen else {
-            // macOS has moved the window back to show its panel.
+            // macOS normally moves the window back itself to show its
+            // panel; make sure it's never left off screen.
+            if let moved, let position = Self.position(of: moved.window), position.x >= offscreenX - 1 {
+                Self.setPosition(moved.original, of: moved.window)
+            }
             firstSeen.removeAll()
             moved = nil
             return
@@ -785,10 +789,15 @@ final class SystemBannerHider {
         let arrived = keys.filter { firstSeen[$0] == nil }
         for key in arrived { firstSeen[key] = now }
 
+        // A banner on its way out leaves the window empty for a moment
+        // while macOS animates it away; bringing the window back then
+        // would show it, so leave it until macOS closes the window.
+        if keys.isEmpty && unreadable == 0 { return }
+
         let isWaiting = firstSeen.values.contains { now.timeIntervalSince($0) > Self.waitingAfter }
         // Banners islo. couldn't read stay visible, as do alerts that wait
         // for an answer.
-        if keys.isEmpty || isWaiting {
+        if unreadable > 0 || isWaiting {
             restore()
         } else if isAllowed {
             hide(window)
@@ -1093,6 +1102,7 @@ final class NotificationMonitor: ObservableObject {
             hider.update(
                 window: window,
                 keys: windowScan.banners.map(\.key),
+                unreadable: windowScan.unreadable.count,
                 isCenterOpen: windowScan.isCenterOpen
             )
             scan.banners += windowScan.banners
