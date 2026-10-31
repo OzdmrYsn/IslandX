@@ -1297,52 +1297,106 @@ struct ScreenshotCapture: Equatable {
     var name: String { url.lastPathComponent }
 }
 
-/// Finds new screenshots through Spotlight's "is screen capture" flag, so
-/// any save location works. macOS writes the file once its floating
-/// thumbnail goes away.
+/// Watches a folder and reports names that appear in it (new files and
+/// files renamed into it, like a finished download dropping .crdownload).
+final class FolderWatcher {
+    let url: URL
+    private var source: DispatchSourceFileSystemObject?
+    private var known: Set<String>
+    private let onNew: ([URL]) -> Void
+
+    init?(url: URL, onNew: @escaping ([URL]) -> Void) {
+        let descriptor = open(url.path, O_EVTONLY)
+        guard descriptor >= 0 else { return nil }
+        self.url = url
+        self.onNew = onNew
+        known = Set((try? FileManager.default.contentsOfDirectory(atPath: url.path)) ?? [])
+        let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: descriptor, eventMask: .write, queue: .main)
+        source.setEventHandler { [weak self] in self?.scan() }
+        source.setCancelHandler { close(descriptor) }
+        source.resume()
+        self.source = source
+    }
+
+    deinit { source?.cancel() }
+
+    private func scan() {
+        let names = Set((try? FileManager.default.contentsOfDirectory(atPath: url.path)) ?? [])
+        let added = names.subtracting(known).filter { !$0.hasPrefix(".") }
+        known = names
+        guard !added.isEmpty else { return }
+        onNew(added.sorted().map { url.appendingPathComponent($0) })
+    }
+
+    static func hasAttribute(_ name: String, at url: URL) -> Bool {
+        getxattr(url.path, name, nil, 0, 0, 0) >= 0
+    }
+}
+
+/// Watches the folder macOS saves screenshots to (System Settings or the
+/// Screenshot app can change it; Desktop by default) for files carrying the
+/// screen-capture tag. macOS writes the file once its floating thumbnail
+/// goes away.
 @MainActor
-final class ScreenshotMonitor: NSObject, ObservableObject {
+final class ScreenshotMonitor: ObservableObject {
     static let shared = ScreenshotMonitor()
 
     @Published private(set) var revision = 0
     private(set) var latest: ScreenshotCapture?
 
-    private var query: NSMetadataQuery?
-    private var startedAt = Date()
-    private var seen: Set<String> = []
+    private var watcher: FolderWatcher?
+    private var locationTimer: Timer?
+
+    private init() {}
 
     func setEnabled(_ enabled: Bool) {
         if enabled {
-            guard query == nil else { return }
-            let query = NSMetadataQuery()
-            query.predicate = NSPredicate(format: "kMDItemIsScreenCapture == 1")
-            query.searchScopes = [NSMetadataQueryUserHomeScope]
-            NotificationCenter.default.addObserver(
-                self, selector: #selector(queryUpdated(_:)),
-                name: .NSMetadataQueryDidUpdate, object: query
-            )
-            startedAt = Date()
-            query.start()
-            self.query = query
+            guard locationTimer == nil else { return }
+            watchCurrentLocation()
+            // The save location can change while islo. runs.
+            locationTimer = Timer.scheduledTimer(withTimeInterval: 20, repeats: true) { _ in
+                Task { @MainActor in ScreenshotMonitor.shared.watchCurrentLocation() }
+            }
         } else {
-            query?.stop()
-            if let query { NotificationCenter.default.removeObserver(self, name: .NSMetadataQueryDidUpdate, object: query) }
-            query = nil
+            locationTimer?.invalidate()
+            locationTimer = nil
+            watcher = nil
         }
     }
 
-    @objc private func queryUpdated(_ notification: Notification) {
-        let added = notification.userInfo?[NSMetadataQueryUpdateAddedItemsKey] as? [NSMetadataItem] ?? []
-        for item in added {
-            guard let path = item.value(forAttribute: NSMetadataItemPathKey) as? String,
-                  !seen.contains(path) else { continue }
-            let created = item.value(forAttribute: NSMetadataItemFSCreationDateKey) as? Date ?? Date()
-            // Only captures made while islo. runs, and only recent ones
-            // (Spotlight also reports files copied or restored later).
-            guard created >= startedAt.addingTimeInterval(-2),
-                  Date().timeIntervalSince(created) < 60 else { continue }
-            seen.insert(path)
-            announce(URL(fileURLWithPath: path))
+    static var saveLocation: URL {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        if let path = CFPreferencesCopyAppValue("location" as CFString, "com.apple.screencapture" as CFString) as? String {
+            let url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath, isDirectory: true)
+            var isDirectory: ObjCBool = false
+            if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory), isDirectory.boolValue {
+                return url
+            }
+        }
+        return home.appendingPathComponent("Desktop", isDirectory: true)
+    }
+
+    private func watchCurrentLocation() {
+        let location = Self.saveLocation
+        guard watcher?.url.standardizedFileURL != location.standardizedFileURL else { return }
+        watcher = FolderWatcher(url: location) { urls in
+            Task { @MainActor in ScreenshotMonitor.shared.inspect(urls, attempt: 0) }
+        }
+    }
+
+    /// The tag can land a moment after the file does; look once more.
+    private func inspect(_ urls: [URL], attempt: Int) {
+        var pending: [URL] = []
+        for url in urls {
+            if FolderWatcher.hasAttribute("com.apple.metadata:kMDItemIsScreenCapture", at: url) {
+                announce(url)
+            } else if attempt == 0 {
+                pending.append(url)
+            }
+        }
+        guard !pending.isEmpty else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            ScreenshotMonitor.shared.inspect(pending, attempt: 1)
         }
     }
 
@@ -1389,6 +1443,10 @@ final class DownloadMonitor: ObservableObject {
 
     private var subscriber: Any?
     private var observations: [String: NSKeyValueObservation] = [:]
+    private var watcher: FolderWatcher?
+    /// Final paths already announced, so the progress and the folder
+    /// watcher don't both report the same file.
+    private var announced: [String: Date] = [:]
 
     private init() {}
 
@@ -1402,6 +1460,11 @@ final class DownloadMonitor: ObservableObject {
         if enabled {
             guard subscriber == nil else { return }
             let downloads = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Downloads")
+            // Instant downloads and browsers that publish no progress
+            // (Firefox and its forks) still land here with a quarantine tag.
+            watcher = FolderWatcher(url: downloads) { urls in
+                Task { @MainActor in DownloadMonitor.shared.filesAppeared(urls) }
+            }
             subscriber = Progress.addSubscriber(forFileURL: downloads) { progress in
                 let kind = progress.userInfo[.fileOperationKindKey] as? Progress.FileOperationKind
                 guard kind == .downloading || kind == .receiving,
@@ -1423,6 +1486,7 @@ final class DownloadMonitor: ObservableObject {
         } else {
             if let subscriber { Progress.removeSubscriber(subscriber) }
             subscriber = nil
+            watcher = nil
             observations.removeAll()
             active.removeAll()
         }
@@ -1449,9 +1513,37 @@ final class DownloadMonitor: ObservableObject {
         // The browser renames the file (drops .download/.crdownload) just
         // after it stops publishing.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-            let final = Self.finalURL(for: url)
-            DownloadMonitor.shared.lastFinished = FinishedDownload(url: final, isAirDrop: isAirDrop)
-            DownloadMonitor.shared.finishRevision &+= 1
+            DownloadMonitor.shared.announce(Self.finalURL(for: url), isAirDrop: isAirDrop)
+        }
+    }
+
+    private func announce(_ url: URL, isAirDrop: Bool) {
+        let now = Date()
+        announced = announced.filter { now.timeIntervalSince($0.value) < 60 }
+        guard announced[url.path] == nil else { return }
+        announced[url.path] = now
+        lastFinished = FinishedDownload(url: url, isAirDrop: isAirDrop)
+        finishRevision &+= 1
+    }
+
+    /// New names in ~/Downloads: report finished downloaded files that no
+    /// progress covers. Partial files and files the user moved in (no
+    /// quarantine tag) are skipped.
+    private func filesAppeared(_ urls: [URL]) {
+        let candidates = urls.filter { url in
+            !Self.partialExtensions.contains(url.pathExtension.lowercased())
+                && FolderWatcher.hasAttribute("com.apple.quarantine", at: url)
+        }
+        guard !candidates.isEmpty else { return }
+        // Give a publishing browser's own "finished" a moment to arrive.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            let monitor = DownloadMonitor.shared
+            for url in candidates {
+                let stillRunning = monitor.active.contains { $0.name == url.lastPathComponent }
+                guard !stillRunning, FileManager.default.fileExists(atPath: url.path) else { continue }
+                let agent = (try? String(contentsOfQuarantineOf: url)) ?? ""
+                monitor.announce(url, isAirDrop: agent.localizedCaseInsensitiveContains("sharingd") || agent.localizedCaseInsensitiveContains("airdrop"))
+            }
         }
     }
 
@@ -1489,11 +1581,10 @@ final class DownloadMonitor: ObservableObject {
         active.append(DownloadItem(id: id, name: name, fraction: 0.42, isAirDrop: false))
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
             self.active.removeAll { $0.id == id }
-            self.lastFinished = FinishedDownload(
-                url: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Downloads/\(name)"),
+            self.announce(
+                FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Downloads/\(name)"),
                 isAirDrop: false
             )
-            self.finishRevision &+= 1
         }
     }
     #endif
@@ -1564,5 +1655,17 @@ final class ShortcutsManager: ObservableObject {
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
         return (process.terminationStatus, String(decoding: data, as: UTF8.self))
+    }
+}
+
+private extension String {
+    /// The quarantine tag's text ("flags;time;agent;id"), e.g. to tell an
+    /// AirDrop from a browser download.
+    init(contentsOfQuarantineOf url: URL) throws {
+        let length = getxattr(url.path, "com.apple.quarantine", nil, 0, 0, 0)
+        guard length > 0 else { throw CocoaError(.fileReadNoSuchFile) }
+        var buffer = [UInt8](repeating: 0, count: length)
+        getxattr(url.path, "com.apple.quarantine", &buffer, length, 0, 0)
+        self = String(decoding: buffer, as: UTF8.self)
     }
 }
