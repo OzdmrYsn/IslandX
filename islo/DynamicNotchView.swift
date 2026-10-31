@@ -24,6 +24,7 @@ private enum DashboardSection: String, CaseIterable {
     case timer
     case shelf
     case clipboard
+    case shortcuts
 }
 
 /// Derives the camera-housing geometry from AppKit's safe display regions.
@@ -127,6 +128,9 @@ struct DynamicNotchView: View {
     @ObservedObject private var privacyMonitor = PrivacyMonitor.shared
     @ObservedObject private var lyricsManager = LyricsManager.shared
     @ObservedObject private var weatherManager = WeatherManager.shared
+    @ObservedObject private var screenshotMonitor = ScreenshotMonitor.shared
+    @ObservedObject private var downloadMonitor = DownloadMonitor.shared
+    @ObservedObject private var shortcutsManager = ShortcutsManager.shared
     @AppStorage("dashboard.lyrics.visible") private var showsLyrics = false
     @State private var showsOutputPicker = false
 
@@ -165,6 +169,9 @@ struct DynamicNotchView: View {
     /// that aren't shown can't change what's on screen.
     @State private var displayedEcho: CommandEchoKind = .copied
     @State private var displayedEchoRevision = 0
+    /// While the pointer is on a HUD with buttons it stays up.
+    @State private var isEchoHovered = false
+    @State private var echoActionDone: String?
     /// A meeting alert that arrived while the dashboard was open.
     @State private var pendingEventAlert: CalendarEventInfo?
     @State private var commandEchoTask: Task<Void, Never>?
@@ -402,6 +409,17 @@ struct DynamicNotchView: View {
         .onChange(of: isPrivacyLive) { _ in
             refreshIdleSurface()
         }
+        .onChange(of: isDownloadLive) { _ in
+            refreshIdleSurface()
+        }
+        .onReceive(screenshotMonitor.$revision.dropFirst()) { _ in
+            guard let capture = screenshotMonitor.latest else { return }
+            commandEchoManager.showScreenshot(capture)
+        }
+        .onReceive(downloadMonitor.$finishRevision.dropFirst()) { _ in
+            guard let download = downloadMonitor.lastFinished else { return }
+            commandEchoManager.showDownloadFinished(download)
+        }
         .onReceive(privacyMonitor.$startRevision.dropFirst()) { _ in
             commandEchoManager.showPrivacy(privacyMonitor.usage)
         }
@@ -432,6 +450,9 @@ struct DynamicNotchView: View {
         }
         .onChange(of: settings.dashboardNotificationsEnabled) { enabled in
             if !enabled, dashboardSection == .notifications { dashboardSection = .home }
+        }
+        .onChange(of: settings.shortcutsEnabled) { enabled in
+            if !enabled, dashboardSection == .shortcuts { dashboardSection = .home }
         }
         .onChange(of: dashboardSection) { section in
             if section == .notifications { notificationMonitor.markAllRead() }
@@ -608,7 +629,12 @@ struct DynamicNotchView: View {
         case none
         case music
         case timer
+        case download
         case privacy
+    }
+
+    private var isDownloadLive: Bool {
+        settings.downloadsEnabled && !downloadMonitor.active.isEmpty
     }
 
     private var isPrivacyLive: Bool {
@@ -623,6 +649,7 @@ struct DynamicNotchView: View {
 
     private var idleActivity: IdleActivity {
         if isTimerLive { return .timer }
+        if isDownloadLive { return .download }
         if showsIdleWings { return .music }
         if isPrivacyLive { return .privacy }
         return .none
@@ -633,6 +660,8 @@ struct DynamicNotchView: View {
         switch idleActivity {
         case .timer:
             timerMiniRing
+        case .download:
+            downloadMiniRing
         case .privacy:
             PrivacyDots(usage: privacyMonitor.usage, size: 8)
         case .music, .none:
@@ -656,6 +685,12 @@ struct DynamicNotchView: View {
     @ViewBuilder
     private var compactTrailingContent: some View {
         switch idleActivity {
+        case .download:
+            Text(percentText(Int((downloadMonitor.overallFraction * 100).rounded())))
+                .font(.system(size: 12, weight: .semibold, design: .rounded).monospacedDigit())
+                .foregroundStyle(Color.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
         case .privacy:
             Text(privacyMonitor.usage.appName ?? privacyKindText(privacyMonitor.usage))
                 .font(.system(size: 9.5, weight: .semibold))
@@ -674,6 +709,31 @@ struct DynamicNotchView: View {
             PlaybackWaveform(isPlaying: mediaManager.isPlaying)
                 .foregroundStyle(playbackIndicatorColor)
         }
+    }
+
+    /// Download progress as a small ring around an arrow; a count when
+    /// several files are coming in.
+    private var downloadMiniRing: some View {
+        let fraction = downloadMonitor.overallFraction
+        let count = downloadMonitor.active.count
+        return ZStack {
+            Circle().stroke(Color.white.opacity(0.16), lineWidth: 2.5)
+            Circle()
+                .trim(from: 0, to: max(fraction, 0.02))
+                .stroke(Color.green, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .animation(.easeOut(duration: 0.3), value: fraction)
+            if count > 1 {
+                Text("\(count)")
+                    .font(.system(size: 8, weight: .heavy, design: .rounded))
+                    .foregroundStyle(Color.green)
+            } else {
+                Image(systemName: downloadMonitor.active.first?.isAirDrop == true ? "dot.radiowaves.left.and.right" : "arrow.down")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(Color.green)
+            }
+        }
+        .frame(width: 20, height: 20)
     }
 
     /// The time left as a small ring, with the phase as its icon.
@@ -753,6 +813,7 @@ struct DynamicNotchView: View {
             case .timer: dashboardTimerSection
             case .shelf: dashboardShelfSection
             case .clipboard: dashboardClipboardSection
+            case .shortcuts: dashboardShortcutsSection
             }
         }
         .padding(.horizontal, bodyPadding(16, gap: 12))
@@ -1543,6 +1604,138 @@ struct DynamicNotchView: View {
             : minutesText(minutes)
     }
 
+    // MARK: Shortcuts
+
+    /// The user's pinned Shortcuts as tiles; the last tile edits the list.
+    private var dashboardShortcutsSection: some View {
+        let known = Set(shortcutsManager.available)
+        let favorites = settings.shortcutFavorites.filter { known.isEmpty || known.contains($0) }.prefix(7)
+        return dashboardCard {
+            if favorites.isEmpty {
+                VStack(spacing: 10) {
+                    Image(systemName: "bolt.circle")
+                        .font(.system(size: 26, weight: .light))
+                        .foregroundStyle(accent)
+                    Text(localized("Sık kullandığın kısayolları buraya sabitle.", "Pin the Shortcuts you use most here."))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(primaryColor)
+                    Text(localized("Kısayollar uygulamasındaki her şey tek tıkla çentikten çalışır.", "Anything in the Shortcuts app, one click away in the notch."))
+                        .font(.system(size: 10))
+                        .foregroundStyle(primaryColor.opacity(0.5))
+                    HStack(spacing: 8) {
+                        shortcutsPillButton(localized("Kısayol seç", "Pick shortcuts"), filled: true, action: openShortcutSettings)
+                        shortcutsPillButton(localized("Kısayollar'ı aç", "Open Shortcuts"), filled: false, action: shortcutsManager.openShortcutsApp)
+                    }
+                    .padding(.top, 2)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 4), spacing: 10) {
+                    ForEach(Array(favorites), id: \.self) { name in
+                        shortcutTile(name)
+                    }
+                    shortcutEditTile
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            }
+        }
+        .onAppear { if shortcutsManager.available.isEmpty { shortcutsManager.reload() } }
+    }
+
+    private func shortcutTile(_ name: String) -> some View {
+        let state = shortcutsManager.states[name]
+        let tint = shortcutTint(name)
+        return Button {
+            shortcutsManager.run(name)
+        } label: {
+            HStack(spacing: 9) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .fill(LinearGradient(colors: [tint, tint.opacity(0.7)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    switch state {
+                    case .running:
+                        ProgressView().controlSize(.small).tint(.white)
+                    case .succeeded:
+                        Image(systemName: "checkmark").font(.system(size: 12, weight: .bold))
+                    case .failed:
+                        Image(systemName: "xmark").font(.system(size: 12, weight: .bold))
+                    case nil:
+                        Image(systemName: "bolt.fill").font(.system(size: 12, weight: .bold))
+                    }
+                }
+                .foregroundStyle(.white)
+                .frame(width: 30, height: 30)
+
+                Text(name)
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(primaryColor)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, minHeight: 56, maxHeight: 56, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(primaryColor.opacity(state == .running ? 0.12 : 0.07)))
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .help(name)
+        .accessibilityLabel(Text(localized("Kısayolu çalıştır: \(name)", "Run shortcut: \(name)")))
+    }
+
+    private var shortcutEditTile: some View {
+        Button(action: openShortcutSettings) {
+            HStack(spacing: 9) {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(primaryColor.opacity(0.7))
+                    .frame(width: 30, height: 30)
+                    .background(RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(primaryColor.opacity(0.2), style: StrokeStyle(lineWidth: 1, dash: [3, 3])))
+                Text(localized("Düzenle", "Edit"))
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(primaryColor.opacity(0.7))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, minHeight: 56, maxHeight: 56, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(primaryColor.opacity(0.1), lineWidth: 1))
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func shortcutsPillButton(_ title: String, filled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 10.5, weight: .semibold))
+                .foregroundStyle(filled ? Color.white : primaryColor.opacity(0.8))
+                .padding(.horizontal, 13)
+                .frame(height: 26)
+                .background(Capsule().fill(filled ? accent : primaryColor.opacity(0.08)))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// A steady colour per shortcut, like the Shortcuts app's tiles.
+    private func shortcutTint(_ name: String) -> Color {
+        let palette: [Color] = [
+            Color(red: 0.36, green: 0.55, blue: 1), Color(red: 0.62, green: 0.42, blue: 0.98),
+            Color(red: 1, green: 0.45, blue: 0.62), Color(red: 1, green: 0.62, blue: 0.25),
+            Color(red: 0.25, green: 0.78, blue: 0.55), Color(red: 0.2, green: 0.72, blue: 0.9)
+        ]
+        let hash = name.unicodeScalars.reduce(0) { ($0 &* 31 &+ Int($1.value)) & 0x7fffffff }
+        return palette[hash % palette.count]
+    }
+
+    private func openShortcutSettings() {
+        NotificationCenter.default.post(
+            name: .isloShowSettings,
+            object: nil,
+            userInfo: ["destination": "modules"]
+        )
+    }
+
     // MARK: Shelf
 
     private var dashboardShelfSection: some View {
@@ -2021,10 +2214,19 @@ struct DynamicNotchView: View {
         .padding(.bottom, 8)
     }
 
+    /// The tabs beside the camera housing; if the selected tab's name
+    /// doesn't fit (many tabs, a badge), they fall back to icons only.
     private var dashboardNavigationLeading: some View {
-        HStack(spacing: 6) {
-            ForEach(visibleDashboardSections, id: \.self) { section in
-                dashboardNavigationItem(section)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 4) {
+                ForEach(visibleDashboardSections, id: \.self) { section in
+                    dashboardNavigationItem(section, showsLabel: true)
+                }
+            }
+            HStack(spacing: 4) {
+                ForEach(visibleDashboardSections, id: \.self) { section in
+                    dashboardNavigationItem(section, showsLabel: false)
+                }
             }
         }
     }
@@ -2035,6 +2237,7 @@ struct DynamicNotchView: View {
             case .timer: settings.dashboardFocusTimerEnabled
             case .shelf: settings.dashboardFileShelfEnabled
             case .notifications: settings.dashboardNotificationsEnabled
+            case .shortcuts: settings.shortcutsEnabled
             case .home, .calendar, .clipboard: true
             }
         }
@@ -2068,7 +2271,7 @@ struct DynamicNotchView: View {
 
     /// The selected section opens into a capsule with its name; the others
     /// stay as icons. One shared capsule slides between them.
-    private func dashboardNavigationItem(_ section: DashboardSection) -> some View {
+    private func dashboardNavigationItem(_ section: DashboardSection, showsLabel: Bool = true) -> some View {
         let isSelected = dashboardSection == section
         let badge = section == .notifications ? notificationMonitor.unreadCount : 0
 
@@ -2079,7 +2282,7 @@ struct DynamicNotchView: View {
                 Image(systemName: dashboardSectionSymbol(section))
                     .font(.system(size: 11, weight: .semibold))
 
-                if isSelected {
+                if isSelected, showsLabel {
                     Text(dashboardSectionLabel(section))
                         .font(.system(size: 11, weight: .semibold))
                         .lineLimit(1)
@@ -2094,8 +2297,8 @@ struct DynamicNotchView: View {
                 }
             }
             .foregroundStyle(isSelected ? primaryColor : primaryColor.opacity(0.5))
-            .padding(.horizontal, isSelected ? 10 : (badge > 0 ? 6 : 0))
-            .frame(minWidth: 27, minHeight: 27)
+            .padding(.horizontal, isSelected && showsLabel ? 10 : (badge > 0 ? 6 : 0))
+            .frame(minWidth: 25, minHeight: 27)
             .background {
                 if isSelected {
                     Capsule()
@@ -2118,6 +2321,7 @@ struct DynamicNotchView: View {
         case .shelf: "tray.full.fill"
         case .clipboard: "list.clipboard.fill"
         case .notifications: "bell.fill"
+        case .shortcuts: "bolt.fill"
         }
     }
 
@@ -2440,6 +2644,10 @@ struct DynamicNotchView: View {
                 eventHUD(event)
             } else if case .headphones(let battery) = displayedEcho {
                 headphoneHUD(battery)
+            } else if case .screenshotPreview(let capture) = displayedEcho {
+                screenshotHUD(capture)
+            } else if case .downloadFinished(let download) = displayedEcho {
+                downloadHUD(download)
             } else {
                 systemEchoHUD
             }
@@ -2501,6 +2709,185 @@ struct DynamicNotchView: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
+    }
+
+    /// A new screenshot under the notch: drag the thumbnail anywhere, or
+    /// copy, shelve, reveal or bin it.
+    private func screenshotHUD(_ capture: ScreenshotCapture) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 0) {
+                HStack(spacing: 7) {
+                    Image(systemName: "camera.viewfinder")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(accent)
+                    Text(localized("Ekran görüntüsü", "Screenshot"))
+                        .font(.system(size: 11, weight: .semibold))
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: layout.hasCameraHousing ? commandEchoWingWidth : .infinity, alignment: .leading)
+                if layout.hasCameraHousing {
+                    Color.clear.frame(width: layout.cameraHousingWidth).accessibilityHidden(true)
+                }
+                Text(localized("Sürükleyip bırakabilirsin", "Drag it anywhere"))
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .lineLimit(1)
+                    .frame(maxWidth: layout.hasCameraHousing ? commandEchoWingWidth : .infinity, alignment: .trailing)
+            }
+            .padding(.horizontal, 18)
+            .frame(height: layout.hasCameraHousing ? layout.notchBandHeight : 34)
+
+            HStack(alignment: .center, spacing: 12) {
+                Group {
+                    if let thumbnail = capture.thumbnail {
+                        Image(nsImage: thumbnail).resizable().scaledToFill()
+                    } else {
+                        ZStack {
+                            Color.white.opacity(0.08)
+                            Image(systemName: "photo").foregroundStyle(.white.opacity(0.5))
+                        }
+                    }
+                }
+                .frame(width: 124, height: 78)
+                .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous).strokeBorder(.white.opacity(0.18), lineWidth: 0.5))
+                .contentShape(Rectangle())
+                .onDrag { NSItemProvider(contentsOf: capture.url) ?? NSItemProvider() }
+                .onTapGesture {
+                    NSWorkspace.shared.open(capture.url)
+                    dismissEcho()
+                }
+                .help(localized("Aç ya da sürükleyip bırak", "Open, or drag and drop"))
+
+                VStack(alignment: .leading, spacing: 9) {
+                    Text(capture.name)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    HStack(spacing: 6) {
+                        echoAction("doc.on.doc", localized("Kopyala", "Copy"), id: "copy") {
+                            let pasteboard = NSPasteboard.general
+                            pasteboard.clearContents()
+                            var objects: [NSPasteboardWriting] = [capture.url as NSURL]
+                            if let image = NSImage(contentsOf: capture.url) { objects.insert(image, at: 0) }
+                            pasteboard.writeObjects(objects)
+                        }
+                        echoAction("tray.and.arrow.down", localized("Rafa ekle", "Shelf"), id: "shelf") {
+                            fileShelfManager.add(capture.url)
+                        }
+                        echoAction("folder", localized("Göster", "Show"), id: "show", closes: true) {
+                            NSWorkspace.shared.activateFileViewerSelecting([capture.url])
+                        }
+                        echoAction("trash", localized("Sil", "Delete"), id: "trash", closes: true, destructive: true) {
+                            NSWorkspace.shared.recycle([capture.url])
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, bodyPadding(18, gap: 16))
+            .padding(.top, 6)
+        }
+        .foregroundStyle(.white)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .onHover(perform: echoHoverChanged)
+    }
+
+    /// A finished download: open it or show it in Finder.
+    private func downloadHUD(_ download: FinishedDownload) -> some View {
+        HStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: download.isAirDrop ? "dot.radiowaves.left.and.right" : "arrow.down.circle.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.green)
+                    .id(displayedEchoRevision)
+                    .transition(.scale(scale: 0.6).combined(with: .opacity))
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(commandEchoTitle)
+                        .font(.system(size: 11, weight: .semibold))
+                        .lineLimit(1)
+                    Text(download.name)
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+            }
+            .frame(maxWidth: layout.hasCameraHousing ? commandEchoWingWidth : .infinity, alignment: .leading)
+
+            if layout.hasCameraHousing {
+                Color.clear.frame(width: layout.cameraHousingWidth).accessibilityHidden(true)
+            }
+
+            HStack(spacing: 6) {
+                Spacer(minLength: 0)
+                Button {
+                    downloadMonitor.open(download)
+                    dismissEcho()
+                } label: {
+                    Text(localized("Aç", "Open"))
+                        .font(.system(size: 10.5, weight: .bold))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 12)
+                        .frame(height: 22)
+                        .background(Capsule().fill(Color.white))
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                Button {
+                    downloadMonitor.reveal(download)
+                    dismissEcho()
+                } label: {
+                    Text(localized("Göster", "Show"))
+                        .font(.system(size: 10.5, weight: .semibold))
+                        .padding(.horizontal, 11)
+                        .frame(height: 22)
+                        .background(Capsule().strokeBorder(.white.opacity(0.35), lineWidth: 1))
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+            .frame(maxWidth: layout.hasCameraHousing ? commandEchoWingWidth : .infinity, alignment: .trailing)
+        }
+        .padding(.horizontal, 18)
+        .frame(height: layout.hasCameraHousing ? layout.notchBandHeight : 40)
+        .foregroundStyle(.white)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .onHover(perform: echoHoverChanged)
+    }
+
+    /// A small HUD button; shows a checkmark for a moment after it runs.
+    private func echoAction(
+        _ symbol: String,
+        _ title: String,
+        id: String,
+        closes: Bool = false,
+        destructive: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button {
+            action()
+            if closes {
+                dismissEcho()
+            } else {
+                withAnimation(.easeOut(duration: 0.15)) { echoActionDone = id }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: echoActionDone == id ? "checkmark" : symbol)
+                    .font(.system(size: 9.5, weight: .bold))
+                Text(title)
+                    .font(.system(size: 10, weight: .semibold))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(destructive ? Color(red: 1, green: 0.45, blue: 0.42) : .white)
+            .padding(.horizontal, 9)
+            .frame(height: 24)
+            .background(Capsule().fill(.white.opacity(echoActionDone == id ? 0.2 : 0.1)))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .help(title)
     }
 
     /// Headphones just became the output: their name on the left, battery
@@ -2829,7 +3216,7 @@ struct DynamicNotchView: View {
             case .pluggedIn(let level, _), .unplugged(let level), .low(let level): Double(level) / 100
             }
         case .copied, .pasted, .screenshot, .capsLock, .mediaSkip, .trackChanged, .notification,
-             .timerFinished, .upcomingEvent, .headphones, .privacy: nil
+             .timerFinished, .upcomingEvent, .headphones, .privacy, .screenshotPreview, .downloadFinished: nil
         }
     }
 
@@ -2849,6 +3236,8 @@ struct DynamicNotchView: View {
         case .upcomingEvent(let event): event.title
         case .headphones(let battery): battery.name
         case .privacy(let usage): usage.appName ?? privacyKindText(usage)
+        case .screenshotPreview: localized("Ekran görüntüsü", "Screenshot")
+        case .downloadFinished(let download): download.isAirDrop ? localized("AirDrop ile alındı", "Received via AirDrop") : localized("İndirildi", "Downloaded")
         case .power(let event):
             switch event {
             case .pluggedIn(_, let charging): charging ? localized("Şarj oluyor", "Charging") : localized("Güç bağlandı", "Power connected")
@@ -2876,6 +3265,8 @@ struct DynamicNotchView: View {
         case .upcomingEvent(let event): eventTimeText(event, now: Date())
         case .headphones: localized("Bağlandı", "Connected")
         case .privacy(let usage): privacyDetailText(usage)
+        case .screenshotPreview(let capture): capture.name
+        case .downloadFinished(let download): download.name
         case .power: ""
         case .timerFinished(let finish):
             switch finish {
@@ -2903,6 +3294,10 @@ struct DynamicNotchView: View {
         case .upcomingEvent: isAllowed = settings.calendarEnabled && settings.calendarAlertsEnabled
         case .power, .headphones: isAllowed = settings.devicesHUDEnabled
         case .privacy: isAllowed = settings.privacyIndicatorEnabled
+        case .screenshotPreview: isAllowed = settings.screenshotPreviewEnabled
+        case .downloadFinished: isAllowed = settings.downloadsEnabled
+        // The preview replaces the plain "Screenshot captured" echo.
+        case .screenshot: isAllowed = settings.dashboardCommandEchoEnabled && !settings.screenshotPreviewEnabled
         default: isAllowed = settings.dashboardCommandEchoEnabled
         }
         guard isAllowed, presentation == .idle else { return }
@@ -2912,6 +3307,7 @@ struct DynamicNotchView: View {
         commandEchoTask?.cancel()
         displayedEcho = incoming
         displayedEchoRevision &+= 1
+        echoActionDone = nil
         let echoAnimation: Animation = reduceMotion
             ? .easeOut(duration: 0.12)
             : .spring(response: 0.3, dampingFraction: 0.86)
@@ -2919,35 +3315,62 @@ struct DynamicNotchView: View {
             isCommandEchoVisible = true
         }
         resizeSurface(to: preferredSize, animation: echoAnimation)
+        let duration: Double
+        switch incoming {
+        case .notification, .headphones: duration = 4.5
+        case .timerFinished: duration = 5
+        case .upcomingEvent: duration = 10
+        case .power: duration = 3
+        case .privacy: duration = 3.5
+        case .screenshotPreview: duration = 7
+        case .downloadFinished: duration = 6
+        case .screenshot: duration = 3.2
+        case .trackChanged: duration = 2.2
+        default: duration = 1.45
+        }
+        scheduleEchoHide(after: duration, animation: echoAnimation)
+    }
+
+    /// Hides the HUD after `delay`, unless the pointer is on it; leaving it
+    /// starts a short countdown again.
+    private func scheduleEchoHide(after delay: Double, animation: Animation? = nil) {
+        commandEchoTask?.cancel()
+        let echoAnimation: Animation = animation ?? (reduceMotion
+            ? .easeOut(duration: 0.12)
+            : .spring(response: 0.3, dampingFraction: 0.86))
         commandEchoTask = Task {
-            let duration: Duration
-            if case .notification = incoming {
-                duration = .seconds(4.5)
-            } else if case .timerFinished = incoming {
-                duration = .seconds(5)
-            } else if case .upcomingEvent = incoming {
-                duration = .seconds(10)
-            } else if case .headphones = incoming {
-                duration = .seconds(4.5)
-            } else if case .power = incoming {
-                duration = .seconds(3)
-            } else if case .privacy = incoming {
-                duration = .seconds(3.5)
-            } else if case .screenshot = incoming {
-                duration = .seconds(3.2)
-            } else if case .trackChanged = incoming {
-                duration = .seconds(2.2)
-            } else {
-                duration = .seconds(1.45)
-            }
-            try? await Task.sleep(for: duration)
+            try? await Task.sleep(for: .seconds(delay))
             guard !Task.isCancelled else { return }
             await MainActor.run {
+                guard !isEchoHovered else { return }
                 withAnimation(echoAnimation) {
                     isCommandEchoVisible = false
                 }
                 resizeSurface(to: preferredSize, animation: echoAnimation)
             }
+        }
+    }
+
+    private func echoHoverChanged(_ hovering: Bool) {
+        isEchoHovered = hovering
+        if hovering {
+            commandEchoTask?.cancel()
+        } else if isCommandEchoVisible {
+            scheduleEchoHide(after: 1.6)
+        }
+    }
+
+    private func dismissEcho() {
+        isEchoHovered = false
+        scheduleEchoHide(after: 0)
+    }
+
+    /// HUDs with buttons; hovering them must not open the dashboard.
+    private var isInteractiveEchoVisible: Bool {
+        guard isCommandEchoVisible else { return false }
+        switch displayedEcho {
+        case .screenshotPreview, .downloadFinished, .upcomingEvent: return true
+        default: return false
         }
     }
 
@@ -2959,6 +3382,7 @@ struct DynamicNotchView: View {
         case .shelf: localized("Dosya Rafı", "File Shelf")
         case .clipboard: localized("Pano", "Clipboard")
         case .notifications: localized("Bildirimler", "Notifications")
+        case .shortcuts: localized("Kısayollar", "Shortcuts")
         }
     }
 
@@ -3301,7 +3725,8 @@ struct DynamicNotchView: View {
 
             guard presentation == .idle,
                   !isPinned,
-                  !isInteracting else {
+                  !isInteracting,
+                  !isInteractiveEchoVisible else {
                 return
             }
 
@@ -3575,7 +4000,7 @@ struct DynamicNotchView: View {
     private var effectiveIdleMode: NotchIdleMode {
         switch idleActivity {
         case .none: .hiddenMini
-        case .timer, .privacy: .visibleIsland
+        case .timer, .download, .privacy: .visibleIsland
         case .music: settings.notchIdleMode == .hiddenMini ? .hiddenMini : .visibleIsland
         }
     }
@@ -3591,6 +4016,13 @@ struct DynamicNotchView: View {
             let height = layout.hasCameraHousing ? layout.notchBandHeight + 46 : 76
             return CGSize(width: width, height: height)
         }
+        if case .screenshotPreview = displayedEcho {
+            let width = layout.hasCameraHousing
+                ? min(max(layout.cameraHousingWidth + 350, 530), layout.screenWidth - 24)
+                : min(460, layout.screenWidth - 24)
+            let height = layout.hasCameraHousing ? layout.notchBandHeight + 104 : 132
+            return CGSize(width: width, height: height)
+        }
         let extensionWidth: CGFloat
         switch displayedEcho {
         case .trackChanged: extensionWidth = 380
@@ -3599,6 +4031,7 @@ struct DynamicNotchView: View {
         case .headphones: extensionWidth = 430
         case .power: extensionWidth = 330
         case .privacy: extensionWidth = 360
+        case .downloadFinished: extensionWidth = 420
         case .mediaSkip: extensionWidth = 260
         default: extensionWidth = 300
         }
@@ -3743,6 +4176,10 @@ struct DynamicNotchView: View {
     private var compactAccessibilityText: String {
         if idleActivity == .timer {
             return localized("Zamanlayıcı, kalan \(focusTimerManager.formattedTime)", "Timer, \(focusTimerManager.formattedTime) left")
+        }
+        if idleActivity == .download {
+            let percent = Int((downloadMonitor.overallFraction * 100).rounded())
+            return localized("İndiriliyor, yüzde \(percent)", "Downloading, \(percent) percent")
         }
         if idleActivity == .privacy {
             let usage = privacyMonitor.usage

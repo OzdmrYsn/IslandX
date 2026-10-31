@@ -27,6 +27,8 @@ enum CommandEchoKind: Equatable {
     case power(PowerEvent)
     case headphones(HeadphoneBattery)
     case privacy(PrivacyUsage)
+    case screenshotPreview(ScreenshotCapture)
+    case downloadFinished(FinishedDownload)
     case volume(Double)
     case brightness(Double)
     case copied
@@ -58,6 +60,8 @@ enum CommandEchoKind: Equatable {
             }
         case .headphones(let battery): battery.symbolName
         case .privacy(let usage): usage.camera ? "video.fill" : "mic.fill"
+        case .screenshotPreview: "camera.viewfinder"
+        case .downloadFinished(let download): download.isAirDrop ? "dot.radiowaves.left.and.right" : "arrow.down.circle.fill"
         case .timerFinished(let finish):
             switch finish {
             case .timer: "bell.fill"
@@ -71,7 +75,8 @@ enum CommandEchoKind: Equatable {
     /// must not replace while they're on screen.
     var isImportant: Bool {
         switch self {
-        case .notification, .upcomingEvent, .timerFinished, .headphones, .privacy, .power: true
+        case .notification, .upcomingEvent, .timerFinished, .headphones, .privacy, .power,
+             .screenshotPreview, .downloadFinished: true
         case .volume, .brightness, .copied, .pasted, .screenshot, .capsLock, .mediaSkip, .trackChanged: false
         }
     }
@@ -151,6 +156,14 @@ final class CommandEchoManager: ObservableObject {
 
     func showPrivacy(_ usage: PrivacyUsage) {
         publish(.privacy(usage))
+    }
+
+    func showScreenshot(_ capture: ScreenshotCapture) {
+        publish(.screenshotPreview(capture))
+    }
+
+    func showDownloadFinished(_ download: FinishedDownload) {
+        publish(.downloadFinished(download))
     }
 
     /// For key presses islo. handled itself. Also primes the volume poller so
@@ -987,6 +1000,12 @@ final class FocusTimerManager: ObservableObject {
         }
     }
 
+    /// Run when a Pomodoro focus phase starts and when it ends (finished,
+    /// skipped, reset or switched away), e.g. to turn Do Not Disturb on/off.
+    var onFocusStart: (() -> Void)?
+    var onFocusEnd: (() -> Void)?
+    private var isFocusActive = false
+
     /// Bumped each time a countdown runs out; `lastFinish` says which.
     @Published private(set) var finishRevision = 0
     private(set) var lastFinish: TimerFinish = .timer
@@ -1076,6 +1095,7 @@ final class FocusTimerManager: ObservableObject {
     }
 
     func reset() {
+        endFocusIfActive()
         stopTimer()
         isRunning = false
         isBreak = false
@@ -1084,10 +1104,17 @@ final class FocusTimerManager: ObservableObject {
 
     func skipPhase() {
         guard mode == .pomodoro else { return }
+        endFocusIfActive()
         stopTimer()
         isRunning = false
         isBreak.toggle()
         remainingSeconds = totalSeconds
+    }
+
+    private func endFocusIfActive() {
+        guard isFocusActive else { return }
+        isFocusActive = false
+        onFocusEnd?()
     }
 
     private func durationChanged(
@@ -1112,6 +1139,10 @@ final class FocusTimerManager: ObservableObject {
 
     private func start() {
         if remainingSeconds <= 0 { reset() }
+        if mode == .pomodoro, !isBreak, !isFocusActive {
+            isFocusActive = true
+            onFocusStart?()
+        }
         isRunning = true
         targetDate = Date().addingTimeInterval(TimeInterval(remainingSeconds))
         timer?.invalidate()
@@ -1138,6 +1169,7 @@ final class FocusTimerManager: ObservableObject {
             recordFinishedFocus(seconds: totalSeconds, countsAsSession: mode == .pomodoro)
         }
         lastFinish = mode == .timer ? .timer : (isBreak ? .breakDone : .focusDone)
+        if lastFinish == .focusDone { endFocusIfActive() }
         if mode == .pomodoro {
             isBreak.toggle()
             remainingSeconds = totalSeconds

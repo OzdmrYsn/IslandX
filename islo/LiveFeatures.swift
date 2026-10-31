@@ -6,6 +6,7 @@ import CoreMediaIO
 import Darwin
 import EventKit
 import IOKit.ps
+import QuickLookThumbnailing
 
 // MARK: - Calendar
 
@@ -1283,5 +1284,285 @@ final class HotKeyManager {
             Task { @MainActor in HotKeyManager.shared.onPress?() }
             return noErr
         }, 1, &spec, nil, &handlerRef)
+    }
+}
+
+// MARK: - Screenshots
+
+/// A screenshot (or screen recording) that was just saved.
+struct ScreenshotCapture: Equatable {
+    let url: URL
+    let thumbnail: NSImage?
+
+    var name: String { url.lastPathComponent }
+}
+
+/// Finds new screenshots through Spotlight's "is screen capture" flag, so
+/// any save location works. macOS writes the file once its floating
+/// thumbnail goes away.
+@MainActor
+final class ScreenshotMonitor: NSObject, ObservableObject {
+    static let shared = ScreenshotMonitor()
+
+    @Published private(set) var revision = 0
+    private(set) var latest: ScreenshotCapture?
+
+    private var query: NSMetadataQuery?
+    private var startedAt = Date()
+    private var seen: Set<String> = []
+
+    func setEnabled(_ enabled: Bool) {
+        if enabled {
+            guard query == nil else { return }
+            let query = NSMetadataQuery()
+            query.predicate = NSPredicate(format: "kMDItemIsScreenCapture == 1")
+            query.searchScopes = [NSMetadataQueryUserHomeScope]
+            NotificationCenter.default.addObserver(
+                self, selector: #selector(queryUpdated(_:)),
+                name: .NSMetadataQueryDidUpdate, object: query
+            )
+            startedAt = Date()
+            query.start()
+            self.query = query
+        } else {
+            query?.stop()
+            if let query { NotificationCenter.default.removeObserver(self, name: .NSMetadataQueryDidUpdate, object: query) }
+            query = nil
+        }
+    }
+
+    @objc private func queryUpdated(_ notification: Notification) {
+        let added = notification.userInfo?[NSMetadataQueryUpdateAddedItemsKey] as? [NSMetadataItem] ?? []
+        for item in added {
+            guard let path = item.value(forAttribute: NSMetadataItemPathKey) as? String,
+                  !seen.contains(path) else { continue }
+            let created = item.value(forAttribute: NSMetadataItemFSCreationDateKey) as? Date ?? Date()
+            // Only captures made while islo. runs, and only recent ones
+            // (Spotlight also reports files copied or restored later).
+            guard created >= startedAt.addingTimeInterval(-2),
+                  Date().timeIntervalSince(created) < 60 else { continue }
+            seen.insert(path)
+            announce(URL(fileURLWithPath: path))
+        }
+    }
+
+    private func announce(_ url: URL) {
+        let request = QLThumbnailGenerator.Request(
+            fileAt: url, size: CGSize(width: 320, height: 200), scale: 2, representationTypes: .thumbnail
+        )
+        QLThumbnailGenerator.shared.generateBestRepresentation(for: request) { representation, _ in
+            let image = representation?.nsImage
+            Task { @MainActor in
+                let monitor = ScreenshotMonitor.shared
+                monitor.latest = ScreenshotCapture(url: url, thumbnail: image)
+                monitor.revision &+= 1
+            }
+        }
+    }
+}
+
+// MARK: - Downloads
+
+struct DownloadItem: Identifiable, Equatable {
+    let id: String
+    var name: String
+    var fraction: Double
+    var isAirDrop: Bool
+}
+
+struct FinishedDownload: Equatable {
+    let url: URL
+    let isAirDrop: Bool
+
+    var name: String { url.lastPathComponent }
+}
+
+/// Follows downloads into ~/Downloads (Safari, Chrome, AirDrop…) through
+/// the file progress they publish for Finder; no permission is needed.
+@MainActor
+final class DownloadMonitor: ObservableObject {
+    static let shared = DownloadMonitor()
+
+    @Published private(set) var active: [DownloadItem] = []
+    @Published private(set) var finishRevision = 0
+    private(set) var lastFinished: FinishedDownload?
+
+    private var subscriber: Any?
+    private var observations: [String: NSKeyValueObservation] = [:]
+
+    private init() {}
+
+    /// The share of all running downloads that's done.
+    var overallFraction: Double {
+        guard !active.isEmpty else { return 0 }
+        return active.map(\.fraction).reduce(0, +) / Double(active.count)
+    }
+
+    func setEnabled(_ enabled: Bool) {
+        if enabled {
+            guard subscriber == nil else { return }
+            let downloads = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Downloads")
+            subscriber = Progress.addSubscriber(forFileURL: downloads) { progress in
+                let kind = progress.userInfo[.fileOperationKindKey] as? Progress.FileOperationKind
+                guard kind == .downloading || kind == .receiving,
+                      let url = progress.userInfo[.fileURLKey] as? URL else { return nil }
+                let id = url.path
+                let isAirDrop = kind == .receiving
+                let observation = progress.observe(\.fractionCompleted) { progress, _ in
+                    let fraction = progress.fractionCompleted
+                    Task { @MainActor in DownloadMonitor.shared.update(id, fraction: fraction) }
+                }
+                Task { @MainActor in
+                    DownloadMonitor.shared.began(id, url: url, isAirDrop: isAirDrop, fraction: progress.fractionCompleted, observation: observation)
+                }
+                return {
+                    let completed = !progress.isCancelled && (progress.isFinished || progress.fractionCompleted > 0.98)
+                    Task { @MainActor in DownloadMonitor.shared.ended(id, url: url, isAirDrop: isAirDrop, completed: completed) }
+                }
+            }
+        } else {
+            if let subscriber { Progress.removeSubscriber(subscriber) }
+            subscriber = nil
+            observations.removeAll()
+            active.removeAll()
+        }
+    }
+
+    private func began(_ id: String, url: URL, isAirDrop: Bool, fraction: Double, observation: NSKeyValueObservation) {
+        observations[id] = observation
+        guard !active.contains(where: { $0.id == id }) else { return }
+        active.append(DownloadItem(id: id, name: Self.finalName(for: url), fraction: max(0, fraction), isAirDrop: isAirDrop))
+    }
+
+    private func update(_ id: String, fraction: Double) {
+        guard let index = active.firstIndex(where: { $0.id == id }) else { return }
+        // Whole percents are enough and keep redraws down.
+        let rounded = (fraction * 100).rounded() / 100
+        guard rounded != active[index].fraction else { return }
+        active[index].fraction = rounded
+    }
+
+    private func ended(_ id: String, url: URL, isAirDrop: Bool, completed: Bool) {
+        observations[id] = nil
+        active.removeAll { $0.id == id }
+        guard completed else { return }
+        // The browser renames the file (drops .download/.crdownload) just
+        // after it stops publishing.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            let final = Self.finalURL(for: url)
+            DownloadMonitor.shared.lastFinished = FinishedDownload(url: final, isAirDrop: isAirDrop)
+            DownloadMonitor.shared.finishRevision &+= 1
+        }
+    }
+
+    private static let partialExtensions = ["download", "crdownload", "part", "partial"]
+
+    nonisolated static func finalName(for url: URL) -> String {
+        finalURL(for: url, checkingDisk: false).lastPathComponent
+    }
+
+    nonisolated static func finalURL(for url: URL, checkingDisk: Bool = true) -> URL {
+        var candidate = url
+        while partialExtensions.contains(candidate.pathExtension.lowercased()) {
+            candidate = candidate.deletingPathExtension()
+        }
+        if checkingDisk, candidate != url,
+           !FileManager.default.fileExists(atPath: candidate.path),
+           FileManager.default.fileExists(atPath: url.path) {
+            return url
+        }
+        return candidate
+    }
+
+    func open(_ download: FinishedDownload) {
+        NSWorkspace.shared.open(download.url)
+    }
+
+    func reveal(_ download: FinishedDownload) {
+        NSWorkspace.shared.activateFileViewerSelecting([download.url])
+    }
+
+    #if DEBUG
+    /// Debug builds: fake a download for checking the wings and the HUD.
+    func debugSimulate(name: String) {
+        let id = "debug-\(name)"
+        active.append(DownloadItem(id: id, name: name, fraction: 0.42, isAirDrop: false))
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            self.active.removeAll { $0.id == id }
+            self.lastFinished = FinishedDownload(
+                url: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Downloads/\(name)"),
+                isAirDrop: false
+            )
+            self.finishRevision &+= 1
+        }
+    }
+    #endif
+}
+
+// MARK: - Shortcuts
+
+/// The user's Shortcuts, listed and run through the `shortcuts` tool.
+@MainActor
+final class ShortcutsManager: ObservableObject {
+    static let shared = ShortcutsManager()
+
+    enum RunState: Equatable { case running, succeeded, failed }
+
+    @Published private(set) var available: [String] = []
+    @Published private(set) var states: [String: RunState] = [:]
+    @Published private(set) var isLoading = false
+
+    private init() {}
+
+    func reload() {
+        guard !isLoading else { return }
+        isLoading = true
+        DispatchQueue.global(qos: .utility).async {
+            let output = Self.runTool(["list"]).output
+            let names = output
+                .split(whereSeparator: \.isNewline)
+                .map { String($0).trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+            DispatchQueue.main.async {
+                let manager = ShortcutsManager.shared
+                manager.isLoading = false
+                let sorted = names.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+                if sorted != manager.available { manager.available = sorted }
+            }
+        }
+    }
+
+    func run(_ name: String) {
+        guard states[name] != .running else { return }
+        states[name] = .running
+        DispatchQueue.global(qos: .userInitiated).async {
+            let succeeded = Self.runTool(["run", name]).status == 0
+            DispatchQueue.main.async {
+                let manager = ShortcutsManager.shared
+                manager.states[name] = succeeded ? .succeeded : .failed
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                    if manager.states[name] != .running { manager.states[name] = nil }
+                }
+            }
+        }
+    }
+
+    func openShortcutsApp() {
+        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.shortcuts") {
+            NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+        }
+    }
+
+    nonisolated private static func runTool(_ arguments: [String]) -> (status: Int32, output: String) {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/shortcuts")
+        process.arguments = arguments
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        guard (try? process.run()) != nil else { return (-1, "") }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        return (process.terminationStatus, String(decoding: data, as: UTF8.self))
     }
 }

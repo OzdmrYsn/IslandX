@@ -143,7 +143,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func configureNotifications() {
         NotificationCenter.default.addObserver(
             self,
-            selector: #selector(showSettingsFromNotification),
+            selector: #selector(showSettingsFromNotification(_:)),
             name: .isloShowSettings,
             object: nil
         )
@@ -347,6 +347,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             .sink { enabled in PrivacyMonitor.shared.setEnabled(enabled) }
             .store(in: &cancellables)
 
+        settings.$screenshotPreviewEnabled
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { enabled in ScreenshotMonitor.shared.setEnabled(enabled) }
+            .store(in: &cancellables)
+
+        settings.$downloadsEnabled
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { enabled in DownloadMonitor.shared.setEnabled(enabled) }
+            .store(in: &cancellables)
+
+        settings.$shortcutsEnabled
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { enabled in if enabled { ShortcutsManager.shared.reload() } }
+            .store(in: &cancellables)
+
+        // Pomodoro automations (e.g. a Shortcut that turns Do Not Disturb on).
+        focusTimerManager.onFocusStart = { [weak self] in
+            guard let name = self?.settings.focusStartShortcut else { return }
+            ShortcutsManager.shared.run(name)
+        }
+        focusTimerManager.onFocusEnd = { [weak self] in
+            guard let name = self?.settings.focusEndShortcut else { return }
+            ShortcutsManager.shared.run(name)
+        }
+
         HotKeyManager.shared.onPress = {
             NotificationCenter.default.post(name: .isloToggle, object: nil)
         }
@@ -491,8 +519,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc
-    private func showSettingsFromNotification() {
-        showSettings()
+    private func showSettingsFromNotification(_ notification: Notification) {
+        let destination = (notification.userInfo?["destination"] as? String).flatMap(SettingsDestination.init(rawValue:))
+        presentSettings(destination: destination)
     }
 
     @objc
@@ -536,6 +565,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 name: "AirPods Pro", symbolName: "airpodspro",
                 left: 82, right: 78, caseLevel: 45, main: nil
             ))
+        case "download":
+            DownloadMonitor.shared.debugSimulate(name: "islo-2.1.1.dmg")
         case "privacy":
             PrivacyMonitor.shared.debugSimulate(PrivacyUsage(microphone: true, camera: true, appName: "Zoom"))
         case "privacy-off":

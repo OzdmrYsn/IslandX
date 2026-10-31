@@ -41,6 +41,7 @@ struct SettingsView: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject private var updateManager = UpdateManager.shared
     @ObservedObject private var calendarManager = CalendarManager.shared
+    @ObservedObject private var shortcutsManager = ShortcutsManager.shared
     var router: SettingsRouter?
     var onShowOnboarding: () -> Void = {}
     @State private var selection: SettingsDestination = .general
@@ -288,6 +289,30 @@ struct SettingsView: View {
                 rowDivider
                 toggleRow(symbol: "tray.full.fill", title: text("Dosya Rafı + AirDrop", "File Shelf + AirDrop"), subtitle: text("Dosyaları çentiğe bırakın, taşıyın veya AirDrop ile gönderin.", "Drop files on the notch, move them, or send them with AirDrop."), isOn: $settings.dashboardFileShelfEnabled)
             }
+            settingsCard(title: text("Ekran ve indirmeler", "Screen and downloads")) {
+                toggleRow(symbol: "camera.viewfinder", title: text("Ekran görüntüsü önizlemesi", "Screenshot preview"), subtitle: text("Yeni ekran görüntüsü çentiğin altında küçük resmiyle açılır: sürükleyip bırak, kopyala, rafa ekle, göster ya da sil. macOS ilk seferde Masaüstü erişimini sorabilir.", "A new screenshot opens under the notch: drag it anywhere, copy, shelve, reveal or delete it. macOS may ask once for access to your Desktop."), isOn: $settings.screenshotPreviewEnabled)
+                rowDivider
+                toggleRow(symbol: "arrow.down.circle", title: text("İndirme takibi", "Download progress"), subtitle: text("İndirilenler'e gelen dosyaların (Safari, Chrome, AirDrop) ilerlemesi kapalı çentikte görünür; bitince Aç ve Göster düğmeleri çıkar.", "Files coming into Downloads (Safari, Chrome, AirDrop) show their progress in the closed notch, with Open and Show when done."), isOn: $settings.downloadsEnabled)
+            }
+            settingsCard(title: text("Kısayollar", "Shortcuts")) {
+                toggleRow(symbol: "bolt.fill", title: text("Kısayollar sekmesi", "Shortcuts tab"), subtitle: text("Seçtiğin kısayollar çentikte tek tıkla çalışır.", "Run the shortcuts you pick with one click in the notch."), isOn: $settings.shortcutsEnabled)
+                if settings.shortcutsEnabled {
+                    rowDivider
+                    shortcutFavoritesPicker
+                }
+                rowDivider
+                settingsRow(symbol: "play.circle", title: text("Odak başlarken", "When focus starts"), subtitle: text("Pomodoro odağı başladığında çalışır; örneğin Rahatsız Etme'yi açan bir kısayol.", "Runs when a Pomodoro focus starts, e.g. a shortcut that turns on Do Not Disturb.")) {
+                    shortcutPicker($settings.focusStartShortcut)
+                }
+                rowDivider
+                settingsRow(symbol: "stop.circle", title: text("Odak bitince", "When focus ends"), subtitle: text("Odak bittiğinde, atlandığında ya da sıfırlandığında çalışır.", "Runs when focus finishes, is skipped or is reset.")) {
+                    shortcutPicker($settings.focusEndShortcut)
+                }
+                Text(text("İpucu: Kısayollar uygulamasında \"Odak Modunu Ayarla\" eylemiyle Rahatsız Etme'yi açıp kapatan iki kısayol oluşturabilirsin.", "Tip: in the Shortcuts app, the \"Set Focus\" action can turn Do Not Disturb on and off in two shortcuts."))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .padding(.leading, 48).padding(.top, 2)
+            }
+            .onAppear { if shortcutsManager.available.isEmpty { shortcutsManager.reload() } }
             settingsCard(title: text("Müzik", "Music")) {
                 toggleRow(symbol: "quote.bubble.fill", title: text("Şarkı sözleri", "Lyrics"), subtitle: text("Şarkı kartındaki söz düğmesiyle sözler satır satır akar. Sözler ücretsiz LRCLIB'den gelir; bunun için şarkının adı ve sanatçısı oraya gönderilir.", "The lyrics button in the song card shows synced lyrics line by line. They come from the free LRCLIB service, which receives the song's title and artist."), isOn: $settings.lyricsEnabled)
             }
@@ -613,6 +638,65 @@ struct SettingsView: View {
             Spacer()
             if let buttonTitle { Button(buttonTitle, action: action) }
         }.padding(14).background(cardBackground)
+    }
+
+    /// Up to seven shortcuts for the notch's Shortcuts tab, in the order
+    /// they were picked.
+    private var shortcutFavoritesPicker: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(text("Sekmede görünecekler (en çok 7)", "Shown in the tab (up to 7)"))
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+                if shortcutsManager.isLoading { ProgressView().controlSize(.small) }
+                Button(text("Yenile", "Refresh"), action: shortcutsManager.reload)
+                Button(text("Kısayollar'ı aç", "Open Shortcuts"), action: shortcutsManager.openShortcutsApp)
+            }
+            if shortcutsManager.available.isEmpty, !shortcutsManager.isLoading {
+                Text(text("Hiç kısayol bulunamadı.", "No shortcuts found."))
+                    .font(.caption).foregroundStyle(.secondary)
+            } else {
+                ScrollView {
+                    LazyVGrid(columns: [GridItem(.flexible(), alignment: .leading), GridItem(.flexible(), alignment: .leading)], alignment: .leading, spacing: 6) {
+                        ForEach(shortcutsManager.available, id: \.self) { name in
+                            let isOn = settings.shortcutFavorites.contains(name)
+                            Toggle(name, isOn: Binding(
+                                get: { isOn },
+                                set: { on in
+                                    if on {
+                                        if !settings.shortcutFavorites.contains(name) { settings.shortcutFavorites.append(name) }
+                                    } else {
+                                        settings.shortcutFavorites.removeAll { $0 == name }
+                                    }
+                                }
+                            ))
+                            .toggleStyle(.checkbox)
+                            .lineLimit(1)
+                            .disabled(!isOn && settings.shortcutFavorites.count >= 7)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+                .frame(maxHeight: 150)
+            }
+        }
+        .padding(.leading, 48)
+        .padding(.vertical, 8)
+    }
+
+    private func shortcutPicker(_ selection: Binding<String?>) -> some View {
+        Picker("", selection: Binding(
+            get: { selection.wrappedValue ?? "" },
+            set: { selection.wrappedValue = $0.isEmpty ? nil : $0 }
+        )) {
+            Text(text("Yok", "None")).tag("")
+            if let current = selection.wrappedValue, !shortcutsManager.available.contains(current) {
+                Text(current).tag(current)
+            }
+            ForEach(shortcutsManager.available, id: \.self) { Text($0).tag($0) }
+        }
+        .labelsHidden()
+        .frame(width: 210)
     }
 
     private var weatherLocationText: String {

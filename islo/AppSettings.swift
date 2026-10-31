@@ -346,6 +346,12 @@ final class AppSettings: ObservableObject {
         static let lyricsEnabled = "dashboard.lyrics.enabled"
         static let weatherEnabled = "dashboard.weather.enabled"
         static let hotKeyEnabled = "interaction.hotKey.enabled"
+        static let screenshotPreviewEnabled = "dashboard.screenshots.enabled"
+        static let downloadsEnabled = "dashboard.downloads.enabled"
+        static let shortcutsEnabled = "dashboard.shortcuts.enabled"
+        static let shortcutFavorites = "dashboard.shortcuts.favorites"
+        static let focusStartShortcut = "focus.startShortcut"
+        static let focusEndShortcut = "focus.endShortcut"
         static let toggleHotKey = "interaction.hotKey"
         static let weatherLocation = "dashboard.weather.location"
         static let dashboardKeepAwakeEnabled = "dashboard.keepAwake.enabled"
@@ -437,6 +443,35 @@ final class AppSettings: ObservableObject {
     /// Charger plugged in or out, low battery, and headphone batteries.
     @Published var devicesHUDEnabled: Bool {
         didSet { defaults.set(devicesHUDEnabled, forKey: Key.devicesHUDEnabled) }
+    }
+
+    /// A preview of each new screenshot under the notch.
+    @Published var screenshotPreviewEnabled: Bool {
+        didSet { defaults.set(screenshotPreviewEnabled, forKey: Key.screenshotPreviewEnabled) }
+    }
+
+    /// Download progress in the closed notch and a "Downloaded" HUD.
+    @Published var downloadsEnabled: Bool {
+        didSet { defaults.set(downloadsEnabled, forKey: Key.downloadsEnabled) }
+    }
+
+    /// The Shortcuts tab.
+    @Published var shortcutsEnabled: Bool {
+        didSet { defaults.set(shortcutsEnabled, forKey: Key.shortcutsEnabled) }
+    }
+
+    /// Shortcuts pinned to the tab, in order.
+    @Published var shortcutFavorites: [String] {
+        didSet { defaults.set(shortcutFavorites, forKey: Key.shortcutFavorites) }
+    }
+
+    /// Shortcuts run when a Pomodoro focus phase starts / ends.
+    @Published var focusStartShortcut: String? {
+        didSet { defaults.set(focusStartShortcut, forKey: Key.focusStartShortcut) }
+    }
+
+    @Published var focusEndShortcut: String? {
+        didSet { defaults.set(focusEndShortcut, forKey: Key.focusEndShortcut) }
     }
 
     /// A system-wide shortcut that opens and closes the notch.
@@ -602,6 +637,12 @@ final class AppSettings: ObservableObject {
         lyricsEnabled = Self.bool(forKey: Key.lyricsEnabled, defaults: defaults, fallback: true)
         weatherEnabled = Self.bool(forKey: Key.weatherEnabled, defaults: defaults, fallback: true)
         hotKeyEnabled = Self.bool(forKey: Key.hotKeyEnabled, defaults: defaults, fallback: true)
+        screenshotPreviewEnabled = Self.bool(forKey: Key.screenshotPreviewEnabled, defaults: defaults, fallback: true)
+        downloadsEnabled = Self.bool(forKey: Key.downloadsEnabled, defaults: defaults, fallback: true)
+        shortcutsEnabled = Self.bool(forKey: Key.shortcutsEnabled, defaults: defaults, fallback: true)
+        shortcutFavorites = defaults.stringArray(forKey: Key.shortcutFavorites) ?? []
+        focusStartShortcut = defaults.string(forKey: Key.focusStartShortcut)
+        focusEndShortcut = defaults.string(forKey: Key.focusEndShortcut)
         toggleHotKey = defaults.data(forKey: Key.toggleHotKey)
             .flatMap { try? JSONDecoder().decode(HotKey.self, from: $0) } ?? .defaultToggle
         weatherLocation = defaults.data(forKey: Key.weatherLocation)
@@ -689,6 +730,9 @@ final class AppSettings: ObservableObject {
         privacyIndicatorEnabled = true
         lyricsEnabled = true
         weatherEnabled = true
+        screenshotPreviewEnabled = true
+        downloadsEnabled = true
+        shortcutsEnabled = true
         dashboardKeepAwakeEnabled = true
         dashboardFileShelfEnabled = true
         dashboardNotificationsEnabled = true

@@ -32,6 +32,9 @@ islo., medya kontrollerini ve günlük araçları MacBook'un kamera çentiğiyle
 - Kamera/mikrofon kullanan uygulamayı gösteren gizlilik noktası
 - Ana sayfada hava durumu (Open-Meteo, konum izni gerekmez)
 - Çentiği açıp kapatan, ayarlanabilir kısayol (varsayılan ⌥Space)
+- Ekran görüntüsü önizlemesi: sürükle-bırak, kopyala, rafa ekle, göster, sil
+- Kapalı çentikte indirme ilerlemesi (Safari, Chrome, AirDrop) ve Aç/Göster
+- Kısayollar sekmesi ve Pomodoro odak başlangıç/bitiş otomasyonları
 - Eksik izinleri gösteren ve tek tıkla onaran İzinler sayfası
 - Dock simgesi olmadan menü çubuğunda çalışma
 - Tüm Spaces ve tam ekran uygulamalarla çalışma
@@ -77,6 +80,9 @@ islo. is a SwiftUI + AppKit app that blends media controls and everyday utilitie
 - A privacy dot naming the app that uses the camera or microphone
 - Weather on Home (Open-Meteo, no location permission)
 - A customizable shortcut to open and close the notch (⌥Space by default)
+- Screenshot preview: drag and drop, copy, add to the shelf, reveal, delete
+- Download progress in the closed notch (Safari, Chrome, AirDrop) with Open/Show
+- A Shortcuts tab and Pomodoro focus start/end automations
 - A Permissions page that shows missing permissions and repairs them in one click
 - Menu-bar operation without a Dock icon
 - Works across Spaces and over full-screen apps
