@@ -739,6 +739,100 @@ extension ClipboardEntry {
 
 private let notificationLog = Logger(subsystem: "com.ozdmrysn.islo", category: "notifications")
 
+/// Keeps macOS's own banners off screen while the notch shows them.
+/// Notification Center draws banners in one window; moving that window
+/// past the right edge of the screens hides them without dismissing
+/// anything, so each notification still times out into Notification
+/// Center. macOS puts the window back itself when Notification Center is
+/// opened. Everything except the two settings runs on the scan queue.
+final class SystemBannerHider {
+    /// An alert still up after this long is waiting for an answer
+    /// (Calendar's, for example), so it comes back on screen.
+    static let waitingAfter: TimeInterval = 10
+
+    private let lock = NSLock()
+    private var allowed = false
+    private var offscreen: CGFloat = 40_000
+
+    var isAllowed: Bool {
+        get { locked { allowed } }
+        set { locked { allowed = newValue } }
+    }
+
+    var offscreenX: CGFloat {
+        get { locked { offscreen } }
+        set { locked { offscreen = newValue } }
+    }
+
+    private func locked<T>(_ body: () -> T) -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        return body()
+    }
+
+    private var firstSeen: [String: Date] = [:]
+    private var moved: (window: AXUIElement, original: CGPoint)?
+
+    func update(window: AXUIElement, keys: [String], isCenterOpen: Bool) {
+        guard !isCenterOpen else {
+            // macOS has moved the window back to show its panel.
+            firstSeen.removeAll()
+            moved = nil
+            return
+        }
+        let now = Date()
+        firstSeen = firstSeen.filter { keys.contains($0.key) }
+        let arrived = keys.filter { firstSeen[$0] == nil }
+        for key in arrived { firstSeen[key] = now }
+
+        let isWaiting = firstSeen.values.contains { now.timeIntervalSince($0) > Self.waitingAfter }
+        // Banners islo. couldn't read stay visible, as do alerts that wait
+        // for an answer.
+        if keys.isEmpty || isWaiting {
+            restore()
+        } else if isAllowed {
+            hide(window)
+        } else if !arrived.isEmpty {
+            // The notch can't show this one (it's open or hidden), so let
+            // macOS show it.
+            restore()
+        }
+    }
+
+    func windowsClosed() {
+        firstSeen.removeAll()
+        moved = nil
+    }
+
+    func restore() {
+        guard let moved else { return }
+        self.moved = nil
+        Self.setPosition(moved.original, of: moved.window)
+    }
+
+    private func hide(_ window: AXUIElement) {
+        guard let position = Self.position(of: window) else { return }
+        let target = offscreenX
+        guard position.x < target - 1 else { return }
+        moved = (window, position)
+        Self.setPosition(CGPoint(x: target, y: position.y), of: window)
+    }
+
+    private static func position(of window: AXUIElement) -> CGPoint? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &value) == .success,
+              let value, CFGetTypeID(value) == AXValueGetTypeID() else { return nil }
+        var point = CGPoint.zero
+        return AXValueGetValue(value as! AXValue, .cgPoint, &point) ? point : nil
+    }
+
+    private static func setPosition(_ point: CGPoint, of window: AXUIElement) {
+        var point = point
+        guard let value = AXValueCreate(.cgPoint, &point) else { return }
+        AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, value)
+    }
+}
+
 /// A notification macOS showed as a banner, read through Accessibility.
 struct CapturedNotification: Identifiable, Equatable {
     let id: String
@@ -775,9 +869,20 @@ final class NotificationMonitor: ObservableObject {
     private let scanQueue = DispatchQueue(label: "islo.notifications", qos: .utility)
     private var timer: Timer?
     private var isScanning = false
+    private var needsRescan = false
     private var hasBaseline = false
     private var seenIdentifiers: [String] = []
     private var loggedUnreadable: Set<String> = []
+
+    /// Tells islo. the moment Notification Center puts a banner up, so the
+    /// notch can take over before macOS's banner is really seen.
+    private var observer: AXObserver?
+    private var observedProcess: pid_t = 0
+    private let hider = SystemBannerHider()
+    private var hidesSystemBanners = false
+    private var isNotchReady = true
+    private var isNotchVisible = true
+    private var wasHiding = false
 
     func setEnabled(_ enabled: Bool) {
         guard enabled != (timer != nil) else { return }
@@ -790,7 +895,40 @@ final class NotificationMonitor: ObservableObject {
         } else {
             timer?.invalidate()
             timer = nil
+            removeObserver()
         }
+        updateHiding()
+    }
+
+    /// Whether macOS's banner should give way to the notch's own.
+    func setHidesSystemBanners(_ hides: Bool) {
+        hidesSystemBanners = hides
+        updateHiding()
+    }
+
+    /// The notch is closed and can show a notification as it arrives.
+    func setNotchReady(_ ready: Bool) {
+        isNotchReady = ready
+        updateHiding()
+    }
+
+    /// The notch is on screen (it hides over full-screen apps).
+    func setNotchVisible(_ visible: Bool) {
+        isNotchVisible = visible
+        updateHiding()
+    }
+
+    private func updateHiding() {
+        let isOn = hidesSystemBanners && timer != nil
+        hider.offscreenX = (NSScreen.screens.map(\.frame.maxX).max() ?? 4_000) + 8_000
+        hider.isAllowed = isOn && isNotchReady && isNotchVisible
+        if wasHiding, !isOn {
+            // Put back anything still hidden; on quit too, so nothing is
+            // left off screen.
+            let hider = hider
+            scanQueue.sync { hider.restore() }
+        }
+        wasHiding = isOn
     }
 
     func markAllRead() {
@@ -817,20 +955,60 @@ final class NotificationMonitor: ObservableObject {
     }
 
     private func scheduleScan() {
-        guard !isScanning, AXIsProcessTrusted(),
+        guard timer != nil else { return }
+        guard !isScanning else {
+            needsRescan = true
+            return
+        }
+        guard AXIsProcessTrusted(),
               let center = NSRunningApplication.runningApplications(
                 withBundleIdentifier: "com.apple.notificationcenterui"
               ).first else { return }
-        isScanning = true
         let pid = center.processIdentifier
+        if pid != observedProcess { installObserver(processIdentifier: pid) }
+        isScanning = true
+        let hider = hider
         // Accessibility calls are cross-process; keep them off the main thread.
         scanQueue.async { [weak self] in
-            let scan = Self.readBanners(processIdentifier: pid)
+            let scan = Self.readBanners(processIdentifier: pid, hider: hider)
             Task { @MainActor in
-                self?.isScanning = false
-                self?.ingest(scan)
+                guard let self else { return }
+                self.isScanning = false
+                self.ingest(scan)
+                if self.needsRescan {
+                    self.needsRescan = false
+                    self.scheduleScan()
+                }
             }
         }
+    }
+
+    private func installObserver(processIdentifier pid: pid_t) {
+        removeObserver()
+        observedProcess = pid
+        let callback: AXObserverCallback = { _, _, _, refcon in
+            guard let refcon else { return }
+            let monitor = Unmanaged<NotificationMonitor>.fromOpaque(refcon).takeUnretainedValue()
+            Task { @MainActor in monitor.scheduleScan() }
+        }
+        var created: AXObserver?
+        guard AXObserverCreate(pid, callback, &created) == .success, let created else { return }
+        let application = AXUIElementCreateApplication(pid)
+        // The monitor lives as long as the app.
+        let refcon = Unmanaged.passUnretained(self).toOpaque()
+        for name in [kAXWindowCreatedNotification, kAXCreatedNotification, kAXLayoutChangedNotification] {
+            AXObserverAddNotification(created, application, name as CFString, refcon)
+        }
+        CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(created), .commonModes)
+        observer = created
+    }
+
+    private func removeObserver() {
+        if let observer {
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .commonModes)
+        }
+        observer = nil
+        observedProcess = 0
     }
 
     private func ingest(_ scan: BannerScan) {
@@ -902,14 +1080,26 @@ final class NotificationMonitor: ObservableObject {
         var unreadable: [String] = []
     }
 
-    nonisolated private static func readBanners(processIdentifier: pid_t) -> BannerScan {
+    nonisolated private static func readBanners(processIdentifier: pid_t, hider: SystemBannerHider) -> BannerScan {
         let application = AXUIElementCreateApplication(processIdentifier)
         AXUIElementSetMessagingTimeout(application, 0.25)
         var scan = BannerScan()
+        var sawWindow = false
         for window in children(of: application)
         where string(window, kAXSubroleAttribute) == "AXSystemDialog" {
-            collectBanners(in: window, depth: 0, into: &scan)
+            sawWindow = true
+            var windowScan = BannerScan()
+            collectBanners(in: window, depth: 0, into: &windowScan)
+            hider.update(
+                window: window,
+                keys: windowScan.banners.map(\.key),
+                isCenterOpen: windowScan.isCenterOpen
+            )
+            scan.banners += windowScan.banners
+            scan.unreadable += windowScan.unreadable
+            scan.isCenterOpen = scan.isCenterOpen || windowScan.isCenterOpen
         }
+        if !sawWindow { hider.windowsClosed() }
         return scan
     }
 

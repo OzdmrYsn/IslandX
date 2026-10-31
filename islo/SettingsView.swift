@@ -727,6 +727,10 @@ struct SettingsView: View {
         switch feature {
         case .notifications:
             section(text("Seçenekler", "Options")) {
+                row(symbol: "rectangle.on.rectangle.slash", colors: Tint.red, title: text("macOS'un bildirimini gizle", "Hide macOS's banner"), subtitle: text("Bildirim yalnızca çentikte görünür; köşedeki baloncuk gizlenir ama bildirim Bildirim Merkezi'nde kalır. Yanıt bekleyen uyarılar (ör. Takvim) birkaç saniye sonra yine görünür.", "The notification shows only in the notch; the corner banner is hidden but stays in Notification Center. Alerts that wait for an answer (e.g. Calendar) still appear after a few seconds.")) {
+                    switchControl($settings.hideSystemNotificationBanners)
+                }
+                divider
                 stackedRow(symbol: "text.bubble.fill", colors: Tint.red, title: text("Önizleme", "Preview"), subtitle: text("Çentik genişlediğinde bildirimin içeriği mi, yalnızca yeni bildirim geldiği mi görünsün?", "When the notch widens, show the notification's content or only that one arrived?")) {
                     ChipPicker(selection: $settings.notificationPreviewStyle, options: NotificationPreviewStyle.allCases.map { ($0, $0.title(language: settings.language)) }, accent: accent, fillsWidth: true)
                 }

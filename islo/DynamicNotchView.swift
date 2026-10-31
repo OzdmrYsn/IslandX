@@ -457,6 +457,10 @@ struct DynamicNotchView: View {
         .onChange(of: dashboardSection) { section in
             if section == .notifications { notificationMonitor.markAllRead() }
         }
+        // macOS's banner only steps aside while the closed notch can show it.
+        .onChange(of: presentation) { state in
+            notificationMonitor.setNotchReady(state == .idle)
+        }
         .onReceive(notificationMonitor.$announcementRevision.dropFirst()) { _ in
             guard settings.dashboardNotificationsEnabled,
                   let latest = notificationMonitor.latest else { return }

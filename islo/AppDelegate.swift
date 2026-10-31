@@ -420,6 +420,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 self?.notificationMonitor.setEnabled(enabled)
             }
             .store(in: &cancellables)
+
+        settings.$hideSystemNotificationBanners
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] hides in
+                self?.notificationMonitor.setHidesSystemBanners(hides)
+            }
+            .store(in: &cancellables)
     }
 
     private func localized(_ turkish: String, _ english: String) -> String {

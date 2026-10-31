@@ -309,6 +309,7 @@ final class AppSettings: ObservableObject {
         static let dashboardKeepAwakeEnabled = "dashboard.keepAwake.enabled"
         static let dashboardFileShelfEnabled = "dashboard.fileShelf.enabled"
         static let dashboardNotificationsEnabled = "dashboard.notifications.enabled"
+        static let hideSystemNotificationBanners = "dashboard.notifications.hideSystemBanners"
         static let notificationPreviewStyle = "dashboard.notifications.preview"
         static let homeWidgetStyle = "dashboard.homeWidgetStyle"
         static let legacySceneStyle = "appearance.notchSceneStyle"
@@ -482,6 +483,12 @@ final class AppSettings: ObservableObject {
         didSet { defaults.set(notificationPreviewStyle.rawValue, forKey: Key.notificationPreviewStyle) }
     }
 
+    /// Keep macOS's own banner off screen while the notch shows the
+    /// notification; it still goes to Notification Center.
+    @Published var hideSystemNotificationBanners: Bool {
+        didSet { defaults.set(hideSystemNotificationBanners, forKey: Key.hideSystemNotificationBanners) }
+    }
+
     @Published var homeWidgetStyle: HomeWidgetStyle {
         didSet { defaults.set(homeWidgetStyle.rawValue, forKey: Key.homeWidgetStyle) }
     }
@@ -612,6 +619,11 @@ final class AppSettings: ObservableObject {
         notificationPreviewStyle = NotificationPreviewStyle(
             rawValue: defaults.string(forKey: Key.notificationPreviewStyle) ?? ""
         ) ?? .content
+        hideSystemNotificationBanners = Self.bool(
+            forKey: Key.hideSystemNotificationBanners,
+            defaults: defaults,
+            fallback: true
+        )
         homeWidgetStyle = HomeWidgetStyle(
             rawValue: defaults.string(forKey: Key.homeWidgetStyle) ?? ""
         ) ?? .balanced
@@ -673,6 +685,7 @@ final class AppSettings: ObservableObject {
         dashboardFileShelfEnabled = true
         dashboardNotificationsEnabled = true
         notificationPreviewStyle = .content
+        hideSystemNotificationBanners = true
     }
 
     private static func bool(

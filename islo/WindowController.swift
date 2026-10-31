@@ -275,8 +275,10 @@ final class FloatingNotchWindowController: NSWindowController {
                 object: nil
             )
             window.orderOut(nil)
+            notificationMonitor.setNotchVisible(false)
         } else {
             window.orderFrontRegardless()
+            notificationMonitor.setNotchVisible(true)
         }
     }
 
