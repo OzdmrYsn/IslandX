@@ -497,28 +497,11 @@ struct DynamicNotchView: View {
             setPresentation(.idle)
         }
         .accessibilityElement(children: .contain)
-        .preferredColorScheme(settings.theme.colorScheme)
+        .preferredColorScheme(.dark)
     }
 
     @ViewBuilder
     private var surfaceContextMenu: some View {
-        Menu(localized("Görünüm", "Appearance")) {
-            ForEach(AppTheme.allCases) { theme in
-                Button {
-                    guard theme.isAvailable else { return }
-                    settings.theme = theme
-                } label: {
-                    Label(
-                        theme.title(language: settings.language),
-                        systemImage: settings.theme == theme
-                            ? "checkmark"
-                            : theme.symbolName
-                    )
-                }
-                .disabled(!theme.isAvailable)
-            }
-        }
-
         Menu(localized("Çentik Boşta Görünümü", "Notch Idle Appearance")) {
             ForEach(NotchIdleMode.allCases) { mode in
                 Button {
@@ -4092,30 +4075,8 @@ struct DynamicNotchView: View {
         )
     }
 
-    @ViewBuilder
     private var notchBackground: some View {
-        if settings.theme == .liquidGlass {
-            if #available(macOS 26.0, *) {
-                notchShape
-                    .fill(Color.clear)
-                    .glassEffect(
-                        .regular.interactive(true),
-                        in: notchShape
-                    )
-            } else {
-                notchShape.fill(.ultraThinMaterial)
-            }
-        } else {
-            ZStack {
-                if settings.theme == .system,
-                   !layout.hasCameraHousing,
-                   !reduceTransparency {
-                    notchShape.fill(.ultraThinMaterial)
-                }
-
-                notchShape.fill(panelColor.opacity(panelOpacity))
-            }
-        }
+        notchShape.fill(panelColor.opacity(panelOpacity))
     }
 
     /// The dashboard is always a dark surface, like the notch it grows from.
@@ -4129,7 +4090,7 @@ struct DynamicNotchView: View {
         if reduceTransparency || layout.hasCameraHousing {
             return 1
         }
-        return settings.theme == .system ? 0.88 : 0.96
+        return 0.96
     }
 
     private var presentationAnimation: Animation {

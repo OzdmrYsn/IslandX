@@ -21,7 +21,7 @@ islo., medya kontrollerini ve günlük araçları MacBook'un kamera çentiğiyle
 - Üzerine gelme, tıklama veya çentiğin orta etkin alanıyla seçilebilir açılma davranışı
 - Şarkı değiştiğinde süreli gösterim ve tam ekran uygulamalarda isteğe bağlı gizleme
 - Albüm kapağı veya kaynak rozetinden çalan parçayı Music/Spotify'da açma
-- Sistem, Beyaz, Siyah ve desteklenen macOS sürümlerinde Liquid Glass görünümü
+- 10 tema rengi ve hem çentiğe hem ayarlar penceresine sinen ton seçimi
 - Türkçe/İngilizce ilk kurulum rehberi
 - Açılışta başlatma ve Sparkle tabanlı imzalı güncellemeler
 - İsteğe bağlı Command Echo (macOS'un kendi ses/parlaklık göstergesinin yerine), Uyanık Tut ve Dosya Rafı + AirDrop modülleri
@@ -69,7 +69,7 @@ islo. is a SwiftUI + AppKit app that blends media controls and everyday utilitie
 - Selectable hover, click, or center-zone opening behavior
 - Timed track-change previews and optional hiding over full-screen apps
 - Open the current track in Music or Spotify from its artwork or source badge
-- System, White, Black, and Liquid Glass appearances on supported macOS versions
+- Ten theme colours and a tone that tints both the notch and the Settings window
 - Turkish and English first-run guide
 - Launch at login and signed Sparkle updates
 - Optional Command Echo (replaces the macOS volume and brightness indicator), Keep Awake, and File Shelf + AirDrop modules

@@ -14,7 +14,7 @@ final class SettingsWindowController: NSWindowController {
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 940, height: 690),
-            styleMask: [.titled, .closable, .miniaturizable],
+            styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
@@ -22,7 +22,16 @@ final class SettingsWindowController: NSWindowController {
             turkish: "islo. Ayarları",
             english: "islo. Settings"
         )
-        window.contentViewController = NSHostingController(rootView: rootView)
+        // The dark islo. look runs edge to edge, under the traffic lights.
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.isMovableByWindowBackground = true
+        window.appearance = NSAppearance(named: .darkAqua)
+        window.backgroundColor = NSColor(red: 0.035, green: 0.035, blue: 0.045, alpha: 1)
+        let hostingController = NSHostingController(rootView: rootView)
+        // The window sets the size; the view fills it, titlebar area included.
+        hostingController.sizingOptions = []
+        window.contentViewController = hostingController
         window.isReleasedWhenClosed = false
         centerOnPrimaryDisplay(
             window,
@@ -38,9 +47,12 @@ final class SettingsWindowController: NSWindowController {
         fatalError("init(coder:) is not supported")
     }
 
-    func present(destination: SettingsDestination? = nil) {
+    func present(destination: SettingsDestination? = nil, feature: String? = nil) {
         if let destination {
             router.requestedDestination = destination
+        }
+        if let feature {
+            router.requestedFeature = feature
         }
         router.isWindowVisible = true
         showWindow(nil)
@@ -79,6 +91,8 @@ final class OnboardingWindowController: NSWindowController {
         )
         window.titlebarAppearsTransparent = true
         window.isMovableByWindowBackground = true
+        window.appearance = NSAppearance(named: .darkAqua)
+        window.backgroundColor = NSColor(red: 0.035, green: 0.035, blue: 0.045, alpha: 1)
         window.contentViewController = NSHostingController(rootView: rootView)
         window.isReleasedWhenClosed = false
         centerOnPrimaryDisplay(

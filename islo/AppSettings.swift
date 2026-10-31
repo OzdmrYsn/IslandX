@@ -12,6 +12,31 @@ enum PermissionState: Equatable {
     case appNotInstalled
 }
 
+/// Folders macOS guards (Desktop, Documents, Downloads) that islo. watches.
+enum ProtectedFolder: String, CaseIterable, Identifiable {
+    /// Where screenshots are saved; Desktop unless the user changed it.
+    case screenshots
+    case downloads
+
+    var id: String { rawValue }
+
+    /// The privacy service macOS files access to this folder under, or nil
+    /// when the folder isn't one macOS guards.
+    static func privacyService(for url: URL) -> String? {
+        let home = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL.path
+        let path = url.standardizedFileURL.path
+        for (folder, service) in [
+            ("Desktop", "SystemPolicyDesktopFolder"),
+            ("Documents", "SystemPolicyDocumentsFolder"),
+            ("Downloads", "SystemPolicyDownloadsFolder"),
+        ] {
+            let guarded = home + "/" + folder
+            if path == guarded || path.hasPrefix(guarded + "/") { return service }
+        }
+        return nil
+    }
+}
+
 /// Apps islo. controls through Apple Events.
 enum AutomationTarget: String, CaseIterable, Identifiable {
     case music = "com.apple.Music"
@@ -23,79 +48,6 @@ enum AutomationTarget: String, CaseIterable, Identifiable {
         switch self {
         case .music: "Music"
         case .spotify: "Spotify"
-        }
-    }
-}
-
-enum AppTheme: String, CaseIterable, Identifiable {
-    case system
-    case light
-    case dark
-    case liquidGlass
-
-    var id: String { rawValue }
-
-    func title(language: AppLanguage) -> String {
-        switch self {
-        case .system: language.value(turkish: "Sistem", english: "System")
-        case .light: language.value(turkish: "Beyaz", english: "Light")
-        case .dark: language.value(turkish: "Siyah", english: "Dark")
-        case .liquidGlass: "Liquid Glass"
-        }
-    }
-
-    func subtitle(language: AppLanguage) -> String {
-        switch self {
-        case .system:
-            language.value(
-                turkish: "macOS görünümünü izler",
-                english: "Follows macOS appearance"
-            )
-        case .light:
-            language.value(
-                turkish: "Aydınlık beyaz kontroller",
-                english: "Bright white controls"
-            )
-        case .dark:
-            language.value(
-                turkish: "Derin siyah kontroller",
-                english: "Deep black controls"
-            )
-        case .liquidGlass:
-            language.value(
-                turkish: "Sistem camı ve canlı yansımalar",
-                english: "System glass and live reflections"
-            )
-        }
-    }
-
-    var symbolName: String {
-        switch self {
-        case .system: "circle.lefthalf.filled"
-        case .light: "sun.max.fill"
-        case .dark: "moon.stars.fill"
-        case .liquidGlass: "sparkles"
-        }
-    }
-
-    var colorScheme: ColorScheme? {
-        switch self {
-        case .system: nil
-        case .light: .light
-        case .dark: .dark
-        case .liquidGlass: nil
-        }
-    }
-
-    var isAvailable: Bool {
-        switch self {
-        case .liquidGlass:
-            if #available(macOS 26.0, *) {
-                return true
-            }
-            return false
-        default:
-            return true
         }
     }
 }
@@ -368,13 +320,6 @@ final class AppSettings: ObservableObject {
 
     private let defaults: UserDefaults
 
-    @Published var theme: AppTheme {
-        didSet {
-            defaults.set(theme.rawValue, forKey: Key.theme)
-            applyApplicationAppearance()
-        }
-    }
-
     @Published var language: AppLanguage {
         didSet {
             defaults.set(language.rawValue, forKey: Key.language)
@@ -555,15 +500,17 @@ final class AppSettings: ObservableObject {
     @Published private(set) var launchAtLoginError: String?
     @Published private(set) var isAccessibilityTrusted = AXIsProcessTrusted()
     @Published private(set) var automationStates: [AutomationTarget: PermissionState] = [:]
+    /// Only folders whose feature is on and that macOS guards.
+    @Published private(set) var folderStates: [ProtectedFolder: PermissionState] = [:]
     private var isCheckingAutomation = false
+    private var checkingFolders: Set<ProtectedFolder> = []
 
     private init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
 
-        let savedTheme = AppTheme(
-            rawValue: defaults.string(forKey: Key.theme) ?? ""
-        ) ?? .system
-        theme = savedTheme.isAvailable ? savedTheme : .system
+        // islo.'s windows now always use its own dark look; the old
+        // System/Light/Dark/Liquid Glass choice is gone.
+        defaults.removeObject(forKey: Key.theme)
 
         language = AppLanguage(
             rawValue: defaults.string(forKey: Key.language) ?? ""
@@ -701,17 +648,6 @@ final class AppSettings: ObservableObject {
         defaults.set(true, forKey: Key.onboardingCompleted)
     }
 
-    func applyApplicationAppearance() {
-        switch theme {
-        case .system, .liquidGlass:
-            NSApp.appearance = nil
-        case .light:
-            NSApp.appearance = NSAppearance(named: .aqua)
-        case .dark:
-            NSApp.appearance = NSAppearance(named: .darkAqua)
-        }
-    }
-
     func resetInteractionDefaults() {
         activationMode = .hover
         collapseDelay = 0.28
@@ -787,6 +723,7 @@ final class AppSettings: ObservableObject {
     var missingPermissionCount: Int {
         (isAccessibilityTrusted ? 0 : 1)
             + automationStates.values.filter { $0 == .missing }.count
+            + folderStates.values.filter { $0 == .missing }.count
             + (calendarEnabled && CalendarManager.shared.authorization == .missing ? 1 : 0)
     }
 
@@ -799,6 +736,73 @@ final class AppSettings: ObservableObject {
         }
         CalendarManager.shared.refreshAuthorization()
         refreshAutomationStates()
+        refreshFolderStates()
+    }
+
+    func folderURL(_ folder: ProtectedFolder) -> URL {
+        switch folder {
+        case .screenshots:
+            ScreenshotMonitor.saveLocation
+        case .downloads:
+            FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Downloads", isDirectory: true)
+        }
+    }
+
+    func isFolderFeatureEnabled(_ folder: ProtectedFolder) -> Bool {
+        switch folder {
+        case .screenshots: screenshotPreviewEnabled
+        case .downloads: downloadsEnabled
+        }
+    }
+
+    /// Asks macOS for a folder again. Once access was turned off it never
+    /// asks by itself, so islo.'s own entry is cleared first.
+    func requestFolderAccess(_ folder: ProtectedFolder) {
+        let url = folderURL(folder)
+        guard let service = ProtectedFolder.privacyService(for: url) else { return }
+        let wasMissing = folderStates[folder] == .missing
+        DispatchQueue.global(qos: .userInitiated).async {
+            if wasMissing { Self.resetPermission(service: service) }
+            // Touching the folder is what makes macOS show its prompt.
+            let state = Self.folderState(at: url)
+            DispatchQueue.main.async { [weak self] in
+                self?.refreshPermissionState()
+                if state == .missing { self?.openPrivacySettings("Privacy_FilesAndFolders") }
+            }
+        }
+    }
+
+    private func refreshFolderStates() {
+        for folder in ProtectedFolder.allCases {
+            let url = folderURL(folder)
+            guard isFolderFeatureEnabled(folder),
+                  ProtectedFolder.privacyService(for: url) != nil else {
+                if folderStates[folder] != nil { folderStates[folder] = nil }
+                continue
+            }
+            // Each folder on its own: a check waiting on macOS's prompt for
+            // one folder mustn't hold up the other.
+            guard !checkingFolders.contains(folder) else { continue }
+            checkingFolders.insert(folder)
+            DispatchQueue.global(qos: .utility).async {
+                let state = Self.folderState(at: url)
+                DispatchQueue.main.async { [weak self] in
+                    guard let self else { return }
+                    checkingFolders.remove(folder)
+                    guard isFolderFeatureEnabled(folder) else { return }
+                    if folderStates[folder] != state { folderStates[folder] = state }
+                }
+            }
+        }
+    }
+
+    /// Opening a guarded folder fails with EPERM while access is off.
+    nonisolated private static func folderState(at url: URL) -> PermissionState {
+        guard let directory = opendir(url.path) else {
+            return errno == EPERM || errno == EACCES ? .missing : .granted
+        }
+        closedir(directory)
+        return .granted
     }
 
     func requestAccessibilityPermission() {

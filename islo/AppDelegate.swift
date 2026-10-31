@@ -25,7 +25,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var settingsWindowController: SettingsWindowController?
     private var onboardingWindowController: OnboardingWindowController?
     private var statusItem: NSStatusItem?
-    private var themeMenuItems: [AppTheme: NSMenuItem] = [:]
     private var notchModeMenuItems: [NotchIdleMode: NSMenuItem] = [:]
     private var activationModeMenuItems: [NotchActivationMode: NSMenuItem] = [:]
     private var launchAtLoginMenuItem: NSMenuItem?
@@ -37,7 +36,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // The app lives in the menu bar and notch without occupying the Dock.
         NSApp.setActivationPolicy(.accessory)
         applyDockIcon()
-        settings.applyApplicationAppearance()
         configureMenuBarItem()
         observeSettings()
         // Menu-bar apps are rarely "active", so read permissions at launch too.
@@ -119,9 +117,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
-        for (theme, item) in themeMenuItems {
-            item.state = settings.theme == theme ? .on : .off
-        }
         for (mode, item) in notchModeMenuItems {
             item.state = settings.notchIdleMode == mode ? .on : .off
         }
@@ -174,7 +169,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if let statusItem {
             NSStatusBar.system.removeStatusItem(statusItem)
         }
-        themeMenuItems.removeAll()
         notchModeMenuItems.removeAll()
         activationModeMenuItems.removeAll()
 
@@ -216,22 +210,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             )
         )
         menu.addItem(.separator())
-
-        let appearanceTitle = localized("Görünüm", "Appearance")
-        let appearanceItem = NSMenuItem(title: appearanceTitle, action: nil, keyEquivalent: "")
-        let appearanceMenu = NSMenu(title: appearanceTitle)
-        for (index, theme) in AppTheme.allCases.enumerated() {
-            let themeItem = menuItem(
-                title: theme.title(language: settings.language),
-                action: #selector(selectTheme(_:))
-            )
-            themeItem.tag = index
-            themeItem.isEnabled = theme.isAvailable
-            appearanceMenu.addItem(themeItem)
-            themeMenuItems[theme] = themeItem
-        }
-        appearanceItem.submenu = appearanceMenu
-        menu.addItem(appearanceItem)
 
         let notchModeTitle = localized(
             "Çentik Boşta Görünümü",
@@ -445,14 +423,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc
-    private func selectTheme(_ sender: NSMenuItem) {
-        guard AppTheme.allCases.indices.contains(sender.tag) else { return }
-        let theme = AppTheme.allCases[sender.tag]
-        guard theme.isAvailable else { return }
-        settings.theme = theme
-    }
-
-    @objc
     private func selectActivationMode(_ sender: NSMenuItem) {
         guard NotchActivationMode.allCases.indices.contains(sender.tag) else {
             return
@@ -488,7 +458,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         presentSettings(destination: nil)
     }
 
-    private func presentSettings(destination: SettingsDestination?) {
+    private func presentSettings(destination: SettingsDestination?, feature: String? = nil) {
         if settingsWindowController == nil {
             settingsWindowController = SettingsWindowController(
                 settings: settings,
@@ -498,7 +468,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             )
         }
 
-        settingsWindowController?.present(destination: destination)
+        settingsWindowController?.present(destination: destination, feature: feature)
     }
 
     private func showOnboarding() {
@@ -578,6 +548,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 isAllDay: false, joinURL: URL(string: "https://meet.google.com/abc-defg-hij"),
                 color: .systemPurple
             ))
+        case let command where command.hasPrefix("settings"):
+            // "settings" or "settings:<page>", e.g. "settings:features".
+            let page = command.split(separator: ":").dropFirst().first.map(String.init)
+            presentSettings(destination: page.flatMap(SettingsDestination.init(rawValue:)))
+        case let command where command.hasPrefix("feature:"):
+            // A feature's details, e.g. "feature:timer".
+            presentSettings(destination: nil, feature: String(command.dropFirst("feature:".count)))
         default:
             break
         }

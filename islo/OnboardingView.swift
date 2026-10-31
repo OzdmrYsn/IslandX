@@ -22,7 +22,7 @@ struct OnboardingView: View {
         }
         .frame(width: 1040, height: 680)
         .background(background)
-        .preferredColorScheme(settings.theme.colorScheme)
+        .preferredColorScheme(.dark)
         .tint(accent)
     }
 
@@ -94,9 +94,8 @@ struct OnboardingView: View {
             eyebrow(text("GÖRÜNÜM", "APPEARANCE"))
             Text(text("Çentik, Mac'inizin\nbir parçası gibi.", "A notch that feels\npart of your Mac."))
                 .font(.system(size: 38, weight: .bold, design: .rounded)).tracking(-0.8)
-            Text(text("Tema rengini, pencere görünümünü ve islo.'nun boşta nasıl görüneceğini seçin.", "Choose the theme color, the window look, and how islo. looks while idle."))
+            Text(text("Tema rengini ve islo.'nun boşta nasıl görüneceğini seçin.", "Choose the theme color and how islo. looks while idle."))
                 .font(.system(size: 15)).foregroundStyle(.secondary)
-            ThemeChoicePicker(selection: $settings.theme, language: settings.language, accent: accent)
             AccentSwatchPicker(selection: $settings.accentTheme, language: settings.language)
             Picker("", selection: $settings.notchIdleMode) {
                 ForEach(NotchIdleMode.allCases) { mode in Text(mode.title(language: settings.language)).tag(mode) }
@@ -169,10 +168,7 @@ struct OnboardingView: View {
     }
 
     private var background: some View {
-        ZStack {
-            Color(nsColor: .windowBackgroundColor)
-            LinearGradient(colors: [accent.opacity(0.055), .clear, Color.pink.opacity(0.035)], startPoint: .topLeading, endPoint: .bottomTrailing)
-        }
+        IsloWindowBackground(accent: accent, tone: settings.surfaceTone)
     }
 
     private func eyebrow(_ value: String) -> some View {
