@@ -19,7 +19,8 @@ const copy = {
       calendar: 'Takvim: bu hafta ve gerçek etkinliklerin; video görüşmelerine tek tıkla katıl.',
       timer: 'Zamanlayıcı: kadranı çevir ya da −/+ ile istediğin süre; sağda bugünkü odağın.',
       shelf: 'Dosya Rafı: sürükle bırak; küçük resimler, filtreler ve AirDrop.',
-      clipboard: 'Pano: son kopyaların; bağlantılar tek tıkla açılır.'
+      clipboard: 'Pano: son kopyaların; bağlantılar tek tıkla açılır.',
+      shortcuts: 'Kısayollar: sık kullandığın yedi kısayola kadar, her biri tek tıkla; Pomodoro odak başlarken ve biterken de birini çalıştırabilir.'
     },
     notchLabel: 'islo. çentiği — açmak için tıklayın'
   },
@@ -30,7 +31,8 @@ const copy = {
       calendar: 'Calendar: this week and your real events; join video calls in one click.',
       timer: 'Timer: turn the dial or use −/+ for any length; today’s focus on the right.',
       shelf: 'File Shelf: drag and drop, with thumbnails, filters, and AirDrop.',
-      clipboard: 'Clipboard: your recent copies; links open in one click.'
+      clipboard: 'Clipboard: your recent copies; links open in one click.',
+      shortcuts: 'Shortcuts: up to seven of your favorites, one click each; Pomodoro can also run one when focus starts and ends.'
     },
     notchLabel: 'The islo. notch — click to open'
   }
@@ -71,6 +73,7 @@ function setLanguage(next) {
   updateThemeName();
   renderTimer();
   renderLyric(false);
+  fitTabs();
 }
 
 $$('[data-language]').forEach((button) => {
@@ -238,6 +241,7 @@ let volumeTimer = null;
 function setState(state) {
   notch.dataset.state = state;
   if (state === 'volume') animateVolume();
+  if (state === 'download') animateDownload();
 }
 
 function animateVolume() {
@@ -251,6 +255,30 @@ function animateVolume() {
   }, 110);
 }
 
+/* A download in the wings: the green ring fills, then "Downloaded". */
+const ringLength = 2 * Math.PI * 9;
+const downloadPct = $('.js-dl-pct');
+const downloadRing = $('.js-dl-ring');
+let downloadTimer = null;
+
+function renderRing(label, ring, value) {
+  label.dataset.v = String(value);
+  label.textContent = pct(value);
+  ring.style.strokeDashoffset = String(ringLength * (1 - value / 100));
+}
+
+function animateDownload() {
+  clearInterval(downloadTimer);
+  if (reduceMotion) { renderRing(downloadPct, downloadRing, 64); return; }
+  let value = 0;
+  renderRing(downloadPct, downloadRing, value);
+  downloadTimer = setInterval(() => {
+    value = Math.min(value + 4, 100);
+    renderRing(downloadPct, downloadRing, value);
+    if (value >= 100) clearInterval(downloadTimer);
+  }, 90);
+}
+
 /* The hero's story: a day with islo., one moment after another. */
 const story = [
   ['idle', 1000],
@@ -259,7 +287,10 @@ const story = [
   ['countdown', 2800],
   ['timesup', 2600],
   ['music', 1400],
+  ['screenshot', 3800],
   ['meeting', 3600],
+  ['download', 2600],
+  ['downloaded', 3000],
   ['charging', 2600],
   ['airpods', 3000],
   ['privacy', 2600],
@@ -267,8 +298,11 @@ const story = [
   ['music', 2000]
 ];
 
-const flashDurations = { notification: 4200, meeting: 4200, airpods: 3600, timesup: 3000 };
-const sequences = { devices: [['charging', 2600], ['airpods', 3200]] };
+const flashDurations = { notification: 4200, meeting: 4200, airpods: 3600, timesup: 3000, screenshot: 4400, downloaded: 3400 };
+const sequences = {
+  devices: [['charging', 2600], ['airpods', 3200]],
+  downloads: [['download', 2600], ['downloaded', 3400]]
+};
 
 function stopStory() {
   clearTimeout(storyTimer);
@@ -417,21 +451,76 @@ const tabOrder = tabs.map((tab) => tab.dataset.tab);
 let autoTab = !reduceMotion;
 let tabTimer = null;
 let lyricsTourTimer = null;
+let shortcutsTourTimer = null;
 
 function stopTour() {
   autoTab = false;
   clearTimeout(tabTimer);
   clearTimeout(lyricsTourTimer);
+  clearTimeout(shortcutsTourTimer);
 }
 
 function selectTab(tab) {
   dash.dataset.tab = tab;
   tabs.forEach((button) => button.setAttribute('aria-selected', String(button.dataset.tab === tab)));
+  fitTabs();
   updateCaption();
   setOutputs(false);
   setLyrics(false);
   scheduleLyricsTour();
+  scheduleShortcutsTour();
 }
+
+/* Like the app: if the selected tab's name doesn't fit beside the camera
+   housing, every tab shows its icon only. Widths mirror styles.css. */
+function fitTabs() {
+  const row = $('.d-tabs', dash);
+  const available = (dash.offsetWidth - $('.d-housing', dash).offsetWidth) / 2;
+  let needed = 12 + 4 * (tabs.length - 1);
+  tabs.forEach((tab) => {
+    const badge = $('em', tab);
+    const badgeWidth = badge ? 4 + badge.offsetWidth : 0;
+    needed += tab.dataset.tab === dash.dataset.tab
+      ? 20 + 13 + 5 + $('span', tab).scrollWidth + badgeWidth
+      : Math.max(27, 13 + badgeWidth);
+  });
+  row.classList.toggle('icons-only', needed > available);
+}
+
+/* Shortcuts: a click runs the tile — a spinner, then a check. */
+const shortcutTimers = new Map();
+function runShortcut(tile) {
+  if (!tile) return;
+  clearTimeout(shortcutTimers.get(tile));
+  tile.classList.remove('done');
+  tile.classList.add('running');
+  shortcutTimers.set(tile, setTimeout(() => {
+    tile.classList.replace('running', 'done');
+    shortcutTimers.set(tile, setTimeout(() => tile.classList.remove('done'), 1800));
+  }, reduceMotion ? 300 : 1200));
+}
+$$('.sc-tile:not(.sc-edit)').forEach((tile) => {
+  tile.addEventListener('click', () => { stopTour(); runShortcut(tile); });
+});
+
+/* On the tour, the first shortcut runs once the tab is showing. */
+function scheduleShortcutsTour() {
+  clearTimeout(shortcutsTourTimer);
+  if (!autoTab || dash.dataset.tab !== 'shortcuts') return;
+  shortcutsTourTimer = setTimeout(() => {
+    if (autoTab && dash.dataset.tab === 'shortcuts') runShortcut($('.sc-tile', dash));
+  }, 1400);
+}
+
+/* A moment card can open a tab in the showcase above it. */
+$$('[data-show-tab]').forEach((button) => {
+  button.addEventListener('click', () => {
+    stopTour();
+    selectTab(button.dataset.showTab);
+    $('#device').scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' });
+    if (button.dataset.showTab === 'shortcuts') setTimeout(() => runShortcut($('.sc-tile', dash)), reduceMotion ? 0 : 900);
+  });
+});
 
 /* On the tour, Home turns its lyrics on halfway through. */
 function scheduleLyricsTour() {
@@ -477,9 +566,11 @@ const deviceObserver = new IntersectionObserver((entries) => {
     if (entry.isIntersecting) {
       scheduleNextTab();
       if (!mediaCard.classList.contains('show-lyrics')) scheduleLyricsTour();
+      scheduleShortcutsTour();
     } else {
       clearTimeout(tabTimer);
       clearTimeout(lyricsTourTimer);
+      clearTimeout(shortcutsTourTimer);
     }
   });
 }, { threshold: 0.4 });
@@ -782,6 +873,28 @@ dial.addEventListener('pointermove', (event) => {
   dial.addEventListener(type, () => { draggingDial = false; });
 });
 
+/* Mini download in the moments section: the ring fills, then it's done. */
+const miniDownload = $('.js-mini-dl');
+if (miniDownload) {
+  const miniPct = $('.js-mini-dl-pct', miniDownload);
+  const miniRing = $('.js-mini-dl-ring', miniDownload);
+  renderRing(miniPct, miniRing, 64);
+  if (!reduceMotion) {
+    let value = 0;
+    let hold = 0;
+    setInterval(() => {
+      if (hold > 0) {
+        hold -= 1;
+        if (!hold) { miniDownload.classList.remove('done'); value = 0; renderRing(miniPct, miniRing, 0); }
+        return;
+      }
+      value = Math.min(value + 5, 100);
+      renderRing(miniPct, miniRing, value);
+      if (value >= 100) { miniDownload.classList.add('done'); hold = 22; }
+    }, 120);
+  }
+}
+
 /* Mini volume HUD in the moments section. */
 const miniVolume = $('.js-mini-vol');
 if (miniVolume && !reduceMotion) {
@@ -817,5 +930,7 @@ let initialLanguage = navigator.language.toLowerCase().startsWith('tr') ? 'tr' :
 try { initialLanguage = localStorage.getItem('islo-language') || initialLanguage; } catch { /* ignore */ }
 setLanguage(initialLanguage);
 
+renderRing(downloadPct, downloadRing, reduceMotion ? 64 : 0);
 fitDash();
+if (document.fonts) document.fonts.ready.then(fitTabs);
 playStory(0);
