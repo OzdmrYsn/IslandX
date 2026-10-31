@@ -1299,33 +1299,78 @@ struct ScreenshotCapture: Equatable {
 
 /// Watches a folder and reports names that appear in it (new files and
 /// files renamed into it, like a finished download dropping .crdownload).
+/// Opening a folder macOS guards (Desktop, Downloads) waits until the user
+/// answers macOS's permission prompt, so all file access runs on a
+/// background queue; `onNew` is called there too.
 final class FolderWatcher {
     let url: URL
-    private var source: DispatchSourceFileSystemObject?
-    private var known: Set<String>
-    private let onNew: ([URL]) -> Void
+    private let state: State
 
-    init?(url: URL, onNew: @escaping ([URL]) -> Void) {
-        let descriptor = open(url.path, O_EVTONLY)
-        guard descriptor >= 0 else { return nil }
+    init(url: URL, onNew: @escaping ([URL]) -> Void) {
         self.url = url
-        self.onNew = onNew
-        known = Set((try? FileManager.default.contentsOfDirectory(atPath: url.path)) ?? [])
-        let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: descriptor, eventMask: .write, queue: .main)
-        source.setEventHandler { [weak self] in self?.scan() }
-        source.setCancelHandler { close(descriptor) }
-        source.resume()
-        self.source = source
+        let state = State(url: url, onNew: onNew)
+        self.state = state
+        state.queue.async { state.start() }
     }
 
-    deinit { source?.cancel() }
+    deinit {
+        let state = state
+        state.queue.async { state.stop() }
+    }
 
-    private func scan() {
-        let names = Set((try? FileManager.default.contentsOfDirectory(atPath: url.path)) ?? [])
-        let added = names.subtracting(known).filter { !$0.hasPrefix(".") }
-        known = names
-        guard !added.isEmpty else { return }
-        onNew(added.sorted().map { url.appendingPathComponent($0) })
+    /// Everything here runs on `queue` only.
+    private final class State {
+        let url: URL
+        let onNew: ([URL]) -> Void
+        let queue = DispatchQueue(label: "islo.folder-watcher", qos: .utility)
+        private var source: DispatchSourceFileSystemObject?
+        private var known: Set<String> = []
+        /// The folder couldn't be listed yet (macOS hadn't allowed access);
+        /// its first readable listing is what was already there, not new.
+        private var needsBaseline = false
+        private var isStopped = false
+
+        init(url: URL, onNew: @escaping ([URL]) -> Void) {
+            self.url = url
+            self.onNew = onNew
+        }
+
+        func start() {
+            guard !isStopped else { return }
+            let descriptor = open(url.path, O_EVTONLY)
+            guard descriptor >= 0 else { return }
+            if let names = try? FileManager.default.contentsOfDirectory(atPath: url.path) {
+                known = Set(names)
+            } else {
+                needsBaseline = true
+            }
+            let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: descriptor, eventMask: .write, queue: queue)
+            source.setEventHandler { [weak self] in self?.scan() }
+            source.setCancelHandler { close(descriptor) }
+            source.resume()
+            self.source = source
+        }
+
+        func stop() {
+            isStopped = true
+            source?.cancel()
+            source = nil
+        }
+
+        private func scan() {
+            guard !isStopped,
+                  let listing = try? FileManager.default.contentsOfDirectory(atPath: url.path) else { return }
+            let names = Set(listing)
+            if needsBaseline {
+                needsBaseline = false
+                known = names
+                return
+            }
+            let added = names.subtracting(known).filter { !$0.hasPrefix(".") }
+            known = names
+            guard !added.isEmpty else { return }
+            onNew(added.sorted().map { url.appendingPathComponent($0) })
+        }
     }
 
     static func hasAttribute(_ name: String, at url: URL) -> Bool {
