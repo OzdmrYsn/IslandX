@@ -4,6 +4,7 @@ import Combine
 import CoreAudio
 import Darwin
 import IOKit.graphics
+import OSLog
 import QuickLookThumbnailing
 import UniformTypeIdentifiers
 
@@ -736,6 +737,8 @@ extension ClipboardEntry {
     }
 }
 
+private let notificationLog = Logger(subsystem: "com.ozdmrysn.islo", category: "notifications")
+
 /// A notification macOS showed as a banner, read through Accessibility.
 struct CapturedNotification: Identifiable, Equatable {
     let id: String
@@ -774,6 +777,7 @@ final class NotificationMonitor: ObservableObject {
     private var isScanning = false
     private var hasBaseline = false
     private var seenIdentifiers: [String] = []
+    private var loggedUnreadable: Set<String> = []
 
     func setEnabled(_ enabled: Bool) {
         guard enabled != (timer != nil) else { return }
@@ -821,23 +825,31 @@ final class NotificationMonitor: ObservableObject {
         let pid = center.processIdentifier
         // Accessibility calls are cross-process; keep them off the main thread.
         scanQueue.async { [weak self] in
-            let banners = Self.readBanners(processIdentifier: pid)
+            let scan = Self.readBanners(processIdentifier: pid)
             Task { @MainActor in
                 self?.isScanning = false
-                self?.ingest(banners)
+                self?.ingest(scan)
             }
         }
     }
 
-    private func ingest(_ banners: [RawBanner]) {
-        let fresh = banners.filter { !seenIdentifiers.contains($0.id) }
-        seenIdentifiers.append(contentsOf: fresh.map(\.id))
+    private func ingest(_ scan: BannerScan) {
+        // Say once per kind, so a future macOS layout change shows up in
+        // the system log instead of notifications silently going missing.
+        for subrole in Set(scan.unreadable) where !loggedUnreadable.contains(subrole) {
+            loggedUnreadable.insert(subrole)
+            notificationLog.info("Couldn't read a notification element: \(subrole, privacy: .public)")
+        }
+        let banners = scan.banners
+        let fresh = banners.filter { !seenIdentifiers.contains($0.key) }
+        seenIdentifiers.append(contentsOf: fresh.map(\.key))
         if seenIdentifiers.count > 400 {
             seenIdentifiers.removeFirst(seenIdentifiers.count - 400)
         }
 
-        // Banners already on screen when monitoring starts aren't new.
-        guard hasBaseline else {
+        // Banners already on screen when monitoring starts aren't new, and
+        // neither is the history the user sees in an open Notification Center.
+        guard hasBaseline, !scan.isCenterOpen else {
             hasBaseline = true
             return
         }
@@ -847,7 +859,7 @@ final class NotificationMonitor: ObservableObject {
 
         let captured = fresh.map { banner in
             CapturedNotification(
-                id: banner.id,
+                id: banner.key,
                 appName: banner.appName,
                 bundleIdentifier: Self.bundleIdentifier(forAppNamed: banner.appName),
                 title: banner.title,
@@ -875,52 +887,82 @@ final class NotificationMonitor: ObservableObject {
         let title: String
         let subtitle: String
         let body: String
+
+        /// A stack keeps its identifier while new messages replace its top
+        /// one (e.g. several WhatsApp messages from one chat), so the text
+        /// is part of what makes a notification new.
+        var key: String { [id, title, subtitle, body].joined(separator: "\u{1F}") }
     }
 
-    nonisolated private static func readBanners(processIdentifier: pid_t) -> [RawBanner] {
+    fileprivate struct BannerScan {
+        var banners: [RawBanner] = []
+        /// Notification Center's panel is open, listing older notifications.
+        var isCenterOpen = false
+        /// Subroles of notification elements whose text couldn't be read.
+        var unreadable: [String] = []
+    }
+
+    nonisolated private static func readBanners(processIdentifier: pid_t) -> BannerScan {
         let application = AXUIElementCreateApplication(processIdentifier)
         AXUIElementSetMessagingTimeout(application, 0.25)
-        var banners: [RawBanner] = []
+        var scan = BannerScan()
         for window in children(of: application)
         where string(window, kAXSubroleAttribute) == "AXSystemDialog" {
-            collectBanners(in: window, depth: 0, into: &banners)
+            collectBanners(in: window, depth: 0, into: &scan)
         }
-        return banners
+        return scan
     }
 
     nonisolated private static func collectBanners(
         in element: AXUIElement,
         depth: Int,
-        into banners: inout [RawBanner]
+        into scan: inout BannerScan
     ) {
-        guard depth < 8 else { return }
-        if string(element, kAXSubroleAttribute) == "AXNotificationCenterBanner" {
-            if let banner = banner(from: element) { banners.append(banner) }
+        guard depth < 10 else { return }
+        let subrole = string(element, kAXSubroleAttribute) ?? ""
+        // Single banners, stacks ("AXNotificationCenterBannerStack") and
+        // alerts all share this prefix.
+        if subrole.hasPrefix("AXNotificationCenter") {
+            if let banner = banner(from: element) {
+                scan.banners.append(banner)
+            } else {
+                scan.unreadable.append(subrole)
+            }
             return
         }
+        // Only the open panel has the history button and the widget grid.
+        if subrole == "AXOpaqueProviderGrid"
+            || string(element, kAXIdentifierAttribute) == "AXShowHistoryButton" {
+            scan.isCenterOpen = true
+        }
         for child in children(of: element) {
-            collectBanners(in: child, depth: depth + 1, into: &banners)
+            collectBanners(in: child, depth: depth + 1, into: &scan)
         }
     }
 
     nonisolated private static func banner(from element: AXUIElement) -> RawBanner? {
-        guard let id = string(element, kAXIdentifierAttribute), !id.isEmpty else {
-            return nil
-        }
+        // Texts are usually direct children, but richer banners (message
+        // apps with a sender photo) can wrap them in groups.
         var fields: [String: String] = [:]
-        for child in children(of: element) {
-            if let key = string(child, kAXIdentifierAttribute),
-               let value = string(child, kAXValueAttribute) {
-                fields[key] = value
+        collectTexts(in: element, depth: 0, fields: &fields)
+
+        let description = string(element, kAXDescriptionAttribute) ?? ""
+        var title = fields["title"] ?? ""
+        let subtitle = fields["subtitle"] ?? ""
+        var body = fields["body"] ?? ""
+        // Without named fields, fall back to the description, which reads
+        // "App, title, body".
+        if title.isEmpty && body.isEmpty {
+            let parts = description.components(separatedBy: ", ")
+            if parts.count >= 3 {
+                title = parts[1]
+                body = parts[2...].joined(separator: ", ")
+            } else if parts.count == 2 {
+                body = parts[1]
             }
         }
-        let title = fields["title"] ?? ""
-        let subtitle = fields["subtitle"] ?? ""
-        let body = fields["body"] ?? ""
         guard !(title.isEmpty && body.isEmpty) else { return nil }
 
-        // The description reads "App, title, subtitle, body".
-        let description = string(element, kAXDescriptionAttribute) ?? ""
         let leading = title.isEmpty ? body : title
         let appName: String
         if !leading.isEmpty, let range = description.range(of: ", " + leading) {
@@ -928,7 +970,29 @@ final class NotificationMonitor: ObservableObject {
         } else {
             appName = description.components(separatedBy: ", ").first ?? ""
         }
+        var id = string(element, kAXIdentifierAttribute) ?? ""
+        if id.isEmpty { id = appName }
         return RawBanner(id: id, appName: appName, title: title, subtitle: subtitle, body: body)
+    }
+
+    /// Named texts ("title", "subtitle", "body") anywhere under a banner.
+    nonisolated private static func collectTexts(
+        in element: AXUIElement,
+        depth: Int,
+        fields: inout [String: String]
+    ) {
+        guard depth < 4 else { return }
+        for child in children(of: element) {
+            if string(child, kAXRoleAttribute) == kAXStaticTextRole as String {
+                if let key = string(child, kAXIdentifierAttribute), !key.isEmpty,
+                   let value = string(child, kAXValueAttribute), !value.isEmpty,
+                   fields[key] == nil {
+                    fields[key] = value
+                }
+            } else {
+                collectTexts(in: child, depth: depth + 1, fields: &fields)
+            }
+        }
     }
 
     nonisolated private static func children(of element: AXUIElement) -> [AXUIElement] {
