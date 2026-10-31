@@ -3,6 +3,58 @@
     <channel>
         <title>islo.</title>
         <item>
+            <title>2.2.0</title>
+            <description><![CDATA[
+<style>body{font:13px -apple-system,sans-serif;line-height:1.45}h3{margin:14px 0 4px}h4{margin:10px 0 2px}ul{padding-left:18px;margin:4px 0}</style>
+<h3>Türkçe</h3>
+<p>islo. 2.2 ekran görüntülerini, indirmeleri ve kısayollarını çentiğe taşıyor; 2.1'deki mikrofon göstergesi hatasını da düzeltiyor.</p>
+<h4>Yeni</h4>
+<ul>
+<li><b>Ekran görüntüsü önizlemesi:</b> Ekran görüntüsü aldığında küçük resmi çentiğin altında açılır. Sürükleyip istediğin yere bırak ya da <b>Kopyala</b>, <b>Rafa ekle</b>, <b>Göster</b> ve <b>Sil</b> ile tek tıkla işini gör. Ekran görüntülerin nereye kaydediliyorsa orası izlenir.</li>
+<li><b>İndirme takibi:</b> İndirilenler'e gelen dosyaların ilerlemesi kapalı çentikte yeşil bir halkayla görünür; bitince <b>Aç</b> ve <b>Göster</b> düğmeleriyle haber verir. Chrome, Safari, Firefox ve AirDrop ile çalışır.</li>
+<li><b>Kısayollar sekmesi:</b> Kısayollar uygulamasından seçtiğin en fazla 7 kısayol çentikte renkli kutucuklar olarak durur ve tek tıkla çalışır.</li>
+<li><b>Pomodoro otomasyonu:</b> Odak başlarken ve bitince birer kısayol çalıştır; örneğin Rahatsız Etme'yi otomatik aç ve kapat.</li>
+</ul>
+<h4>İyileştirmeler</h4>
+<ul>
+<li>Düğmeli şeritler (ekran görüntüsü, indirme, toplantı) fare üzerindeyken kapanmaz ve panele dönüşmez.</li>
+<li>Kamera/mikrofon noktası artık müzik dalgasının ya da geri sayımın üstüne binmez.</li>
+<li>Sekme satırı kalabalıklaştığında taşmak yerine yalnızca simgelere geçer.</li>
+</ul>
+<h4>Düzeltmeler</h4>
+<ul>
+<li>Şarkı ya da herhangi bir ses çalınca mikrofon göstergesinin çıkması düzeltildi (macOS'un konuşma servisi artık mikrofon kullanımı sayılmaz).</li>
+</ul>
+<p><i>2.1 ile gelen kalıcı imza sayesinde bu güncellemede izinlerin korunur. Masaüstü'ne kaydedilen ekran görüntüleri için macOS ilk seferde bir kez erişim izni sorabilir.</i></p>
+<h3>English</h3>
+<p>islo. 2.2 brings your screenshots, downloads and Shortcuts into the notch, and fixes 2.1's microphone indicator bug.</p>
+<h4>New</h4>
+<ul>
+<li><b>Screenshot preview:</b> A new screenshot opens under the notch with its thumbnail. Drag it anywhere, or <b>Copy</b>, add to the <b>Shelf</b>, <b>Show</b> or <b>Delete</b> it in one click. Whatever folder your screenshots save to is watched.</li>
+<li><b>Download progress:</b> Files coming into Downloads show their progress as a green ring in the closed notch, and <b>Open</b> and <b>Show</b> buttons when they're done. Works with Chrome, Safari, Firefox and AirDrop.</li>
+<li><b>Shortcuts tab:</b> Up to seven shortcuts from the Shortcuts app sit in the notch as coloured tiles and run in one click.</li>
+<li><b>Pomodoro automations:</b> Run a shortcut when focus starts and when it ends, e.g. to turn Do Not Disturb on and off automatically.</li>
+</ul>
+<h4>Improvements</h4>
+<ul>
+<li>HUDs with buttons (screenshot, download, meeting) stay while the pointer is on them and no longer turn into the dashboard.</li>
+<li>The camera/microphone dot no longer sits on top of the music waveform or the countdown.</li>
+<li>When the tab row gets crowded it switches to icons instead of overflowing.</li>
+</ul>
+<h4>Fixes</h4>
+<ul>
+<li>Playing a song or any sound no longer lights the microphone indicator (macOS's speech service is no longer counted as microphone use).</li>
+</ul>
+<p><i>Thanks to the stable signing introduced in 2.1, your permissions are kept with this update. For screenshots saved to the Desktop, macOS may ask once for access.</i></p>
+]]></description>
+            <pubDate>Sat, 31 Oct 2026 05:03:55 +0300</pubDate>
+            <link>https://github.com/OzdmrYsn/islo</link>
+            <sparkle:version>18</sparkle:version>
+            <sparkle:shortVersionString>2.2.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/OzdmrYsn/islo/releases/download/v2.2.0/islo-2.2.0.zip" length="4976813" type="application/octet-stream" sparkle:edSignature="lKTG/g7EHveKid3islfwTmdZLlgYBTJpEZYxfAqjqglsfdszNqc5xGZSvEXdrKvXjD1XoXVOh8iftUgff+1SDg=="/>
+        </item>
+        <item>
             <title>2.1.0</title>
             <description><![CDATA[
 <style>body{font:13px -apple-system,sans-serif;line-height:1.45}h3{margin:14px 0 4px}h4{margin:10px 0 2px}ul{padding-left:18px;margin:4px 0}</style>
@@ -142,15 +194,6 @@
             <sparkle:shortVersionString>2.0.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
             <enclosure url="https://github.com/OzdmrYsn/islo/releases/download/v2.0.0/islo-2.0.0.zip" length="3458175" type="application/octet-stream" sparkle:edSignature="I7G6P20RQUZAGLHfqpPK1P/hiTrmoMwyGTXRlPwKlHuu/UFHZVeDccgogQOdSY6LIaCwC0pk8yF3V6HbcobtDA=="/>
-        </item>
-        <item>
-            <title>1.8.0</title>
-            <pubDate>Fri, 30 Oct 2026 15:49:23 +0300</pubDate>
-            <link>https://github.com/OzdmrYsn/islo</link>
-            <sparkle:version>14</sparkle:version>
-            <sparkle:shortVersionString>1.8.0</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/OzdmrYsn/islo/releases/download/v1.8.0/islo-1.8.0.zip" length="2413664" type="application/octet-stream" sparkle:edSignature="qZUggrBb9gXxaFUoMCj6q5w0ifj04ECOJ+W5iAh2NtRnxoa5hTFyIX046Q9d4mMpZurORUy9CEkKu0iWToWuAw=="/>
         </item>
     </channel>
 </rss>
